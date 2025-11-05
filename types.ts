@@ -1,3 +1,4 @@
+
 export interface User {
   uid: string; // Changed from id: number
   email: string;
@@ -34,7 +35,7 @@ export interface FeedItem {
   type: FeedItemType;
   author: string;
   authorAvatarUrl: string;
-  timestamp: string; // This will be handled by Firestore server timestamps
+  timestamp: string; // This will be handled by Supabase server timestamps
   title?: string;
   message: string;
   likes?: number;

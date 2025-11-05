@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, AttendanceRecord, AttendanceStatus } from '../types';
 import * as api from '../services/apiService';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
@@ -7,26 +7,7 @@ import { ExclamationCircleIcon } from './icons/ExclamationCircleIcon';
 import { LockClosedIcon } from './icons/LockClosedIcon';
 import { EyeIcon } from './icons/EyeIcon';
 import { EyeOffIcon } from './icons/EyeOffIcon';
-
-const avatars = Array.from({ length: 12 }, (_, i) => `https://i.pravatar.cc/96?u=avatar${i + 1}`);
-
-const AvatarSelector: React.FC<{ onSelect: (url: string) => void, onClose: () => void }> = ({ onSelect, onClose }) => (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Choose an Avatar</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-2xl font-bold">&times;</button>
-        </div>
-        <div className="grid grid-cols-4 gap-4">
-          {avatars.map(url => (
-            <button key={url} onClick={() => onSelect(url)} className="rounded-full overflow-hidden ring-2 ring-transparent hover:ring-pink-500 focus:outline-none focus:ring-pink-500 transition-all aspect-square">
-              <img src={url} alt="Avatar option" className="w-full h-full object-cover" />
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-);
+import { CameraIcon } from './icons/CameraIcon';
 
 const StatCard: React.FC<{icon: React.ReactElement<{className?: string}>, label: string, value: number, percentage: string, color: string}> = ({ icon, label, value, percentage, color }) => (
     <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
@@ -127,8 +108,8 @@ const ChangePasswordForm: React.FC<{ currentUser: User }> = ({ currentUser }) =>
 const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) => void }> = ({ currentUser, onUpdateUserProfile }) => {
     const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
     const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         const fetchAttendance = async () => {
@@ -161,44 +142,60 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
         return ((count / totalActivities) * 100).toFixed(1);
     };
 
-    const handleAvatarChange = async (newAvatarUrl: string) => {
+    const handleAvatarClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
         setIsUpdatingAvatar(true);
         try {
-            await api.updateUser(currentUser.uid, { avatarUrl: newAvatarUrl });
-            const updatedUser = await api.getUserProfile(currentUser.uid);
-            if (updatedUser) {
-                onUpdateUserProfile(updatedUser);
-            }
-        } catch (error) {
-            console.error("Failed to update avatar", error);
+            const updatedUser = await api.uploadProfilePicture(currentUser.uid, file);
+            onUpdateUserProfile(updatedUser);
+        } catch (error: any) {
+            console.error("Failed to upload avatar:", error);
+            alert(`Error uploading image: ${error.message}`);
         } finally {
             setIsUpdatingAvatar(false);
-            setIsAvatarSelectorOpen(false);
+            // Reset file input value to allow re-uploading the same file
+            if(fileInputRef.current) fileInputRef.current.value = "";
         }
     };
     
     return (
         <div className="max-w-4xl mx-auto">
-             {isAvatarSelectorOpen && <AvatarSelector onSelect={handleAvatarChange} onClose={() => setIsAvatarSelectorOpen(false)} />}
             <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-6">My Profile</h2>
             <div className="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
                 <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-8">
                     <div className="relative flex-shrink-0 group">
-                        <img
-                            src={currentUser.avatarUrl || `https://i.pravatar.cc/128?u=${currentUser.username}`}
-                            alt={currentUser.name}
-                            className="w-24 h-24 sm:w-32 sm:h-32 rounded-full ring-4 ring-pink-500/50"
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileSelect}
+                            className="hidden"
+                            accept="image/png, image/jpeg, image/gif"
+                            disabled={isUpdatingAvatar}
                         />
-                         <button 
-                            onClick={() => setIsAvatarSelectorOpen(true)}
-                            className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                            aria-label="Change avatar"
-                         >
-                            {isUpdatingAvatar ? (
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                            ) : (
-                                'Edit'
-                            )}
+                        <button 
+                            onClick={handleAvatarClick}
+                            className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full ring-4 ring-pink-500/50 focus:outline-none focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-900 focus:ring-pink-500 disabled:cursor-not-allowed"
+                            aria-label="Change profile picture"
+                            disabled={isUpdatingAvatar}
+                        >
+                            <img
+                                src={currentUser.avatarUrl || `https://i.pravatar.cc/128?u=${currentUser.username}`}
+                                alt={currentUser.name}
+                                className="w-full h-full rounded-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
+                                {isUpdatingAvatar ? (
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                                ) : (
+                                    <CameraIcon />
+                                )}
+                            </div>
                         </button>
                     </div>
                     <div className="text-center sm:text-left">

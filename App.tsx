@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { User } from './types';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
-import Header from './components/Header';
+import Sidebar from './components/Sidebar';
 import SignUp from './components/SignUp';
 import Welcome from './components/Welcome';
 import PatronLogin from './components/PatronLogin';
@@ -12,12 +12,14 @@ import { supabase } from './services/supabaseClient';
 
 type View = 'welcome' | 'login' | 'signup' | 'dashboard' | 'patronLogin' | 'patronSignUp';
 type Theme = 'light' | 'dark';
+type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'chat' | 'profile' | 'members';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<View>('welcome');
   const [theme, setTheme] = useState<Theme>('light');
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>('feed');
 
   useEffect(() => {
     setIsLoading(true);
@@ -29,6 +31,16 @@ const App: React.FC = () => {
             if (userProfile && userProfile.status === 'APPROVED') {
                 setUser(userProfile);
                 setView('dashboard');
+                setActiveTab('feed'); // Reset tab on login
+
+                // Automatically mark attendance for today's activities on login
+                try {
+                    await api.markAttendanceOnLogin(userProfile.uid);
+                } catch (attendanceError) {
+                    console.warn("Could not mark attendance automatically:", attendanceError);
+                    // This is a non-critical error, so we don't show it to the user.
+                }
+
             } else {
                 // If user has no profile or is not approved, ensure they are logged out.
                 await api.logout();
@@ -92,7 +104,7 @@ const App: React.FC = () => {
   const appClasses = useMemo(() => {
     const classList = ['min-h-screen', 'font-sans', 'transition-colors', 'duration-300'];
     if (theme === 'light') {
-      classList.push('bg-gray-50', 'text-gray-800');
+      classList.push('bg-gray-100', 'text-gray-800');
     } else {
       classList.push('bg-gray-900', 'text-gray-200', 'dark');
     }
@@ -110,12 +122,23 @@ const App: React.FC = () => {
   const renderContent = () => {
     if (view === 'dashboard' && user) {
       return (
-        <>
-          <Header user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} />
-          <main className="p-4 sm:p-6 lg:p-8">
-            <Dashboard currentUser={user} onUpdateUserProfile={handleUpdateUserProfile} />
+        <div className="flex">
+          <Sidebar
+            user={user}
+            onLogout={handleLogout}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+          />
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 h-screen overflow-y-auto">
+            <Dashboard
+              activeTab={activeTab}
+              currentUser={user}
+              onUpdateUserProfile={handleUpdateUserProfile}
+            />
           </main>
-        </>
+        </div>
       );
     }
     if (view === 'signup') {
