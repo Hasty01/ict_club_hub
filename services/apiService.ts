@@ -390,7 +390,7 @@ export const getProjectData = async (): Promise<ProjectData> => {
     // Fetch columns and tasks in parallel, which is more efficient.
     const [columnsRes, tasksRes] = await Promise.all([
         supabase.from('project_columns').select('*').order('position', { ascending: true }),
-        supabase.from('project_tasks').select('*') // We can order tasks later if needed
+        supabase.from('project_tasks').select('*').order('position', { ascending: true })
     ]);
 
     if (columnsRes.error) throw columnsRes.error;
@@ -424,6 +424,7 @@ export const getProjectData = async (): Promise<ProjectData> => {
     }
     
     // Populate the task lists for each column by iterating through the tasks.
+    // Since tasks are pre-sorted by position, they will be added in the correct order.
     for (const task of allTasks) {
         const columnId = task.column_id.toString();
         if (columns[columnId]) {
@@ -435,13 +436,54 @@ export const getProjectData = async (): Promise<ProjectData> => {
 };
 
 
-export const moveProjectTask = async (taskId: string, destinationColumnId: string): Promise<void> => {
-    // With the new schema, moving a task is a simple update operation.
-    const { error } = await supabase
-        .from('project_tasks')
-        .update({ column_id: destinationColumnId })
-        .eq('id', taskId);
+export const moveProjectTask = async (
+    taskId: string,
+    sourceColumnId: string,
+    destinationColumnId: string,
+    newIndex: number,
+    projectData: ProjectData
+): Promise<void> => {
+
+    const updates: { id: string, column_id?: string, position: number }[] = [];
+
+    // If moving to a different column
+    if (sourceColumnId !== destinationColumnId) {
+        // 1. Update positions for all tasks in the source column (excluding the one being moved)
+        projectData.columns[sourceColumnId].taskIds
+            .filter(id => id !== taskId)
+            .forEach((id, index) => {
+                updates.push({ id, position: index });
+            });
+
+        // 2. Create the new task order for the destination column
+        const destinationTaskIds = [...projectData.columns[destinationColumnId].taskIds];
+        destinationTaskIds.splice(newIndex, 0, taskId);
         
+        // 3. Update positions for all tasks in the destination column
+        destinationTaskIds.forEach((id, index) => {
+            updates.push({ id, position: index });
+        });
+
+        // 4. Ensure the moved task's column_id is updated
+        const movedTaskUpdate = updates.find(u => u.id === taskId);
+        if (movedTaskUpdate) {
+            movedTaskUpdate.column_id = destinationColumnId;
+        } else { // Should not happen if logic is correct
+            updates.push({ id: taskId, column_id: destinationColumnId, position: newIndex });
+        }
+
+    } else { // If reordering within the same column
+        const taskIds = [...projectData.columns[sourceColumnId].taskIds];
+        const [movedTask] = taskIds.splice(taskIds.indexOf(taskId), 1);
+        taskIds.splice(newIndex, 0, movedTask);
+        
+        taskIds.forEach((id, index) => {
+            updates.push({ id, position: index });
+        });
+    }
+    
+    // Perform a single bulk update operation in Supabase
+    const { error } = await supabase.from('project_tasks').upsert(updates, { onConflict: 'id' });
     if (error) throw error;
 };
 

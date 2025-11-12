@@ -26,7 +26,9 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
     <div
       draggable={isPatron}
       onDragStart={isPatron ? (e) => onDragStart(e, task.id, columnId) : undefined}
-      className={`bg-white dark:bg-gray-800 p-4 rounded-md shadow-sm border border-gray-200 dark:border-gray-700 ${isPatron ? 'cursor-grab' : ''} ${isBeingDragged ? 'opacity-50 ring-2 ring-pink-500' : ''}`}
+      data-task-id={task.id}
+      data-dragging={isBeingDragged}
+      className={`bg-white dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-700 transform transition-all ${isPatron ? 'cursor-grab' : ''} ${isBeingDragged ? 'opacity-50 ring-2 ring-pink-500 rotate-3 scale-105 shadow-2xl' : 'shadow-sm'}`}
     >
       <p className="text-gray-800 dark:text-gray-200 mb-3">{task.content}</p>
       <div className="pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">

@@ -1,55 +1,99 @@
 import React from 'react';
-import { ProjectColumn, ProjectTask, User } from '../types';
+import { ProjectColumn as ProjectColumnType, ProjectTask, User } from '../types';
 import ProjectTaskCard from './ProjectTaskCard';
+import DropIndicator from './DropIndicator';
 
 interface ProjectColumnProps {
-  column: ProjectColumn;
+  column: ProjectColumnType;
   tasks: ProjectTask[];
   allUsers: User[];
   isPatron: boolean;
   draggedItemId: string | null;
-  dragOverColumnId: string | null;
+  dropIndicator: { columnId: string; index: number } | null;
+  setDropIndicator: (indicator: { columnId: string; index: number } | null) => void;
   onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string, sourceColumnId: string) => void;
-  onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnter: (columnId: string) => void;
-  onDragLeave: () => void;
-  onDrop: (e: React.DragEvent<HTMLDivElement>, destinationColumnId: string) => void;
+  onDrop: (destinationColumnId: string) => void;
   onDeleteTask: (taskId: string, columnId: string) => void;
-  // FIX: Changed assigneeId from number | undefined to string | undefined to match the type in ProjectTask and the event handler.
   onAssignTask: (taskId: string, assigneeId: string | undefined) => void;
 }
 
+const getDragAfterElement = (container: HTMLElement, y: number) => {
+    const draggableElements = [...container.querySelectorAll('[data-task-id]:not([data-dragging="true"])')] as HTMLElement[];
+
+    // FIX: Correctly type the accumulator for the reduce function.
+    // The initial value now includes `element: undefined`, and a generic type is provided to `reduce`.
+    // This ensures the `closest` object always has the same shape (`{offset, element}`),
+    // and prevents a type error when accessing `.element` on the final result.
+    return draggableElements.reduce<{ offset: number; element: HTMLElement | undefined }>((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY, element: undefined }).element;
+};
+
+
 const ProjectColumn: React.FC<ProjectColumnProps> = (props) => {
   const { 
-    column, tasks, allUsers, isPatron, draggedItemId, dragOverColumnId,
-    onDragStart, onDragOver, onDrop, onDeleteTask, onAssignTask, onDragEnter, onDragLeave
+    column, tasks, allUsers, isPatron, draggedItemId, dropIndicator, setDropIndicator,
+    onDragStart, onDrop, onDeleteTask, onAssignTask
   } = props;
+  
+  const tasksToRender = tasks.filter(task => task.id !== draggedItemId);
 
-  const isDropTarget = isPatron && dragOverColumnId === column.id && draggedItemId !== null;
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (!isPatron || !draggedItemId) return;
+    
+    const afterElement = getDragAfterElement(e.currentTarget, e.clientY);
+    const newIndex = afterElement 
+        ? tasksToRender.findIndex(t => t.id === afterElement.dataset.taskId) 
+        : tasksToRender.length;
+
+    setDropIndicator({ columnId: column.id, index: newIndex });
+  };
+
+  const handleDragLeave = () => {
+    setDropIndicator(null);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (!isPatron) return;
+    onDrop(column.id);
+  };
 
   return (
     <div
-      onDragOver={isPatron ? onDragOver : undefined}
-      onDrop={isPatron ? (e) => onDrop(e, column.id) : undefined}
-      onDragEnter={isPatron ? () => onDragEnter(column.id) : undefined}
-      onDragLeave={isPatron ? onDragLeave : undefined}
-      className={`bg-gray-100 dark:bg-gray-800/50 rounded-lg p-4 w-80 flex-shrink-0 border border-gray-200 dark:border-gray-700 transition-colors duration-200 ${isDropTarget ? 'bg-gray-200 dark:bg-gray-700/80' : ''}`}
+      className="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-4 w-80 flex-shrink-0 border border-gray-200 dark:border-gray-700"
     >
       <h3 className="font-bold text-gray-700 dark:text-gray-300 mb-4">{column.title} ({tasks.length})</h3>
-      <div className="space-y-3 min-h-[200px]">
-        {tasks.map((task) => (
-          <ProjectTaskCard
-            key={task.id}
-            task={task}
-            columnId={column.id}
-            isBeingDragged={draggedItemId === task.id}
-            isPatron={isPatron}
-            allUsers={allUsers}
-            onDragStart={onDragStart}
-            onDeleteTask={onDeleteTask}
-            onAssignTask={onAssignTask}
-          />
+      <div 
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className="space-y-3 min-h-[200px] transition-colors"
+      >
+        {tasksToRender.length === 0 && <DropIndicator visible={!!dropIndicator && dropIndicator.columnId === column.id} />}
+        {tasksToRender.map((task, index) => (
+            <React.Fragment key={task.id}>
+                <DropIndicator visible={!!dropIndicator && dropIndicator.columnId === column.id && dropIndicator.index === index} />
+                <ProjectTaskCard
+                    task={task}
+                    columnId={column.id}
+                    isBeingDragged={draggedItemId === task.id}
+                    isPatron={isPatron}
+                    allUsers={allUsers}
+                    onDragStart={onDragStart}
+                    onDeleteTask={onDeleteTask}
+                    onAssignTask={onAssignTask}
+                />
+            </React.Fragment>
         ))}
+        <DropIndicator visible={!!dropIndicator && dropIndicator.columnId === column.id && dropIndicator.index === tasksToRender.length} />
       </div>
     </div>
   );

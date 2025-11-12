@@ -19,46 +19,39 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
   } = useData();
 
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
+  const [sourceColumnId, setSourceColumnId] = useState<string | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<{columnId: string; index: number} | null>(null);
   const [newTaskContent, setNewTaskContent] = useState('');
 
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string, sourceColumnId: string) => {
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string, colId: string) => {
     if (currentUser.role !== 'PATRON') return;
-    e.dataTransfer.setData('taskId', taskId);
-    e.dataTransfer.setData('sourceColumnId', sourceColumnId);
     setDraggedItemId(taskId);
+    setSourceColumnId(colId);
   };
   
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault(); 
-  };
-  
-  const handleDragEnter = (columnId: string) => {
-    if (draggedItemId) {
-      setDragOverColumnId(columnId);
-    }
-  };
-
-  const handleDragLeave = () => {
-    setDragOverColumnId(null);
-  };
-  
-  const handleDrop = async (e: React.DragEvent<HTMLDivElement>, destinationColumnId: string) => {
-    e.preventDefault();
-    setDragOverColumnId(null);
-    setDraggedItemId(null);
-    if (currentUser.role !== 'PATRON' || !data) return;
-
-    const taskId = e.dataTransfer.getData('taskId');
-    const sourceColumnId = e.dataTransfer.getData('sourceColumnId');
-    if (!taskId || sourceColumnId === destinationColumnId) return;
+  const handleDrop = async (destinationColumnId: string) => {
+    if (!dropIndicator || !draggedItemId || !sourceColumnId || !data) return;
     
+    const { index: newIndex } = dropIndicator;
+    
+    // Clear indicators immediately for better UX
+    const currentDraggedItemId = draggedItemId;
+    const currentSourceColumnId = sourceColumnId;
+    setDraggedItemId(null);
+    setSourceColumnId(null);
+    setDropIndicator(null);
+    
+    // Don't do anything if dropping in the exact same spot
+    if (destinationColumnId === currentSourceColumnId && data.columns[currentSourceColumnId].taskIds.indexOf(currentDraggedItemId) === newIndex) {
+        return;
+    }
+
     try {
-      await api.moveProjectTask(taskId, destinationColumnId);
-      await fetchProjectData(); // Refetch from context
+        await api.moveProjectTask(currentDraggedItemId, currentSourceColumnId, destinationColumnId, newIndex, data);
+        await fetchProjectData(); 
     } catch (error) {
-      console.error("Failed to move task:", error);
-      alert("An error occurred while moving the task. Please try again.");
+        console.error("Failed to move task:", error);
+        alert("An error occurred while moving the task. Please try again.");
     }
   };
 
@@ -140,11 +133,9 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
               allUsers={allUsers}
               isPatron={currentUser.role === 'PATRON'}
               draggedItemId={draggedItemId}
-              dragOverColumnId={dragOverColumnId}
+              dropIndicator={dropIndicator}
+              setDropIndicator={setDropIndicator}
               onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDragEnter={handleDragEnter}
-              onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onDeleteTask={handleDeleteTask}
               onAssignTask={handleAssignTask}

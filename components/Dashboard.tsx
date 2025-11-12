@@ -27,39 +27,44 @@ const LoadingIndicator: React.FC = () => (
     </div>
 );
 
+// A simple wrapper to control visibility without unmounting the component
+const TabPanel: React.FC<{ active: boolean; children: React.ReactNode }> = ({ active, children }) => (
+    <div className={active ? 'block' : 'hidden'}>
+        {children}
+    </div>
+);
+
 
 const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile, activeTab, theme }) => {
-
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'feed':
-        return <Feed currentUser={currentUser} />;
-      case 'activities':
-        return <Activities currentUser={currentUser} />;
-      case 'attendance':
-        return <Attendance currentUser={currentUser} />;
-      case 'projects':
-        return <ProjectsBoard currentUser={currentUser} />;
-      case 'chat':
-        return <Chat currentUser={currentUser} />;
-      case 'playground':
-        return <CodePlayground theme={theme} />;
-      case 'profile':
-        return <Profile currentUser={currentUser} onUpdateUserProfile={onUpdateUserProfile} />;
-      case 'members':
-        if (currentUser.role === 'PATRON') {
-          return <Members currentUser={currentUser} />;
-        }
-        return null;
-      default:
-        return <Feed currentUser={currentUser} />;
-    }
-  };
-
   return (
     <div>
       <Suspense fallback={<LoadingIndicator />}>
-        {renderContent()}
+        <TabPanel active={activeTab === 'feed'}>
+            <Feed currentUser={currentUser} />
+        </TabPanel>
+        <TabPanel active={activeTab === 'activities'}>
+            <Activities currentUser={currentUser} />
+        </TabPanel>
+        <TabPanel active={activeTab === 'attendance'}>
+            <Attendance currentUser={currentUser} />
+        </TabPanel>
+        <TabPanel active={activeTab === 'projects'}>
+            <ProjectsBoard currentUser={currentUser} />
+        </TabPanel>
+        <TabPanel active={activeTab === 'chat'}>
+            <Chat currentUser={currentUser} />
+        </TabPanel>
+        <TabPanel active={activeTab === 'playground'}>
+            <CodePlayground theme={theme} />
+        </TabPanel>
+        <TabPanel active={activeTab === 'profile'}>
+            <Profile currentUser={currentUser} onUpdateUserProfile={onUpdateUserProfile} />
+        </TabPanel>
+        {currentUser.role === 'PATRON' && (
+            <TabPanel active={activeTab === 'members'}>
+                <Members currentUser={currentUser} />
+            </TabPanel>
+        )}
       </Suspense>
     </div>
   );
