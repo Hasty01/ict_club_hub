@@ -464,35 +464,27 @@ export const assignProjectTask = async (taskId: string, assigneeId: string | und
 // --- RESOURCES API ---
 const RESOURCE_BUCKET = 'resource_uploads';
 
-export const getResources = async (): Promise<Resource[]> => {
+export const getResources = async (): Promise<Omit<Resource, 'uploaderName' | 'uploaderAvatarUrl'>[]> => {
     const { data, error } = await supabase
         .from('resources')
-        .select(`
-            *,
-            uploader:uploader_uid ( name, avatar_url )
-        `)
+        .select(`*`)
         .order('topic', { ascending: true })
         .order('created_at', { ascending: false });
 
     if (error) throw error;
     if (!data) return [];
 
-    return data.map(item => {
-        const uploaderProfile = item.uploader as { name: string; avatar_url: string } | null;
-        return {
-            id: item.id,
-            createdAt: new Date(item.created_at).toLocaleDateString(),
-            title: item.title,
-            description: item.description,
-            type: item.type,
-            topic: item.topic,
-            url: item.url,
-            filePath: item.file_path,
-            uploaderUid: item.uploader_uid,
-            uploaderName: uploaderProfile?.name || 'Unknown Uploader',
-            uploaderAvatarUrl: uploaderProfile?.avatar_url,
-        };
-    });
+    return data.map(item => ({
+        id: item.id,
+        createdAt: new Date(item.created_at).toLocaleDateString(),
+        title: item.title,
+        description: item.description,
+        type: item.type,
+        topic: item.topic,
+        url: item.url,
+        filePath: item.file_path,
+        uploaderUid: item.uploader_uid,
+    }));
 };
 
 export const addResource = async (
@@ -500,17 +492,33 @@ export const addResource = async (
     file?: File
 ): Promise<void> => {
     let filePath: string | undefined = undefined;
-    let fileUrl: string | undefined = resourceData.url;
+    let finalUrl: string | undefined = resourceData.url;
 
-    // 1. If it's a document, upload the file to storage first
+    // 1. If it's a document, upload the file and get its public URL
     if (resourceData.type === 'DOCUMENT' && file) {
-        const fileName = `${resourceData.uploaderUid}/${Date.now()}_${file.name}`;
+        // Sanitize the filename to remove special characters that might cause issues.
+        const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const fileName = `${resourceData.uploaderUid}/${Date.now()}_${safeFileName}`;
+        
         const { data: uploadData, error: uploadError } = await supabase.storage
             .from(RESOURCE_BUCKET)
             .upload(fileName, file);
 
         if (uploadError) throw uploadError;
+        
+        // Add an explicit check to ensure the upload response is valid.
+        if (!uploadData || !uploadData.path) {
+            throw new Error("File upload succeeded but the storage service did not return a valid path.");
+        }
+        
         filePath = uploadData.path;
+        
+        // Get the public URL of the uploaded file to store in the database
+        const { data: urlData } = supabase.storage
+            .from(RESOURCE_BUCKET)
+            .getPublicUrl(filePath);
+            
+        finalUrl = urlData.publicUrl;
     }
 
     // 2. Insert metadata into the 'resources' table
@@ -519,7 +527,7 @@ export const addResource = async (
         description: resourceData.description,
         type: resourceData.type,
         topic: resourceData.topic,
-        url: fileUrl,
+        url: finalUrl,
         file_path: filePath,
         uploader_uid: resourceData.uploaderUid,
     };

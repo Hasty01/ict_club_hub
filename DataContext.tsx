@@ -41,6 +41,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
+  const [rawResources, setRawResources] = useState<Omit<Resource, 'uploaderName' | 'uploaderAvatarUrl'>[]>([]);
 
   const [isLoadingActivities, setIsLoadingActivities] = useState(true);
   const [isLoadingAttendance, setIsLoadingAttendance] = useState(true);
@@ -110,16 +111,39 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   }, []);
 
   const fetchResources = useCallback(async () => {
-    setIsLoadingResources(true);
     try {
       const data = await api.getResources();
-      setResources(data);
+      setRawResources(data);
     } catch (e) {
       console.error("Failed to fetch resources", e);
-    } finally {
-      setIsLoadingResources(false);
+      setIsLoadingResources(false); // Ensure loading stops on error
     }
   }, []);
+
+  // Effect to perform the client-side join for resources
+  useEffect(() => {
+    if (isLoadingUsers) {
+      return; // Wait for users to be loaded
+    }
+
+    // FIX: Explicitly type the userMap to ensure correct type inference for `uploader`.
+    // This resolves an issue where the compiler could not determine the type of objects
+    // retrieved from the map, leading to errors when accessing properties like 'name'.
+    const userMap: Map<string, User> = new Map(allUsers.map(user => [user.uid, user]));
+
+    const enrichedResources = rawResources.map(resource => {
+      const uploader = userMap.get(resource.uploaderUid);
+      return {
+        ...resource,
+        uploaderName: uploader?.name || 'Unknown User',
+        uploaderAvatarUrl: uploader?.avatarUrl,
+      };
+    });
+    
+    setResources(enrichedResources);
+    setIsLoadingResources(false); // Mark final resources as loaded
+  }, [rawResources, allUsers, isLoadingUsers]);
+  
   
   // Fetch all data when the provider mounts (i.e., when the user logs in)
   useEffect(() => {

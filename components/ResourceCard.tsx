@@ -29,10 +29,8 @@ const ResourceCard: React.FC<ResourceCardProps> = ({ resource, currentUser, onDe
     const isPatron = currentUser.role === 'PATRON';
 
     const getActionLink = () => {
-        if (resource.type === 'DOCUMENT' && resource.filePath) {
-            // This constructs the public URL for the file in Supabase storage
-            return `${supabase.storage.from('resource_uploads').getPublicUrl(resource.filePath).data.publicUrl}`;
-        }
+        // The full public URL for all resource types is now stored in the `url` property.
+        // The `filePath` is still used for deletions but not for display.
         return resource.url || '#';
     };
 
