@@ -1,42 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import { User } from '../types';
 import * as api from '../services/apiService';
 import { TrashIcon } from './icons/TrashIcon';
 import { ArrowUpCircleIcon } from './icons/ArrowUpCircleIcon';
 import { ArrowDownCircleIcon } from './icons/ArrowDownCircleIcon';
 import { CheckIcon } from './icons/CheckIcon';
+import { useData } from '../DataContext';
 
 interface MembersProps {
     currentUser: User;
 }
 
 const Members: React.FC<MembersProps> = ({ currentUser }) => {
-    const [allUsers, setAllUsers] = useState<User[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-
-    const fetchUsers = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const users = await api.getUsers();
-            setAllUsers(users);
-        } catch (error) {
-            console.error("Failed to fetch users", error);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]);
+    const { allUsers, isLoadingUsers, allUsersError, fetchUsers } = useData();
 
     const handleAction = async (action: () => Promise<any>) => {
         try {
             await action();
-            await fetchUsers(); // Refetch after any action
-        } catch (error) {
+            await fetchUsers(); // Refetch from context after any action
+        } catch (error: any) {
             console.error("Failed to perform user action:", error);
-            alert("An error occurred. Please try again.");
+            alert(error.message || "An error occurred. Please try again.");
         }
     };
 
@@ -44,8 +28,12 @@ const Members: React.FC<MembersProps> = ({ currentUser }) => {
     const onUpdateUserRole = (uid: string, role: 'MEMBER' | 'PATRON') => handleAction(() => api.updateUser(uid, { role }));
     const onApproveUser = (uid: string) => handleAction(() => api.updateUser(uid, { status: 'APPROVED' }));
     
-    if (isLoading) {
+    if (isLoadingUsers) {
         return <div className="text-center p-8 text-gray-500 dark:text-gray-400">Loading members...</div>;
+    }
+
+    if (allUsersError) {
+        return <div className="text-center p-8 text-red-500 dark:text-red-400">{`Error fetching members: ${allUsersError}`}</div>;
     }
 
     return (

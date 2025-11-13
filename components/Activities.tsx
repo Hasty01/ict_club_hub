@@ -17,7 +17,7 @@ interface ActivityIdea {
 }
 
 const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
-  const { activities, isLoadingActivities, fetchActivities } = useData();
+  const { activities, isLoadingActivities, activitiesError, fetchActivities } = useData();
 
   // State for AI idea generation remains local
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,6 +47,26 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
       setIsIdeasLoading(false);
     }
   }, [searchQuery]);
+  
+  const renderContent = () => {
+    if (isLoadingActivities) {
+        return <p className="text-center text-gray-500 dark:text-gray-400">Loading activities...</p>;
+    }
+    if (activitiesError) {
+        return <p className="text-center text-red-500 dark:text-red-400 py-4">{`Error fetching activities: ${activitiesError}`}</p>;
+    }
+    if (activities.length > 0) {
+        return (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {activities.map((activity) => (
+                    <ActivityCard key={activity.id} activity={activity} />
+                ))}
+            </div>
+        );
+    }
+    return <p className="text-center text-gray-500 dark:text-gray-400 py-4">No activities have been added yet.</p>;
+  };
+
 
   return (
     <div>
@@ -108,17 +128,7 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
         </div>
 
         <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-6">Upcoming Activities</h2>
-        {isLoadingActivities ? (
-             <p className="text-center text-gray-500 dark:text-gray-400">Loading activities...</p>
-        ) : activities.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {activities.map((activity) => (
-                    <ActivityCard key={activity.id} activity={activity} />
-                ))}
-            </div>
-        ) : (
-            <p className="text-center text-gray-500 dark:text-gray-400 py-4">No activities have been added yet.</p>
-        )}
+        {renderContent()}
     </div>
   );
 };

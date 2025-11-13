@@ -1,5 +1,5 @@
 import React from 'react';
-import { User } from '../types';
+import { User, Tab } from '../types';
 import { LogoutIcon } from './icons/LogoutIcon';
 import { SunIcon } from './icons/SunIcon';
 import { MoonIcon } from './icons/MoonIcon';
@@ -15,8 +15,8 @@ import { CodeIcon } from './icons/CodeIcon';
 import { ChevronsLeftIcon } from './icons/ChevronsLeftIcon';
 import { ChevronsRightIcon } from './icons/ChevronsRightIcon';
 import { BookOpenIcon } from './icons/BookOpenIcon';
+import Notifications from './Notifications';
 
-type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'chat' | 'profile' | 'members' | 'playground' | 'resources';
 
 interface SidebarProps {
   user: User;
@@ -119,14 +119,17 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme,
                 </div>
             )}
           </div>
-          <div className="flex items-center justify-between">
-            <button
-              onClick={onToggleTheme}
-              className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              aria-label="Toggle theme"
-            >
-              {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-            </button>
+          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+            <div className={`flex items-center ${isCollapsed ? 'flex-col space-y-2' : 'space-x-2'}`}>
+              <button
+                onClick={onToggleTheme}
+                className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                aria-label="Toggle theme"
+              >
+                {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+              </button>
+               {user.role === 'PATRON' && <Notifications currentUser={user} setActiveTab={handleNavClick} isSidebarCollapsed={isCollapsed}/>}
+            </div>
             {!isCollapsed && (
                 <button
                 onClick={onLogout}

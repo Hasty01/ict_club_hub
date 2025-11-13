@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { User } from './types';
+import { User, Tab } from './types';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Sidebar from './components/Sidebar';
@@ -14,7 +14,6 @@ import { DataProvider } from './DataContext';
 
 type View = 'welcome' | 'login' | 'signup' | 'dashboard' | 'patronLogin' | 'patronSignUp';
 type Theme = 'light' | 'dark';
-type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'chat' | 'profile' | 'members' | 'playground' | 'resources';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);

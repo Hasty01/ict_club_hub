@@ -1,5 +1,7 @@
 
 
+export type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'chat' | 'profile' | 'members' | 'playground' | 'resources';
+
 export interface User {
   uid: string; // Changed from id: number
   email: string;
@@ -78,4 +80,13 @@ export interface Resource {
   uploaderUid: string;
   uploaderName: string;
   uploaderAvatarUrl?: string;
+}
+
+// New type for Notifications
+export interface Notification {
+  id: number;
+  createdAt: string;
+  message: string;
+  isRead: boolean;
+  linkTo?: Tab;
 }

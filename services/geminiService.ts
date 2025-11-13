@@ -42,6 +42,36 @@ export const generateActivityIdeas = async (query: string): Promise<{ ideas: { i
   }
 };
 
+export const generateAnnouncement = async (prompt: string): Promise<{ title: string, message: string }> => {
+  try {
+    const fullPrompt = `You are an AI assistant for a club patron. Your task is to generate a club announcement based on a simple prompt.
+The announcement should have a concise, engaging title and a clear, informative message.
+Format the response as a single line with the title and message separated by "::". For example: "Announcement Title::Announcement Message".
+Do not include any other text or formatting.
+
+User's prompt: "${prompt}"`;
+    
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: fullPrompt,
+    });
+    
+    const [title, message] = response.text.trim().split('::');
+
+    if (!title || !message) {
+        throw new SyntaxError("AI response was not in the expected 'Title::Message' format.");
+    }
+
+    return { title: title.trim(), message: message.trim() };
+  } catch (error) {
+    console.error("Error generating announcement:", error);
+    if (error instanceof SyntaxError) {
+        throw new Error("Failed to generate announcement from AI. The response was not in the expected format.");
+    }
+    throw new Error("Failed to generate announcement from AI. Please try again.");
+  }
+};
+
 
 export const executeCode = async (code: string): Promise<string> => {
   try {

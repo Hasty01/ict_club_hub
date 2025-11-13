@@ -1,13 +1,47 @@
 import { supabase } from './supabaseClient';
-import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, FeedItemType, ProjectColumn, Resource } from '../types';
+import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, FeedItemType, ProjectColumn, Resource, Notification, Tab } from '../types';
 import { predefinedAvatars } from '../constants';
+
+
+// --- NOTIFICATION HELPERS ---
+const sendNotificationToPatrons = async (message: string) => {
+    try {
+        const { data: patrons, error: patronError } = await supabase
+            .from('users')
+            .select('uid')
+            .eq('role', 'PATRON');
+
+        if (patronError) {
+            console.error('Error fetching patrons to notify:', patronError);
+            return; // Non-critical, so don't block the main operation
+        }
+
+        if (!patrons || patrons.length === 0) {
+            return; // No patrons to notify
+        }
+
+        const notificationsToInsert = patrons.map(patron => ({
+            recipient_uid: patron.uid,
+            message: message,
+            link_to: 'members' as Tab,
+        }));
+
+        const { error: insertError } = await supabase.from('notifications').insert(notificationsToInsert);
+
+        if (insertError) {
+            console.error('Error sending notifications:', insertError);
+        }
+    } catch (error) {
+        console.error("An unexpected error occurred while sending notifications:", error);
+    }
+};
 
 // --- AUTH API ---
 
 export const login = async (email: string, password?: string): Promise<User> => {
     if (!password) throw new Error("Password is required.");
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    if (error) throw new Error(error.message);
     if (!data.user) throw new Error("Login failed: no user returned");
 
     const userProfile = await getUserProfile(data.user.id);
@@ -22,7 +56,7 @@ export const login = async (email: string, password?: string): Promise<User> => 
 
 export const logout = async (): Promise<void> => {
     const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    if (error) throw new Error(error.message);
 };
 
 export const signUp = async (newUser: Omit<User, 'uid' | 'role' | 'status' | 'avatarUrl'> & { password: string }): Promise<void> => {
@@ -30,7 +64,7 @@ export const signUp = async (newUser: Omit<User, 'uid' | 'role' | 'status' | 'av
         email: newUser.email,
         password: newUser.password,
     });
-    if (authError) throw authError;
+    if (authError) throw new Error(authError.message);
     if (!authData.user) throw new Error("Sign up failed, no user created.");
 
     // Assign a random default avatar on sign up
@@ -46,7 +80,10 @@ export const signUp = async (newUser: Omit<User, 'uid' | 'role' | 'status' | 'av
         role: 'MEMBER',
         status: 'PENDING',
     });
-    if (profileError) throw profileError;
+    if (profileError) throw new Error(profileError.message);
+    
+    // Send notification to patrons
+    await sendNotificationToPatrons(`New user "${newUser.name}" is awaiting approval.`);
 };
 
 export const signUpAsPatron = async (newUser: Omit<User, 'uid' | 'role' | 'status' | 'avatarUrl'> & { password: string }): Promise<void> => {
@@ -54,7 +91,7 @@ export const signUpAsPatron = async (newUser: Omit<User, 'uid' | 'role' | 'statu
         email: newUser.email,
         password: newUser.password,
     });
-    if (authError) throw authError;
+    if (authError) throw new Error(authError.message);
     if (!authData.user) throw new Error("Sign up failed, no user created.");
 
     // Assign a random default avatar on sign up
@@ -70,7 +107,10 @@ export const signUpAsPatron = async (newUser: Omit<User, 'uid' | 'role' | 'statu
         role: 'PATRON',
         status: 'PENDING',
     });
-    if (profileError) throw profileError;
+    if (profileError) throw new Error(profileError.message);
+
+    // Send notification to patrons
+    await sendNotificationToPatrons(`New patron "${newUser.name}" is awaiting registration approval.`);
 };
 
 export const getUserProfile = async (uid: string): Promise<User | null> => {
@@ -94,7 +134,7 @@ export const getUserProfile = async (uid: string): Promise<User | null> => {
 
 export const getUsers = async (): Promise<User[]> => {
     const { data: usersData, error } = await supabase.from('users').select('*');
-    if (error) throw error;
+    if (error) throw new Error(error.message);
     if (!usersData || usersData.length === 0) return [];
     
     // The complex logic for fetching from `user_uploads` is removed.
@@ -114,18 +154,18 @@ export const updateUser = async (uid: string, updates: Partial<Pick<User, 'role'
     if (updates.avatarUrl) dbUpdates.avatar_url = updates.avatarUrl;
 
     const { error } = await supabase.from('users').update(dbUpdates).eq('uid', uid);
-    if (error) throw error;
+    if (error) throw new Error(error.message);
 };
 
 export const deleteUser = async (uid: string): Promise<void> => {
     // Note: In a real app, this should be a secure admin function.
     const { error } = await supabase.from('users').delete().eq('uid', uid);
-    if (error) throw error;
+    if (error) throw new Error(error.message);
 };
 
 export const changePassword = async (newPassword: string): Promise<void> => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) throw error;
+    if (error) throw new Error(error.message);
 };
 
 
@@ -133,13 +173,13 @@ export const changePassword = async (newPassword: string): Promise<void> => {
 
 export const getActivities = async (): Promise<Activity[]> => {
     const { data, error } = await supabase.from('activities').select('*').order('date', { ascending: false });
-    if (error) throw error;
+    if (error) throw new Error(error.message);
     return data || [];
 };
 
 export const addActivity = async (activityData: Omit<Activity, 'id'>): Promise<void> => {
     const { error } = await supabase.from('activities').insert(activityData);
-    if (error) throw error;
+    if (error) throw new Error(error.message);
 };
 
 // --- ATTENDANCE API ---
@@ -160,7 +200,7 @@ export const getAttendance = async (userId: string): Promise<AttendanceRecord[]>
         .eq('user_uid', userId)
         .order('date', { referencedTable: 'activities', ascending: false });
 
-    if (error) throw error;
+    if (error) throw new Error(error.message);
     
     // Map the nested structure from Supabase to the flat AttendanceRecord structure
     return (data || []).map(record => {
@@ -188,7 +228,7 @@ export const addAttendance = async (userId: string, recordData: Omit<AttendanceR
         status: recordData.status,
     };
     const { error } = await supabase.from('attendance').insert(newRecord);
-    if (error) throw error;
+    if (error) throw new Error(error.message);
 };
 
 export const markAttendanceOnLogin = async (userId: string): Promise<void> => {
@@ -203,7 +243,7 @@ export const markAttendanceOnLogin = async (userId: string): Promise<void> => {
 
     if (activityError) {
         console.error("Error fetching today's activities:", activityError);
-        throw activityError;
+        throw new Error(activityError.message);
     }
 
     if (!todaysActivities || todaysActivities.length === 0) {
@@ -221,7 +261,7 @@ export const markAttendanceOnLogin = async (userId: string): Promise<void> => {
     
     if (attendanceError) {
         console.error("Error fetching existing attendance:", attendanceError);
-        throw attendanceError;
+        throw new Error(attendanceError.message);
     }
 
     const recordedActivityIds = new Set(existingRecords?.map(r => r.activity_id)); // Use correct property name
@@ -245,7 +285,7 @@ export const markAttendanceOnLogin = async (userId: string): Promise<void> => {
 
     if (insertError) {
         console.error("Error marking attendance on login:", insertError);
-        throw insertError;
+        throw new Error(insertError.message);
     }
 
     console.log(`Successfully marked attendance for ${newRecordsToInsert.length} activities.`);
@@ -263,7 +303,7 @@ export const getFeedItems = async (): Promise<FeedItem[]> => {
         `)
         .order('created_at', { ascending: false });
     
-    if (error) throw error;
+    if (error) throw new Error(error.message);
     if (!data) return [];
     
     // The query joins with the users table via the author_uid foreign key,
@@ -290,7 +330,7 @@ export const addFeedItem = async (itemData: Omit<FeedItem, 'id' | 'author' | 'au
         author_uid: authorId,
     };
     const { error } = await supabase.from('feed_items').insert(newFeedItem);
-    if (error) throw error;
+    if (error) throw new Error(error.message);
 };
 
 // --- PROJECTS API ---
@@ -302,8 +342,8 @@ export const getProjectData = async (): Promise<ProjectData> => {
         supabase.from('project_tasks').select('*')
     ]);
 
-    if (columnsRes.error) throw columnsRes.error;
-    if (tasksRes.error) throw tasksRes.error;
+    if (columnsRes.error) throw new Error(columnsRes.error.message);
+    if (tasksRes.error) throw new Error(tasksRes.error.message);
     
     const allTasksData = tasksRes.data || [];
     const columnsData = columnsRes.data || [];
@@ -328,7 +368,6 @@ export const getProjectData = async (): Promise<ProjectData> => {
         columns[colId] = {
             id: colId,
             title: col.title,
-            // FIX: Ensure all task IDs from DB are converted to strings for consistency
             taskIds: (col.taskIds || []).map((id: any) => String(id)), 
         };
     }
@@ -360,9 +399,9 @@ export const moveProjectTask = async (
         
         const { error } = await supabase
             .from('project_columns')
-            .update({ taskIds: newSourceTaskIds.map(Number) }) // FIX: Convert string IDs to numbers for DB
-            .eq('id', sourceColumnId);
-        if (error) throw error;
+            .update({ taskIds: newSourceTaskIds.map(Number) })
+            .eq('id', Number(sourceColumnId)); // FIX: Convert string columnId to number for DB query.
+        if (error) throw new Error(error.message);
         
     } else {
         // Moving to a different column
@@ -373,32 +412,31 @@ export const moveProjectTask = async (
         const [sourceUpdateResult, destUpdateResult] = await Promise.all([
             supabase
                 .from('project_columns')
-                .update({ taskIds: newSourceTaskIds.map(Number) }) // FIX: Convert string IDs to numbers for DB
-                .eq('id', sourceColumnId),
+                .update({ taskIds: newSourceTaskIds.map(Number) })
+                .eq('id', Number(sourceColumnId)), // FIX: Convert string columnId to number for DB query.
             supabase
                 .from('project_columns')
-                .update({ taskIds: newDestinationTaskIds.map(Number) }) // FIX: Convert string IDs to numbers for DB
-                .eq('id', destinationColumnId)
+                .update({ taskIds: newDestinationTaskIds.map(Number) })
+                .eq('id', Number(destinationColumnId)) // FIX: Convert string columnId to number for DB query.
         ]);
         
-        if (sourceUpdateResult.error) throw sourceUpdateResult.error;
-        if (destUpdateResult.error) throw destUpdateResult.error;
+        if (sourceUpdateResult.error) throw new Error(sourceUpdateResult.error.message);
+        if (destUpdateResult.error) throw new Error(destUpdateResult.error.message);
     }
 };
 
 export const addProjectTask = async (content: string): Promise<void> => {
     // 1. Insert the new task and get its ID back.
-    // FIX: Remove .single() and check the returned array to handle RLS policies gracefully.
     const { data: insertedData, error: taskError } = await supabase
         .from('project_tasks')
         .insert({ content: content })
         .select('id');
         
-    if (taskError) throw taskError;
+    if (taskError) throw new Error(taskError.message);
     if (!insertedData || insertedData.length === 0) {
         throw new Error("Failed to create new task: The operation did not return the new task, which may be due to database permissions.");
     }
-    const newTaskId = insertedData[0].id; // This is a number
+    const newTaskId = insertedData[0].id;
 
     // 2. Find the 'Backlog' column (first column by position).
     const { data: backlogColumn, error: columnError } = await supabase
@@ -408,18 +446,24 @@ export const addProjectTask = async (content: string): Promise<void> => {
         .limit(1)
         .single();
 
-    if (columnError) throw columnError;
+    if (columnError) throw new Error(columnError.message);
     if (!backlogColumn) throw new Error("Could not find a 'Backlog' column to add the task to.");
 
-    // 3. Append the new task's ID to the column's task list.
-    const updatedTaskIds = [...(backlogColumn.taskIds || []), newTaskId];
+    // 3. Append the new task's ID, ensuring the array is clean.
+    // FIX: This is a more robust way to handle potential `null` or non-number values in the array from the DB.
+    // It filters out anything that isn't a valid, positive number before adding the new task ID.
+    const existingIds = (backlogColumn.taskIds || [])
+        .map(id => Number(id)) // Convert all to number
+        .filter(id => id > 0); // Ensure they are valid positive IDs
+
+    const updatedTaskIds = [...existingIds, newTaskId];
 
     const { error: updateError } = await supabase
         .from('project_columns')
         .update({ taskIds: updatedTaskIds })
         .eq('id', backlogColumn.id);
     
-    if (updateError) throw updateError;
+    if (updateError) throw new Error(updateError.message);
 };
 
 export const deleteProjectTask = async (taskId: string, columnId: string): Promise<void> => {
@@ -427,14 +471,13 @@ export const deleteProjectTask = async (taskId: string, columnId: string): Promi
     const { data: column, error: columnError } = await supabase
         .from('project_columns')
         .select('taskIds')
-        .eq('id', columnId)
+        .eq('id', Number(columnId)) // FIX: Convert string columnId to number for DB query.
         .single();
     
-    if (columnError) throw columnError;
+    if (columnError) throw new Error(columnError.message);
     if (!column) throw new Error("Column not found.");
 
     // 2. Remove the taskId from the array.
-    // FIX: Handle mixed types. `column.taskIds` has numbers, `taskId` is a string.
     const updatedTaskIds = (column.taskIds || []).filter((id: number) => id.toString() !== taskId);
 
     // 3. Update the column and delete the task in parallel.
@@ -442,23 +485,23 @@ export const deleteProjectTask = async (taskId: string, columnId: string): Promi
         supabase
             .from('project_columns')
             .update({ taskIds: updatedTaskIds })
-            .eq('id', columnId),
+            .eq('id', Number(columnId)), // FIX: Convert string columnId to number for DB query.
         supabase
             .from('project_tasks')
             .delete()
-            .eq('id', Number(taskId)) // FIX: Convert string taskId to number for DB query.
+            .eq('id', Number(taskId))
     ]);
     
-    if (updateResult.error) throw updateResult.error;
-    if (deleteResult.error) throw deleteResult.error;
+    if (updateResult.error) throw new Error(updateResult.error.message);
+    if (deleteResult.error) throw new Error(deleteResult.error.message);
 };
 
 export const assignProjectTask = async (taskId: string, assigneeId: string | undefined): Promise<void> => {
     const { error } = await supabase
         .from('project_tasks')
         .update({ assignee_uid: assigneeId })
-        .eq('id', Number(taskId)); // FIX: Convert string taskId to number for DB query.
-    if (error) throw error;
+        .eq('id', Number(taskId));
+    if (error) throw new Error(error.message);
 };
 
 // --- RESOURCES API ---
@@ -471,7 +514,7 @@ export const getResources = async (): Promise<Omit<Resource, 'uploaderName' | 'u
         .order('category', { ascending: true })
         .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) throw new Error(error.message);
     if (!data) return [];
 
     return data.map(item => ({
@@ -504,7 +547,7 @@ export const addResource = async (
             .from(RESOURCE_BUCKET)
             .upload(fileName, file);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) throw new Error(uploadError.message);
         
         // Add an explicit check to ensure the upload response is valid.
         if (!uploadData || !uploadData.path) {
@@ -533,7 +576,7 @@ export const addResource = async (
     };
 
     const { error: insertError } = await supabase.from('resources').insert(resourceToInsert);
-    if (insertError) throw insertError;
+    if (insertError) throw new Error(insertError.message);
 };
 
 export const deleteResource = async (resource: Resource): Promise<void> => {
@@ -550,5 +593,45 @@ export const deleteResource = async (resource: Resource): Promise<void> => {
 
     // 2. Delete the metadata record from the 'resources' table
     const { error: dbError } = await supabase.from('resources').delete().eq('id', resource.id);
-    if (dbError) throw dbError;
+    if (dbError) throw new Error(dbError.message);
+};
+
+
+// --- NOTIFICATIONS API ---
+
+export const getNotifications = async (userId: string): Promise<Notification[]> => {
+    const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('recipient_uid', userId)
+        .order('created_at', { ascending: false });
+
+    if (error) throw new Error(error.message);
+    
+    return (data || []).map(n => ({
+        id: n.id,
+        createdAt: new Date(n.created_at).toLocaleString(),
+        message: n.message,
+        isRead: n.is_read,
+        linkTo: n.link_to,
+    }));
+};
+
+export const markNotificationAsRead = async (notificationId: number): Promise<void> => {
+    const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+    
+    if (error) throw new Error(error.message);
+};
+
+export const markAllNotificationsAsRead = async (userId: string): Promise<void> => {
+    const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('recipient_uid', userId)
+        .eq('is_read', false); // Only update unread ones
+
+    if (error) throw new Error(error.message);
 };

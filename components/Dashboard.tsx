@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { User } from '../types';
+import { User, Tab } from '../types';
 
 const Feed = lazy(() => import('./Feed'));
 const Activities = lazy(() => import('./Activities'));
@@ -12,7 +12,6 @@ const CodePlayground = lazy(() => import('./CodePlayground'));
 const Resources = lazy(() => import('./Resources'));
 
 
-type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'chat' | 'profile' | 'members' | 'playground' | 'resources';
 type Theme = 'light' | 'dark';
 
 interface DashboardProps {

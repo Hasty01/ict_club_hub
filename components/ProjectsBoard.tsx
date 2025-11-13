@@ -15,6 +15,8 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     allUsers, 
     isLoadingProjects, 
     isLoadingUsers, 
+    projectDataError,
+    allUsersError,
     fetchProjectData 
   } = useData();
 
@@ -49,9 +51,9 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     try {
         await api.moveProjectTask(currentDraggedItemId, currentSourceColumnId, destinationColumnId, newIndex, data);
         await fetchProjectData(); 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to move task:", error);
-        alert("An error occurred while moving the task. Please try again.");
+        alert(`An error occurred while moving the task: ${error.message}`);
     }
   };
 
@@ -61,9 +63,9 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
       await api.addProjectTask(newTaskContent);
       setNewTaskContent('');
       await fetchProjectData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to add task:", error);
-      alert("An error occurred while adding the task. Please try again.");
+      alert(`An error occurred while adding the task: ${error.message}`);
     }
   };
 
@@ -72,9 +74,9 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     try {
         await api.deleteProjectTask(taskId, columnId);
         await fetchProjectData();
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to delete task:", error);
-        alert("Could not delete the task. Please try again.");
+        alert(`Could not delete the task: ${error.message}`);
     }
   };
 
@@ -82,9 +84,9 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     try {
         await api.assignProjectTask(taskId, assigneeId);
         await fetchProjectData();
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to assign task:", error);
-        alert("Could not assign the task. Please try again.");
+        alert(`Could not assign the task: ${error.message}`);
     }
   };
 
@@ -92,8 +94,12 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     return <div className="text-center p-8 text-gray-500 dark:text-gray-400">Loading project board...</div>;
   }
   
+  if (projectDataError || allUsersError) {
+    return <div className="text-center p-8 text-red-500 dark:text-red-400">{`Could not load project data: ${projectDataError || allUsersError}`}</div>;
+  }
+  
   if (!data) {
-    return <div className="text-center p-8 text-red-500 dark:text-red-400">Could not load project data.</div>;
+    return <div className="text-center p-8 text-gray-500 dark:text-gray-400">No project data found.</div>;
   }
 
   return (

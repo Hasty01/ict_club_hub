@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource } from './types';
+import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, Notification } from './types';
 import * as api from './services/apiService';
 
 // Define the shape of the context state
@@ -11,6 +11,7 @@ interface IDataContext {
   projectData: ProjectData | null;
   allUsers: User[];
   resources: Resource[];
+  notifications: Notification[];
 
   // Loading states
   isLoadingActivities: boolean;
@@ -19,7 +20,17 @@ interface IDataContext {
   isLoadingProjects: boolean;
   isLoadingUsers: boolean;
   isLoadingResources: boolean;
+  isLoadingNotifications: boolean;
   isInitialLoading: boolean;
+
+  // Error states
+  activitiesError: string | null;
+  attendanceError: string | null;
+  feedItemsError: string | null;
+  projectDataError: string | null;
+  allUsersError: string | null;
+  resourcesError: string | null;
+  notificationsError: string | null;
 
   // Refetch functions
   fetchActivities: () => Promise<void>;
@@ -28,6 +39,7 @@ interface IDataContext {
   fetchProjectData: () => Promise<void>;
   fetchUsers: () => Promise<void>;
   fetchResources: () => Promise<void>;
+  fetchNotifications: () => Promise<void>;
 }
 
 // Create the context with a default value
@@ -42,6 +54,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [rawResources, setRawResources] = useState<Omit<Resource, 'uploaderName' | 'uploaderAvatarUrl'>[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const [isLoadingActivities, setIsLoadingActivities] = useState(true);
   const [isLoadingAttendance, setIsLoadingAttendance] = useState(true);
@@ -49,14 +62,25 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [isLoadingResources, setIsLoadingResources] = useState(true);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
+
+  const [activitiesError, setActivitiesError] = useState<string | null>(null);
+  const [attendanceError, setAttendanceError] = useState<string | null>(null);
+  const [feedItemsError, setFeedItemsError] = useState<string | null>(null);
+  const [projectDataError, setProjectDataError] = useState<string | null>(null);
+  const [allUsersError, setAllUsersError] = useState<string | null>(null);
+  const [resourcesError, setResourcesError] = useState<string | null>(null);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
 
   const fetchActivities = useCallback(async () => {
     setIsLoadingActivities(true);
+    setActivitiesError(null);
     try {
       const data = await api.getActivities();
       setActivities(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to fetch activities", e);
+      setActivitiesError(e.message || 'An unknown error occurred.');
     } finally {
       setIsLoadingActivities(false);
     }
@@ -64,11 +88,13 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
 
   const fetchAttendance = useCallback(async () => {
     setIsLoadingAttendance(true);
+    setAttendanceError(null);
     try {
       const data = await api.getAttendance(currentUser.uid);
       setAttendance(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to fetch attendance", e);
+      setAttendanceError(e.message || 'An unknown error occurred.');
     } finally {
       setIsLoadingAttendance(false);
     }
@@ -76,11 +102,13 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   
   const fetchFeedItems = useCallback(async () => {
     setIsLoadingFeed(true);
+    setFeedItemsError(null);
     try {
       const data = await api.getFeedItems();
       setFeedItems(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to fetch feed items", e);
+      setFeedItemsError(e.message || 'An unknown error occurred.');
     } finally {
       setIsLoadingFeed(false);
     }
@@ -88,11 +116,13 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
 
   const fetchProjectData = useCallback(async () => {
     setIsLoadingProjects(true);
+    setProjectDataError(null);
     try {
       const data = await api.getProjectData();
       setProjectData(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to fetch project data", e);
+      setProjectDataError(e.message || 'An unknown error occurred.');
     } finally {
       setIsLoadingProjects(false);
     }
@@ -100,35 +130,56 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   
   const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
+    setAllUsersError(null);
     try {
       const data = await api.getUsers();
       setAllUsers(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to fetch users", e);
+      setAllUsersError(e.message || 'An unknown error occurred.');
     } finally {
       setIsLoadingUsers(false);
     }
   }, []);
 
   const fetchResources = useCallback(async () => {
+    setIsLoadingResources(true);
+    setResourcesError(null);
     try {
       const data = await api.getResources();
       setRawResources(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to fetch resources", e);
+      setResourcesError(e.message || 'An unknown error occurred.');
       setIsLoadingResources(false); // Ensure loading stops on error
     }
   }, []);
+  
+  const fetchNotifications = useCallback(async () => {
+    if (currentUser.role !== 'PATRON') {
+        setNotifications([]);
+        setIsLoadingNotifications(false);
+        return;
+    }
+    setIsLoadingNotifications(true);
+    setNotificationsError(null);
+    try {
+        const data = await api.getNotifications(currentUser.uid);
+        setNotifications(data);
+    } catch (e: any) {
+        console.error("Failed to fetch notifications", e);
+        setNotificationsError(e.message);
+    } finally {
+        setIsLoadingNotifications(false);
+    }
+  }, [currentUser.uid, currentUser.role]);
 
   // Effect to perform the client-side join for resources
   useEffect(() => {
-    if (isLoadingUsers) {
-      return; // Wait for users to be loaded
+    if (isLoadingUsers || resourcesError) { // Don't process if users are loading or there was an error fetching resources
+      return; 
     }
 
-    // FIX: Explicitly type the userMap to ensure correct type inference for `uploader`.
-    // This resolves an issue where the compiler could not determine the type of objects
-    // retrieved from the map, leading to errors when accessing properties like 'name'.
     const userMap: Map<string, User> = new Map(allUsers.map(user => [user.uid, user]));
 
     const enrichedResources = rawResources.map(resource => {
@@ -142,7 +193,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     
     setResources(enrichedResources);
     setIsLoadingResources(false); // Mark final resources as loaded
-  }, [rawResources, allUsers, isLoadingUsers]);
+  }, [rawResources, allUsers, isLoadingUsers, resourcesError]);
   
   
   // Fetch all data when the provider mounts (i.e., when the user logs in)
@@ -154,10 +205,13 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         fetchFeedItems(),
         fetchProjectData(),
         fetchUsers(),
-        fetchResources()
-      ]);
+        fetchNotifications(),
+      ]).then(() => {
+        // After users are fetched, resources can be fetched and joined
+        fetchResources();
+      });
     }
-  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources]);
+  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources, fetchNotifications]);
 
   const value = {
     activities,
@@ -166,19 +220,29 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     projectData,
     allUsers,
     resources,
+    notifications,
     isLoadingActivities,
     isLoadingAttendance,
     isLoadingFeed,
     isLoadingProjects,
     isLoadingUsers,
     isLoadingResources,
-    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources,
+    isLoadingNotifications,
+    activitiesError,
+    attendanceError,
+    feedItemsError,
+    projectDataError,
+    allUsersError,
+    resourcesError,
+    notificationsError,
+    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources || isLoadingNotifications,
     fetchActivities,
     fetchAttendance,
     fetchFeedItems,
     fetchProjectData,
     fetchUsers,
     fetchResources,
+    fetchNotifications,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

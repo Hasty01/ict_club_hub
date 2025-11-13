@@ -10,7 +10,7 @@ interface FeedProps {
 }
 
 const Feed: React.FC<FeedProps> = ({ currentUser }) => {
-  const { feedItems: items, isLoadingFeed, fetchFeedItems } = useData();
+  const { feedItems: items, isLoadingFeed, feedItemsError, fetchFeedItems } = useData();
   const [isMounted, setIsMounted] = useState(false);
   
   useEffect(() => {
@@ -34,8 +34,12 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
     console.log(`Liked item ${id}. (Client-side only)`);
   };
   
-  if(isLoadingFeed) {
+  if (isLoadingFeed) {
     return <div className="text-center p-8 text-gray-500 dark:text-gray-400">Loading feed...</div>;
+  }
+  
+  if (feedItemsError) {
+      return <div className="text-center p-8 text-red-500 dark:text-red-400">{`Error loading feed: ${feedItemsError}`}</div>;
   }
 
   return (

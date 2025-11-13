@@ -28,6 +28,8 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser }) => {
     activities, 
     isLoadingAttendance, 
     isLoadingActivities, 
+    attendanceError,
+    activitiesError,
     fetchAttendance 
   } = useData();
   
@@ -115,9 +117,9 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser }) => {
         setIsFormVisible(false);
         setSelectedActivityId('');
         setSelectedStatus('Present');
-    } catch (err) {
+    } catch (err: any) {
         console.error("Failed to submit attendance:", err);
-        alert("An error occurred while submitting your attendance. Please try again.");
+        alert(`An error occurred while submitting your attendance: ${err.message}`);
     } finally {
         setIsSubmitting(false);
     }
@@ -154,6 +156,10 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser }) => {
 
   if (isLoadingAttendance || isLoadingActivities) {
       return <div className="text-center p-8 text-gray-500 dark:text-gray-400">Loading attendance data...</div>;
+  }
+  
+  if (attendanceError || activitiesError) {
+      return <div className="text-center p-8 text-red-500 dark:text-red-400">{`Error: ${attendanceError || activitiesError}`}</div>;
   }
 
   return (

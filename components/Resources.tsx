@@ -10,7 +10,7 @@ interface ResourcesProps {
 }
 
 const Resources: React.FC<ResourcesProps> = ({ currentUser }) => {
-    const { resources, isLoadingResources, fetchResources } = useData();
+    const { resources, isLoadingResources, resourcesError, fetchResources } = useData();
     const isPatron = currentUser.role === 'PATRON';
 
     // Form state
@@ -79,6 +79,35 @@ const Resources: React.FC<ResourcesProps> = ({ currentUser }) => {
         }, {} as Record<string, Resource[]>);
     }, [resources]);
 
+    const renderContent = () => {
+        if (isLoadingResources) {
+            return <p className="text-center text-gray-500 dark:text-gray-400">Loading resources...</p>;
+        }
+
+        if (resourcesError) {
+            return <p className="text-center text-red-500 dark:text-red-400 py-4">{`Failed to load resources: ${resourcesError}`}</p>;
+        }
+
+        if (Object.keys(groupedResources).length > 0) {
+            return (
+                <div className="space-y-8">
+                    {Object.entries(groupedResources).map(([category, items]) => (
+                        <div key={category}>
+                            <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4 pb-2 border-b-2 border-pink-500/50">{category}</h3>
+                            <div className="space-y-4">
+                                {items.map(resource => (
+                                    <ResourceCard key={resource.id} resource={resource} currentUser={currentUser} onDelete={handleDelete} />
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        return <p className="text-center text-gray-500 dark:text-gray-400 py-4">No resources have been uploaded yet.</p>;
+    };
+
     return (
         <div>
             <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-6">Club Resources</h2>
@@ -135,24 +164,7 @@ const Resources: React.FC<ResourcesProps> = ({ currentUser }) => {
                 </div>
             )}
             
-            {isLoadingResources ? (
-                <p className="text-center text-gray-500 dark:text-gray-400">Loading resources...</p>
-            ) : Object.keys(groupedResources).length > 0 ? (
-                <div className="space-y-8">
-                    {Object.entries(groupedResources).map(([category, items]) => (
-                        <div key={category}>
-                            <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4 pb-2 border-b-2 border-pink-500/50">{category}</h3>
-                            <div className="space-y-4">
-                                {items.map(resource => (
-                                    <ResourceCard key={resource.id} resource={resource} currentUser={currentUser} onDelete={handleDelete} />
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <p className="text-center text-gray-500 dark:text-gray-400 py-4">No resources have been uploaded yet.</p>
-            )}
+            {renderContent()}
         </div>
     );
 };
