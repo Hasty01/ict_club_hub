@@ -61,3 +61,19 @@ export interface ProjectData {
   columns: { [key: string]: ProjectColumn };
   columnOrder: string[];
 }
+
+export type ResourceType = 'DOCUMENT' | 'LINK' | 'VIDEO';
+
+export interface Resource {
+  id: string;
+  createdAt: string;
+  title: string;
+  description: string;
+  type: ResourceType;
+  topic: string;
+  url?: string; // For LINK and VIDEO types
+  filePath?: string; // For DOCUMENT type
+  uploaderUid: string;
+  uploaderName: string;
+  uploaderAvatarUrl?: string;
+}

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import { Activity, AttendanceRecord, FeedItem, ProjectData, User } from './types';
+import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource } from './types';
 import * as api from './services/apiService';
 
 // Define the shape of the context state
@@ -10,6 +10,7 @@ interface IDataContext {
   feedItems: FeedItem[];
   projectData: ProjectData | null;
   allUsers: User[];
+  resources: Resource[];
 
   // Loading states
   isLoadingActivities: boolean;
@@ -17,6 +18,7 @@ interface IDataContext {
   isLoadingFeed: boolean;
   isLoadingProjects: boolean;
   isLoadingUsers: boolean;
+  isLoadingResources: boolean;
   isInitialLoading: boolean;
 
   // Refetch functions
@@ -25,6 +27,7 @@ interface IDataContext {
   fetchFeedItems: () => Promise<void>;
   fetchProjectData: () => Promise<void>;
   fetchUsers: () => Promise<void>;
+  fetchResources: () => Promise<void>;
 }
 
 // Create the context with a default value
@@ -37,12 +40,14 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
 
   const [isLoadingActivities, setIsLoadingActivities] = useState(true);
   const [isLoadingAttendance, setIsLoadingAttendance] = useState(true);
   const [isLoadingFeed, setIsLoadingFeed] = useState(true);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [isLoadingResources, setIsLoadingResources] = useState(true);
 
   const fetchActivities = useCallback(async () => {
     setIsLoadingActivities(true);
@@ -103,6 +108,18 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
       setIsLoadingUsers(false);
     }
   }, []);
+
+  const fetchResources = useCallback(async () => {
+    setIsLoadingResources(true);
+    try {
+      const data = await api.getResources();
+      setResources(data);
+    } catch (e) {
+      console.error("Failed to fetch resources", e);
+    } finally {
+      setIsLoadingResources(false);
+    }
+  }, []);
   
   // Fetch all data when the provider mounts (i.e., when the user logs in)
   useEffect(() => {
@@ -112,10 +129,11 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         fetchAttendance(),
         fetchFeedItems(),
         fetchProjectData(),
-        fetchUsers()
+        fetchUsers(),
+        fetchResources()
       ]);
     }
-  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers]);
+  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources]);
 
   const value = {
     activities,
@@ -123,17 +141,20 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     feedItems,
     projectData,
     allUsers,
+    resources,
     isLoadingActivities,
     isLoadingAttendance,
     isLoadingFeed,
     isLoadingProjects,
     isLoadingUsers,
-    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers,
+    isLoadingResources,
+    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources,
     fetchActivities,
     fetchAttendance,
     fetchFeedItems,
     fetchProjectData,
     fetchUsers,
+    fetchResources,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

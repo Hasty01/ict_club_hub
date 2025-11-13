@@ -6,7 +6,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generateActivityIdeas = async (query: string): Promise<{ ideas: { idea: string, description: string }[], sources: any[] }> => {
   try {
-    const prompt = `Generate 5 fun and engaging activity ideas for an ICT club based on the topic: "${query}". Format the response as a valid JSON object with a single key "ideas", which is an array of objects. Each object in the array should have two string properties: "idea" (the title of the activity) and "description" (a short, one-sentence description of the activity).`;
+    // FIX: Updated prompt to request structured text instead of JSON, as JSON output is not guaranteed with googleSearch grounding.
+    const prompt = `Generate 5 fun and engaging activity ideas for an ICT club based on the topic: "${query}". Format the response as a list where each idea has a title and a one-sentence description, separated by "::". For example: "Activity Title::Activity Description". Each idea should be on a new line. Do not include any other text or formatting.`;
     
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
@@ -18,11 +19,17 @@ export const generateActivityIdeas = async (query: string): Promise<{ ideas: { i
     
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
 
-    // The response text should be a valid JSON string based on the schema.
-    const result = JSON.parse(response.text);
+    // FIX: The response text with grounding is not guaranteed to be JSON. Parse the structured text instead.
+    const ideas = response.text.trim().split('\n').map(line => {
+      const parts = line.split('::');
+      if (parts.length === 2) {
+        return { idea: parts[0].trim(), description: parts[1].trim() };
+      }
+      return null;
+    }).filter((idea): idea is { idea: string, description: string } => idea !== null);
 
     return {
-        ideas: result.ideas || [],
+        ideas: ideas || [],
         // Ensure we only return web sources, as per grounding chunk structure
         sources: sources.filter(s => s.web), 
     };

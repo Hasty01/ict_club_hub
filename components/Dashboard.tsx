@@ -9,9 +9,10 @@ const Chat = lazy(() => import('./Chat'));
 const Profile = lazy(() => import('./Profile'));
 const Members = lazy(() => import('./Members'));
 const CodePlayground = lazy(() => import('./CodePlayground'));
+const Resources = lazy(() => import('./Resources'));
 
 
-type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'chat' | 'profile' | 'members' | 'playground';
+type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'chat' | 'profile' | 'members' | 'playground' | 'resources';
 type Theme = 'light' | 'dark';
 
 interface DashboardProps {
@@ -59,6 +60,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
         </TabPanel>
         <TabPanel active={activeTab === 'profile'}>
             <Profile currentUser={currentUser} onUpdateUserProfile={onUpdateUserProfile} />
+        </TabPanel>
+        <TabPanel active={activeTab === 'resources'}>
+            <Resources currentUser={currentUser} />
         </TabPanel>
         {currentUser.role === 'PATRON' && (
             <TabPanel active={activeTab === 'members'}>

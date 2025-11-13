@@ -14,8 +14,9 @@ import { XIcon } from './icons/XIcon';
 import { CodeIcon } from './icons/CodeIcon';
 import { ChevronsLeftIcon } from './icons/ChevronsLeftIcon';
 import { ChevronsRightIcon } from './icons/ChevronsRightIcon';
+import { BookOpenIcon } from './icons/BookOpenIcon';
 
-type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'chat' | 'profile' | 'members' | 'playground';
+type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'chat' | 'profile' | 'members' | 'playground' | 'resources';
 
 interface SidebarProps {
   user: User;
@@ -96,6 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme,
             <NavLink tabName="chat" label="Chat" icon={<ChatBubbleIcon />} activeTab={activeTab} onClick={handleNavClick} isCollapsed={isCollapsed}/>
             <NavLink tabName="playground" label="Playground" icon={<CodeIcon />} activeTab={activeTab} onClick={handleNavClick} isCollapsed={isCollapsed}/>
             <NavLink tabName="profile" label="Profile" icon={<IdentificationIcon />} activeTab={activeTab} onClick={handleNavClick} isCollapsed={isCollapsed}/>
+            <NavLink tabName="resources" label="Resources" icon={<BookOpenIcon />} activeTab={activeTab} onClick={handleNavClick} isCollapsed={isCollapsed}/>
             {user.role === 'PATRON' && (
               <NavLink tabName="members" label="Members" icon={<UsersIcon />} activeTab={activeTab} onClick={handleNavClick} isCollapsed={isCollapsed}/>
             )}

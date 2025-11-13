@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, FeedItemType, ProjectColumn } from '../types';
+import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, FeedItemType, ProjectColumn, Resource } from '../types';
 import { predefinedAvatars } from '../constants';
 
 // --- AUTH API ---
@@ -459,4 +459,88 @@ export const assignProjectTask = async (taskId: string, assigneeId: string | und
         .update({ assignee_uid: assigneeId })
         .eq('id', Number(taskId)); // FIX: Convert string taskId to number for DB query.
     if (error) throw error;
+};
+
+// --- RESOURCES API ---
+const RESOURCE_BUCKET = 'resource_uploads';
+
+export const getResources = async (): Promise<Resource[]> => {
+    const { data, error } = await supabase
+        .from('resources')
+        .select(`
+            *,
+            uploader:uploader_uid ( name, avatar_url )
+        `)
+        .order('topic', { ascending: true })
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    if (!data) return [];
+
+    return data.map(item => {
+        const uploaderProfile = item.uploader as { name: string; avatar_url: string } | null;
+        return {
+            id: item.id,
+            createdAt: new Date(item.created_at).toLocaleDateString(),
+            title: item.title,
+            description: item.description,
+            type: item.type,
+            topic: item.topic,
+            url: item.url,
+            filePath: item.file_path,
+            uploaderUid: item.uploader_uid,
+            uploaderName: uploaderProfile?.name || 'Unknown Uploader',
+            uploaderAvatarUrl: uploaderProfile?.avatar_url,
+        };
+    });
+};
+
+export const addResource = async (
+    resourceData: Omit<Resource, 'id' | 'createdAt' | 'uploaderName' | 'uploaderAvatarUrl' | 'filePath'>,
+    file?: File
+): Promise<void> => {
+    let filePath: string | undefined = undefined;
+    let fileUrl: string | undefined = resourceData.url;
+
+    // 1. If it's a document, upload the file to storage first
+    if (resourceData.type === 'DOCUMENT' && file) {
+        const fileName = `${resourceData.uploaderUid}/${Date.now()}_${file.name}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from(RESOURCE_BUCKET)
+            .upload(fileName, file);
+
+        if (uploadError) throw uploadError;
+        filePath = uploadData.path;
+    }
+
+    // 2. Insert metadata into the 'resources' table
+    const resourceToInsert = {
+        title: resourceData.title,
+        description: resourceData.description,
+        type: resourceData.type,
+        topic: resourceData.topic,
+        url: fileUrl,
+        file_path: filePath,
+        uploader_uid: resourceData.uploaderUid,
+    };
+
+    const { error: insertError } = await supabase.from('resources').insert(resourceToInsert);
+    if (insertError) throw insertError;
+};
+
+export const deleteResource = async (resource: Resource): Promise<void> => {
+    // 1. If it's a document, delete the file from storage
+    if (resource.type === 'DOCUMENT' && resource.filePath) {
+        const { error: storageError } = await supabase.storage
+            .from(RESOURCE_BUCKET)
+            .remove([resource.filePath]);
+        if (storageError) {
+            // Log the error but proceed to delete the DB record anyway
+            console.error("Could not delete file from storage, but proceeding to delete database record:", storageError);
+        }
+    }
+
+    // 2. Delete the metadata record from the 'resources' table
+    const { error: dbError } = await supabase.from('resources').delete().eq('id', resource.id);
+    if (dbError) throw dbError;
 };
