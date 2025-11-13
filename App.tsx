@@ -35,36 +35,48 @@ const App: React.FC = () => {
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
   useEffect(() => {
-    setIsLoading(true);
+    // The initial state of isLoading is true, so we don't need to set it again here.
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        const currentUser = session?.user;
-        if (currentUser) {
-            const userProfile = await api.getUserProfile(currentUser.id);
-            if (userProfile && userProfile.status === 'APPROVED') {
-                setUser(userProfile);
-                setView('dashboard');
-                setActiveTab('feed'); // Reset tab on login
+        try {
+          const currentUser = session?.user;
+          if (currentUser) {
+              const userProfile = await api.getUserProfile(currentUser.id);
+              if (userProfile && userProfile.status === 'APPROVED') {
+                  setUser(userProfile);
+                  setView('dashboard');
+                  setActiveTab('feed'); // Reset tab on login
 
-                // Automatically mark attendance for today's activities on login
-                try {
-                    await api.markAttendanceOnLogin(userProfile.uid);
-                } catch (attendanceError) {
-                    console.warn("Could not mark attendance automatically:", attendanceError);
-                    // This is a non-critical error, so we don't show it to the user.
-                }
+                  // Automatically mark attendance for today's activities on login
+                  try {
+                      await api.markAttendanceOnLogin(userProfile.uid);
+                  } catch (attendanceError) {
+                      console.warn("Could not mark attendance automatically:", attendanceError);
+                      // This is a non-critical error, so we don't show it to the user.
+                  }
 
-            } else {
-                // If user has no profile or is not approved, ensure they are logged out.
-                await api.logout();
-                setUser(null);
-                setView('welcome');
-            }
-        } else {
+              } else {
+                  // If user has a session but no approved profile, log them out.
+                  // This handles pending users or users whose profiles were removed.
+                  if (session) {
+                    await api.logout();
+                  }
+                  setUser(null);
+                  setView('welcome');
+              }
+          } else {
+              setUser(null);
+              setView('welcome');
+          }
+        } catch (error) {
+            console.error("An error occurred during authentication state change:", error);
+            // In case of any error, reset to a safe, logged-out state.
             setUser(null);
             setView('welcome');
+        } finally {
+            // This is critical: ensure loading is always set to false after the check completes.
+            setIsLoading(false);
         }
-        setIsLoading(false);
       }
     );
 
