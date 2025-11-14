@@ -2,7 +2,9 @@
 
 
 
-export type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'chat' | 'profile' | 'members' | 'playground' | 'resources';
+
+
+export type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'profile' | 'members' | 'playground' | 'resources';
 
 export interface User {
   uid: string; // Changed from id: number

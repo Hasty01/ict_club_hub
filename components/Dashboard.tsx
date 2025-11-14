@@ -5,7 +5,6 @@ const Feed = lazy(() => import('./Feed'));
 const Activities = lazy(() => import('./Activities'));
 const Attendance = lazy(() => import('./Attendance'));
 const ProjectsBoard = lazy(() => import('./ProjectsBoard'));
-const Chat = lazy(() => import('./Chat'));
 const Profile = lazy(() => import('./Profile'));
 const Members = lazy(() => import('./Members'));
 const CodePlayground = lazy(() => import('./CodePlayground'));
@@ -50,9 +49,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
         </TabPanel>
         <TabPanel active={activeTab === 'projects'}>
             <ProjectsBoard currentUser={currentUser} />
-        </TabPanel>
-        <TabPanel active={activeTab === 'chat'}>
-            <Chat currentUser={currentUser} />
         </TabPanel>
         <TabPanel active={activeTab === 'playground'}>
             <CodePlayground theme={theme} />

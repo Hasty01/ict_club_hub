@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { generateAnnouncement } from '../services/geminiService';
-import { SparklesIcon } from './icons/SparklesIcon';
 
 interface AddAnnouncementProps {
     currentUser: User;
@@ -12,11 +10,6 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
     const [title, setTitle] = useState('');
     const [message, setMessage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // New state for AI feature
-    const [aiPrompt, setAiPrompt] = useState('');
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [aiError, setAiError] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -33,22 +26,6 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
             alert('Failed to post announcement.');
         } finally {
             setIsSubmitting(false);
-        }
-    };
-
-    // New handler for AI generation
-    const handleGenerate = async () => {
-        if (!aiPrompt.trim()) return;
-        setIsGenerating(true);
-        setAiError(null);
-        try {
-            const { title: generatedTitle, message: generatedMessage } = await generateAnnouncement(aiPrompt);
-            setTitle(generatedTitle);
-            setMessage(generatedMessage);
-        } catch (error: any) {
-            setAiError(error.message || 'An unknown error occurred.');
-        } finally {
-            setIsGenerating(false);
         }
     };
 
@@ -81,34 +58,6 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
                     </div>
                 </form>
             </div>
-
-             {/* AI Assistant Section */}
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-2">
-                    <SparklesIcon /> AI Assistant
-                </h4>
-                <div className="flex flex-col sm:flex-row items-center gap-3">
-                    <input
-                        type="text"
-                        value={aiPrompt}
-                        onChange={(e) => setAiPrompt(e.target.value)}
-                        placeholder="e.g., 'announce a pizza party next friday'"
-                        className="flex-grow w-full p-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500"
-                        disabled={isGenerating}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleGenerate(); } }}
-                    />
-                    <button
-                        type="button"
-                        onClick={handleGenerate}
-                        disabled={isGenerating || !aiPrompt.trim()}
-                        className="w-full sm:w-auto flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-500 rounded-lg shadow-md hover:from-purple-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                    >
-                        <span>{isGenerating ? 'Generating...' : 'Generate'}</span>
-                    </button>
-                </div>
-                {aiError && <p className="mt-2 text-xs text-red-500 dark:text-red-400">{aiError}</p>}
-            </div>
-
         </div>
     );
 };

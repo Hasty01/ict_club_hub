@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PlayIcon } from './icons/PlayIcon';
 import Editor from '@monaco-editor/react';
-import { executeCode } from '../services/geminiService';
 
 interface CodePlaygroundProps {
     theme: 'light' | 'dark';
@@ -14,9 +13,8 @@ interface OutputLine {
 
 const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme }) => {
   const [code, setCode] = useState<string>('print("Hello from the Club Hub Playground!")\n\n# The return value of the last expression is also displayed\nimport math\n\nmath.pi');
-  const [output, setOutput] = useState<OutputLine[]>([{ type: 'log', content: 'Select an execution mode and click "Run Code" to see the output here.' }]);
+  const [output, setOutput] = useState<OutputLine[]>([{ type: 'log', content: 'Click "Run Code" to see the output here.' }]);
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
-  const [executionMode, setExecutionMode] = useState<'ai' | 'local'>('ai');
   const [pyodide, setPyodide] = useState<any | null>(null);
   const [isPyodideReady, setIsPyodideReady] = useState(false);
 
@@ -32,7 +30,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme }) => {
         console.log("Pyodide loaded successfully.");
       } catch (error) {
         console.error("Failed to load Pyodide:", error);
-        setOutput([{ type: 'error', content: "Error: Could not load the local Python interpreter. Please try refreshing. AI execution is still available." }]);
+        setOutput([{ type: 'error', content: "Error: Could not load the local Python interpreter. Please try refreshing." }]);
       }
     };
     setupPyodide();
@@ -43,45 +41,34 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme }) => {
     setIsExecuting(true);
     setOutput([]); // Clear previous output
 
-    if (executionMode === 'ai') {
-        setOutput([{ type: 'log', content: 'Executing via AI...' }]);
-        try {
-            const result = await executeCode(code);
-            setOutput([{ type: 'log', content: result || 'Code executed successfully with no output.' }]);
-        } catch (error: any) {
-            setOutput([{ type: 'error', content: `Error: ${error.message}` }]);
-        } finally {
-            setIsExecuting(false);
+    if (!pyodide) {
+        setOutput([{ type: 'error', content: 'Error: Local interpreter (Pyodide) is not ready.' }]);
+        setIsExecuting(false);
+        return;
+    }
+
+    let hasOutput = false; // To track if any output was generated
+
+    // 1. Expose JS callback to Pyodide for streaming output
+    (window as any).sendOutputToReact = (text: string, type: 'log' | 'error') => {
+        if (text) {
+            hasOutput = true;
+            setOutput(prev => {
+                const lastOutput = prev[prev.length - 1];
+                // Append to the last message if it's the same type to avoid creating many separate spans
+                if (lastOutput && lastOutput.type === type) {
+                    const newOutput = [...prev];
+                    newOutput[newOutput.length - 1] = { ...lastOutput, content: lastOutput.content + text };
+                    return newOutput;
+                } else {
+                    return [...prev, { type, content: text }];
+                }
+            });
         }
-    } else { // 'local' execution
-        if (!pyodide) {
-            setOutput([{ type: 'error', content: 'Error: Local interpreter (Pyodide) is not ready.' }]);
-            setIsExecuting(false);
-            return;
-        }
+    };
 
-        let hasOutput = false; // To track if any output was generated
-
-        // 1. Expose JS callback to Pyodide for streaming output
-        (window as any).sendOutputToReact = (text: string, type: 'log' | 'error') => {
-            if (text) {
-                hasOutput = true;
-                setOutput(prev => {
-                    const lastOutput = prev[prev.length - 1];
-                    // Append to the last message if it's the same type to avoid creating many separate spans
-                    if (lastOutput && lastOutput.type === type) {
-                        const newOutput = [...prev];
-                        newOutput[newOutput.length - 1] = { ...lastOutput, content: lastOutput.content + text };
-                        return newOutput;
-                    } else {
-                        return [...prev, { type, content: text }];
-                    }
-                });
-            }
-        };
-
-        // 2. Python code to redirect stdout/stderr
-        const setupCode = `
+    // 2. Python code to redirect stdout/stderr
+    const setupCode = `
 import sys
 from js import sendOutputToReact
 
@@ -93,38 +80,37 @@ class Writer:
 
 sys.stdout = Writer('log')
 sys.stderr = Writer('error')
-        `;
+    `;
 
-        try {
-            await pyodide.runPythonAsync(setupCode);
-            const result = await pyodide.runPythonAsync(code);
+    try {
+        await pyodide.runPythonAsync(setupCode);
+        const result = await pyodide.runPythonAsync(code);
 
-            // 3. Handle the return value of the last expression
-            if (result !== undefined) {
-                pyodide.globals.set('last_result', result);
-                // Use print(repr()) to mimic a REPL, which will be caught by our stdout handler
-                await pyodide.runPythonAsync(`print(repr(last_result))`);
-                pyodide.globals.delete('last_result');
-                if (typeof result.destroy === 'function') {
-                    result.destroy();
-                }
+        // 3. Handle the return value of the last expression
+        if (result !== undefined) {
+            pyodide.globals.set('last_result', result);
+            // Use print(repr()) to mimic a REPL, which will be caught by our stdout handler
+            await pyodide.runPythonAsync(`print(repr(last_result))`);
+            pyodide.globals.delete('last_result');
+            if (typeof result.destroy === 'function') {
+                result.destroy();
             }
-            
-            // 4. Handle no output case
-            if (!hasOutput) {
-                setOutput([{ type: 'log', content: 'Code executed successfully with no output.' }]);
-            }
+        }
+        
+        // 4. Handle no output case
+        if (!hasOutput) {
+            setOutput([{ type: 'log', content: 'Code executed successfully with no output.' }]);
+        }
 
-        } catch (error: any) {
-            // Python tracebacks are handled by the stderr writer.
-            // This catches compilation errors or other JS exceptions from pyodide.
-            (window as any).sendOutputToReact(error.message, 'error');
-        } finally {
-            setIsExecuting(false);
-            // Clean up the global function to avoid memory leaks
-            if ((window as any).sendOutputToReact) {
-              delete (window as any).sendOutputToReact;
-            }
+    } catch (error: any) {
+        // Python tracebacks are handled by the stderr writer.
+        // This catches compilation errors or other JS exceptions from pyodide.
+        (window as any).sendOutputToReact(error.message, 'error');
+    } finally {
+        setIsExecuting(false);
+        // Clean up the global function to avoid memory leaks
+        if ((window as any).sendOutputToReact) {
+          delete (window as any).sendOutputToReact;
         }
     }
   };
@@ -136,33 +122,17 @@ sys.stderr = Writer('error')
       <div className="flex-shrink-0 mb-4 flex flex-wrap justify-between items-center gap-4">
         <div >
             <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Code Playground</h2>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">Execute Python code using AI or locally in your browser.</p>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">Execute Python code locally in your browser.</p>
         </div>
         <div className="flex items-center gap-4">
-            <div className="flex items-center p-1 bg-gray-200 dark:bg-gray-900 rounded-lg">
-                <button
-                    onClick={() => setExecutionMode('ai')}
-                    disabled={isExecuting}
-                    className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-all ${executionMode === 'ai' ? 'bg-white dark:bg-gray-700 shadow text-pink-600' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300/50 dark:hover:bg-gray-800/50'}`}
-                >
-                    AI Interpreter
-                </button>
-                <button
-                    onClick={() => setExecutionMode('local')}
-                    disabled={isExecuting || !isPyodideReady}
-                    className={`relative px-3 py-1.5 text-sm font-semibold rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${executionMode === 'local' ? 'bg-white dark:bg-gray-700 shadow text-pink-600' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300/50 dark:hover:bg-gray-800/50'}`}
-                    title={!isPyodideReady ? 'Local interpreter is initializing...' : 'Run code in your browser'}
-                >
-                    Local (Browser)
-                    {!isPyodideReady && <div className="absolute -top-1 -right-1 h-3 w-3 flex items-center justify-center"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span></div>}
-                </button>
-            </div>
             <button
                 onClick={handleRunCode}
-                disabled={isExecuting}
-                className="flex items-center space-x-2 px-5 py-3 font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg shadow-md hover:from-pink-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                disabled={isExecuting || !isPyodideReady}
+                className="relative flex items-center space-x-2 px-5 py-3 font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg shadow-md hover:from-pink-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 aria-label="Run Code"
+                title={!isPyodideReady ? 'Local interpreter is initializing...' : 'Run code in your browser'}
             >
+                {!isPyodideReady && <div className="absolute -top-1 -right-1 h-3 w-3 flex items-center justify-center"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span></div>}
                 <PlayIcon />
                 <span>{isExecuting ? 'Running...' : 'Run Code'}</span>
             </button>

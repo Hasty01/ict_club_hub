@@ -9,7 +9,6 @@ import { HomeIcon } from './icons/HomeIcon';
 import { UsersIcon } from './icons/UsersIcon';
 import { ClipboardListIcon } from './icons/ClipboardListIcon';
 import { IdentificationIcon } from './icons/IdentificationIcon';
-import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
 import { XIcon } from './icons/XIcon';
 import { CodeIcon } from './icons/CodeIcon';
 import { ChevronsLeftIcon } from './icons/ChevronsLeftIcon';
@@ -93,7 +92,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme,
             <NavLink tabName="activities" label="Activities" icon={<CalendarIcon />} activeTab={activeTab} onClick={handleNavClick} isCollapsed={isCollapsed}/>
             <NavLink tabName="attendance" label="Attendance" icon={<CheckCircleIcon />} activeTab={activeTab} onClick={handleNavClick} isCollapsed={isCollapsed}/>
             <NavLink tabName="projects" label="Projects" icon={<ClipboardListIcon />} activeTab={activeTab} onClick={handleNavClick} isCollapsed={isCollapsed}/>
-            <NavLink tabName="chat" label="Chat" icon={<ChatBubbleIcon />} activeTab={activeTab} onClick={handleNavClick} isCollapsed={isCollapsed}/>
             <NavLink tabName="playground" label="Playground" icon={<CodeIcon />} activeTab={activeTab} onClick={handleNavClick} isCollapsed={isCollapsed}/>
             <NavLink tabName="profile" label="Profile" icon={<IdentificationIcon />} activeTab={activeTab} onClick={handleNavClick} isCollapsed={isCollapsed}/>
             <NavLink tabName="resources" label="Resources" icon={<BookOpenIcon />} activeTab={activeTab} onClick={handleNavClick} isCollapsed={isCollapsed}/>
