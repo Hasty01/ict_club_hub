@@ -302,10 +302,11 @@ export const addFeedItem = async (itemData: Omit<FeedItem, 'id' | 'author' | 'au
 // --- PROJECTS API ---
 
 export const getProjectData = async (): Promise<ProjectData> => {
-    // Fetch columns and tasks in parallel
+    // 1. Fetch columns and tasks in parallel, with ordering.
     const [columnsRes, tasksRes] = await Promise.all([
         supabase.from('project_columns').select('*').order('position', { ascending: true }),
-        supabase.from('project_tasks').select('*')
+        // Order tasks by ID to ensure a consistent, chronological order within columns.
+        supabase.from('project_tasks').select('*').order('id', { ascending: true }) 
     ]);
 
     if (columnsRes.error) throw new Error(columnsRes.error.message);
@@ -314,7 +315,7 @@ export const getProjectData = async (): Promise<ProjectData> => {
     const allTasksData = tasksRes.data || [];
     const columnsData = columnsRes.data || [];
 
-    // Process tasks into a dictionary for quick O(1) lookups.
+    // 2. Process tasks into a dictionary for quick O(1) lookups.
     const tasks: { [key: string]: ProjectTask } = allTasksData.reduce((acc, task) => {
         acc[task.id.toString()] = { 
             id: task.id.toString(),
@@ -324,7 +325,7 @@ export const getProjectData = async (): Promise<ProjectData> => {
         return acc;
     }, {} as {[key: string]: ProjectTask});
 
-    // Process columns and their taskIds from the DB
+    // 3. Process columns and build columnOrder. Initialize empty taskIds array.
     const columns: { [key:string]: ProjectColumn } = {};
     const columnOrder: string[] = [];
 
@@ -334,8 +335,16 @@ export const getProjectData = async (): Promise<ProjectData> => {
         columns[colId] = {
             id: colId,
             title: col.title,
-            taskIds: (col.taskIds || []).map((id: any) => String(id)), 
+            taskIds: [], // This will be populated next.
         };
+    }
+
+    // 4. Populate the taskIds for each column based on the fetched tasks.
+    for (const task of allTasksData) {
+        const columnId = task.column_id.toString();
+        if (columns[columnId]) {
+            columns[columnId].taskIds.push(task.id.toString());
+        }
     }
     
     return { tasks, columns, columnOrder };
@@ -349,120 +358,49 @@ export const moveProjectTask = async (
     newIndex: number,
     projectData: ProjectData
 ): Promise<void> => {
-    const sourceColumn = projectData.columns[sourceColumnId];
-    const destinationColumn = projectData.columns[destinationColumnId];
-
-    const newSourceTaskIds = [...sourceColumn.taskIds];
+    // The only action required is to update the task's column_id.
+    // The newIndex is ignored as the schema doesn't support custom ordering.
+    // Tasks will be ordered by their ID on the next data fetch.
+    const { error } = await supabase
+        .from('project_tasks')
+        .update({ column_id: Number(destinationColumnId) })
+        .eq('id', Number(taskId));
     
-    const taskIndex = newSourceTaskIds.indexOf(taskId);
-    if (taskIndex > -1) {
-        newSourceTaskIds.splice(taskIndex, 1);
-    }
-
-    if (sourceColumnId === destinationColumnId) {
-        // Reordering within the same column
-        newSourceTaskIds.splice(newIndex, 0, taskId);
-        
-        const { error } = await supabase
-            .from('project_columns')
-            .update({ taskIds: newSourceTaskIds.map(Number) })
-            .eq('id', Number(sourceColumnId)); // FIX: Convert string columnId to number for DB query.
-        if (error) throw new Error(error.message);
-        
-    } else {
-        // Moving to a different column
-        const newDestinationTaskIds = [...destinationColumn.taskIds];
-        newDestinationTaskIds.splice(newIndex, 0, taskId);
-
-        // Perform two updates in parallel
-        const [sourceUpdateResult, destUpdateResult] = await Promise.all([
-            supabase
-                .from('project_columns')
-                .update({ taskIds: newSourceTaskIds.map(Number) })
-                .eq('id', Number(sourceColumnId)), // FIX: Convert string columnId to number for DB query.
-            supabase
-                .from('project_columns')
-                .update({ taskIds: newDestinationTaskIds.map(Number) })
-                .eq('id', Number(destinationColumnId)) // FIX: Convert string columnId to number for DB query.
-        ]);
-        
-        if (sourceUpdateResult.error) throw new Error(sourceUpdateResult.error.message);
-        if (destUpdateResult.error) throw new Error(destUpdateResult.error.message);
-    }
+    if (error) throw new Error(error.message);
 };
 
 export const addProjectTask = async (content: string): Promise<void> => {
-    // 1. Find the 'Backlog' column (first column by position).
-    const { data: backlogColumn, error: columnError } = await supabase
+    // 1. Find the first column (e.g., 'Backlog') based on its position.
+    const { data: firstColumn, error: columnError } = await supabase
         .from('project_columns')
-        .select('id, taskIds')
+        .select('id')
         .order('position', { ascending: true })
         .limit(1)
         .single();
 
     if (columnError) throw new Error(columnError.message);
-    if (!backlogColumn) throw new Error("Could not find a 'Backlog' column to add the task to.");
+    if (!firstColumn) throw new Error("No columns found in the project board.");
     
-    const backlogColumnId = backlogColumn.id;
-
-    // 2. Insert the new task with the column_id and get its ID back.
-    const { data: insertedData, error: taskError } = await supabase
+    // 2. Insert the new task, linking it to the first column.
+    const { error: taskError } = await supabase
         .from('project_tasks')
         .insert({ 
             content: content,
-            column_id: backlogColumnId // FIX: Add the column_id to satisfy not-null constraint
-        })
-        .select('id');
+            column_id: firstColumn.id
+        });
         
     if (taskError) throw new Error(taskError.message);
-    if (!insertedData || insertedData.length === 0) {
-        throw new Error("Failed to create new task: The operation did not return the new task, which may be due to database permissions.");
-    }
-    const newTaskId = insertedData[0].id;
-    
-    // 3. Append the new task's ID to the column's taskIds array.
-    const existingIds = (backlogColumn.taskIds || [])
-        .map(id => Number(id))
-        .filter(id => id > 0); 
-    const updatedTaskIds = [...existingIds, newTaskId];
-
-    // 4. Update the column with the new taskIds array.
-    const { error: updateError } = await supabase
-        .from('project_columns')
-        .update({ taskIds: updatedTaskIds })
-        .eq('id', backlogColumn.id);
-    
-    if (updateError) throw new Error(updateError.message);
 };
 
 export const deleteProjectTask = async (taskId: string, columnId: string): Promise<void> => {
-    // 1. Fetch the column to get its current taskIds array.
-    const { data: column, error: columnError } = await supabase
-        .from('project_columns')
-        .select('taskIds')
-        .eq('id', Number(columnId)) // FIX: Convert string columnId to number for DB query.
-        .single();
+    // Deleting a task only requires removing it from the project_tasks table.
+    // No need to modify the project_columns table.
+    const { error } = await supabase
+        .from('project_tasks')
+        .delete()
+        .eq('id', Number(taskId));
     
-    if (columnError) throw new Error(columnError.message);
-    if (!column) throw new Error("Column not found.");
-
-    // 2. Remove the taskId from the array.
-    const updatedTaskIds = (column.taskIds || []).filter((id: number) => id.toString() !== taskId);
-
-    // 3. Update the column and delete the task in parallel.
-    const [updateResult, deleteResult] = await Promise.all([
-        supabase
-            .from('project_columns')
-            .update({ taskIds: updatedTaskIds })
-            .eq('id', Number(columnId)), // FIX: Convert string columnId to number for DB query.
-        supabase
-            .from('project_tasks')
-            .delete()
-            .eq('id', Number(taskId))
-    ]);
-    
-    if (updateResult.error) throw new Error(updateResult.error.message);
-    if (deleteResult.error) throw new Error(deleteResult.error.message);
+    if (error) throw new Error(error.message);
 };
 
 export const assignProjectTask = async (taskId: string, assigneeId: string | undefined): Promise<void> => {
