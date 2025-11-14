@@ -41,7 +41,8 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme }) => {
 
   const handleRunCode = async () => {
     setIsExecuting(true);
-    
+    setOutput([]); // Clear previous output
+
     if (executionMode === 'ai') {
         setOutput([{ type: 'log', content: 'Executing via AI...' }]);
         try {
@@ -53,57 +54,77 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme }) => {
             setIsExecuting(false);
         }
     } else { // 'local' execution
-        setOutput([]); // Clear previous output
         if (!pyodide) {
             setOutput([{ type: 'error', content: 'Error: Local interpreter (Pyodide) is not ready.' }]);
             setIsExecuting(false);
             return;
         }
 
-        // Use a temporary array to collect all output chunks as they arrive.
-        const executionOutput: OutputLine[] = [];
-        
+        let hasOutput = false; // To track if any output was generated
+
+        // 1. Expose JS callback to Pyodide for streaming output
+        (window as any).sendOutputToReact = (text: string, type: 'log' | 'error') => {
+            if (text) {
+                hasOutput = true;
+                setOutput(prev => {
+                    const lastOutput = prev[prev.length - 1];
+                    // Append to the last message if it's the same type to avoid creating many separate spans
+                    if (lastOutput && lastOutput.type === type) {
+                        const newOutput = [...prev];
+                        newOutput[newOutput.length - 1] = { ...lastOutput, content: lastOutput.content + text };
+                        return newOutput;
+                    } else {
+                        return [...prev, { type, content: text }];
+                    }
+                });
+            }
+        };
+
+        // 2. Python code to redirect stdout/stderr
+        const setupCode = `
+import sys
+from js import sendOutputToReact
+
+class Writer:
+    def __init__(self, stream_type):
+        self.stream_type = stream_type
+    def write(self, text):
+        sendOutputToReact(text, self.stream_type)
+
+sys.stdout = Writer('log')
+sys.stderr = Writer('error')
+        `;
+
         try {
-            // Redirect stdout and stderr to push chunks into our temporary array.
-            // This preserves the order of stdout and stderr messages.
-            pyodide.setStdout({ batched: (str: string) => {
-                if (str) executionOutput.push({ type: 'log', content: str });
-            }});
-            pyodide.setStderr({ batched: (str: string) => {
-                if (str) executionOutput.push({ type: 'error', content: str });
-            }});
-            
+            await pyodide.runPythonAsync(setupCode);
             const result = await pyodide.runPythonAsync(code);
 
-            // The return value of the last expression is not sent to stdout.
-            // We append it to our output manually.
-            if (result !== undefined && result !== null) {
-                // Add a newline for consistent display with print() statements
-                executionOutput.push({ type: 'log', content: result.toString() + '\n' });
+            // 3. Handle the return value of the last expression
+            if (result !== undefined) {
+                pyodide.globals.set('last_result', result);
+                // Use print(repr()) to mimic a REPL, which will be caught by our stdout handler
+                await pyodide.runPythonAsync(`print(repr(last_result))`);
+                pyodide.globals.delete('last_result');
+                if (typeof result.destroy === 'function') {
+                    result.destroy();
+                }
             }
             
-            // After execution, update the state with the collected output.
-            if (executionOutput.length > 0) {
-                setOutput(executionOutput);
-            } else {
+            // 4. Handle no output case
+            if (!hasOutput) {
                 setOutput([{ type: 'log', content: 'Code executed successfully with no output.' }]);
             }
+
         } catch (error: any) {
-            // Errors from runPythonAsync are usually sent to stderr, which we already capture.
-            // So, we just need to set the output to whatever we have collected.
-            // If nothing was collected, it was a non-python error, so show its message.
-            if (executionOutput.length > 0) {
-                setOutput(executionOutput);
-            } else {
-                setOutput([{ type: 'error', content: `Local Execution Error:\n${error.message}` }]);
-            }
+            // Python tracebacks are handled by the stderr writer.
+            // This catches compilation errors or other JS exceptions from pyodide.
+            (window as any).sendOutputToReact(error.message, 'error');
         } finally {
-            // CRITICAL: Always restore the default stdout/stderr handlers.
-            if (pyodide) {
-                pyodide.setStdout({});
-                pyodide.setStderr({});
-            }
             setIsExecuting(false);
+            // Clean up the global function to avoid memory leaks
+            if ((window as any).sendOutputToReact) {
+              delete (window as any).sendOutputToReact;
+            }
         }
     }
   };
