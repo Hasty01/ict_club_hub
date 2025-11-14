@@ -13,6 +13,9 @@ interface ProjectTaskCardProps {
   onAssignTask: (taskId: string, assigneeId: string | undefined) => void;
 }
 
+// These classes are applied to the element being dragged to style the browser's drag preview.
+const DRAGGING_CLASSES = ['opacity-75', 'ring-2', 'ring-pink-500', 'rotate-3', 'scale-105', 'shadow-2xl'];
+
 const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
     const { 
         task, columnId, isBeingDragged, isPatron, allUsers, 
@@ -25,10 +28,18 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
   return (
     <div
       draggable={isPatron}
-      onDragStart={isPatron ? (e) => onDragStart(e, task.id, columnId) : undefined}
+      onDragStart={isPatron ? (e) => {
+        // Apply classes directly to the element for the drag preview snapshot.
+        DRAGGING_CLASSES.forEach(c => e.currentTarget.classList.add(c));
+        onDragStart(e, task.id, columnId);
+      } : undefined}
+      onDragEnd={isPatron ? (e) => {
+        // Clean up classes after the drag operation is complete.
+        DRAGGING_CLASSES.forEach(c => e.currentTarget.classList.remove(c));
+      } : undefined}
       data-task-id={task.id}
       data-dragging={isBeingDragged}
-      className={`bg-white dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-700 transform transition-all ${isPatron ? 'cursor-grab' : ''} ${isBeingDragged ? 'opacity-50 ring-2 ring-pink-500 rotate-3 scale-105 shadow-2xl' : 'shadow-sm'}`}
+      className={`bg-white dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-700 transform transition-all ${isPatron ? 'cursor-grab' : ''} shadow-sm`}
     >
       <p className="text-gray-800 dark:text-gray-200 mb-3">{task.content}</p>
       <div className="pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">

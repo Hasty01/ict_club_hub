@@ -76,6 +76,7 @@ export interface Resource {
   description: string;
   type: ResourceType;
   category: ResourceCategory;
+  topic?: string;
   url?: string; // For LINK and VIDEO types
   filePath?: string; // For DOCUMENT type
   uploaderUid: string;

@@ -41,6 +41,7 @@ const Resources: React.FC<ResourcesProps> = ({ currentUser }) => {
                 type,
                 url: type === 'DOCUMENT' ? undefined : url,
                 uploaderUid: currentUser.uid,
+                topic: null, // Add topic to satisfy schema
             }, file || undefined);
 
             // Reset form

@@ -392,19 +392,7 @@ export const moveProjectTask = async (
 };
 
 export const addProjectTask = async (content: string): Promise<void> => {
-    // 1. Insert the new task and get its ID back.
-    const { data: insertedData, error: taskError } = await supabase
-        .from('project_tasks')
-        .insert({ content: content })
-        .select('id');
-        
-    if (taskError) throw new Error(taskError.message);
-    if (!insertedData || insertedData.length === 0) {
-        throw new Error("Failed to create new task: The operation did not return the new task, which may be due to database permissions.");
-    }
-    const newTaskId = insertedData[0].id;
-
-    // 2. Find the 'Backlog' column (first column by position).
+    // 1. Find the 'Backlog' column (first column by position).
     const { data: backlogColumn, error: columnError } = await supabase
         .from('project_columns')
         .select('id, taskIds')
@@ -414,16 +402,31 @@ export const addProjectTask = async (content: string): Promise<void> => {
 
     if (columnError) throw new Error(columnError.message);
     if (!backlogColumn) throw new Error("Could not find a 'Backlog' column to add the task to.");
+    
+    const backlogColumnId = backlogColumn.id;
 
-    // 3. Append the new task's ID, ensuring the array is clean.
-    // FIX: This is a more robust way to handle potential `null` or non-number values in the array from the DB.
-    // It filters out anything that isn't a valid, positive number before adding the new task ID.
+    // 2. Insert the new task with the column_id and get its ID back.
+    const { data: insertedData, error: taskError } = await supabase
+        .from('project_tasks')
+        .insert({ 
+            content: content,
+            column_id: backlogColumnId // FIX: Add the column_id to satisfy not-null constraint
+        })
+        .select('id');
+        
+    if (taskError) throw new Error(taskError.message);
+    if (!insertedData || insertedData.length === 0) {
+        throw new Error("Failed to create new task: The operation did not return the new task, which may be due to database permissions.");
+    }
+    const newTaskId = insertedData[0].id;
+    
+    // 3. Append the new task's ID to the column's taskIds array.
     const existingIds = (backlogColumn.taskIds || [])
-        .map(id => Number(id)) // Convert all to number
-        .filter(id => id > 0); // Ensure they are valid positive IDs
-
+        .map(id => Number(id))
+        .filter(id => id > 0); 
     const updatedTaskIds = [...existingIds, newTaskId];
 
+    // 4. Update the column with the new taskIds array.
     const { error: updateError } = await supabase
         .from('project_columns')
         .update({ taskIds: updatedTaskIds })
@@ -490,6 +493,7 @@ export const getResources = async (): Promise<Omit<Resource, 'uploaderName' | 'u
         description: item.description,
         type: item.type,
         category: item.category,
+        topic: item.topic,
         url: item.url,
         filePath: item.file_path,
         uploaderUid: item.uploader_uid,
@@ -536,6 +540,7 @@ export const addResource = async (
         description: resourceData.description,
         type: resourceData.type,
         category: resourceData.category,
+        topic: resourceData.topic || null,
         url: finalUrl,
         file_path: filePath,
         uploader_uid: resourceData.uploaderUid,
