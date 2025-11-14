@@ -302,11 +302,11 @@ export const addFeedItem = async (itemData: Omit<FeedItem, 'id' | 'author' | 'au
 // --- PROJECTS API ---
 
 export const getProjectData = async (): Promise<ProjectData> => {
-    // 1. Fetch columns and tasks in parallel, with ordering.
+    // 1. Fetch columns and tasks in parallel.
     const [columnsRes, tasksRes] = await Promise.all([
         supabase.from('project_columns').select('*').order('position', { ascending: true }),
-        // Order tasks by ID to ensure a consistent, chronological order within columns.
-        supabase.from('project_tasks').select('*').order('id', { ascending: true }) 
+        // Fetch tasks without position ordering, as it does not exist in the schema.
+        supabase.from('project_tasks').select('*') 
     ]);
 
     if (columnsRes.error) throw new Error(columnsRes.error.message);
@@ -320,7 +320,7 @@ export const getProjectData = async (): Promise<ProjectData> => {
         acc[task.id.toString()] = { 
             id: task.id.toString(),
             content: task.content,
-            assigneeId: task.assignee_uid 
+            assigneeId: task.assignee_uid,
         };
         return acc;
     }, {} as {[key: string]: ProjectTask});
@@ -341,9 +341,11 @@ export const getProjectData = async (): Promise<ProjectData> => {
 
     // 4. Populate the taskIds for each column based on the fetched tasks.
     for (const task of allTasksData) {
-        const columnId = task.column_id.toString();
-        if (columns[columnId]) {
-            columns[columnId].taskIds.push(task.id.toString());
+        if (task.column_id) {
+            const columnId = task.column_id.toString();
+            if (columns[columnId]) {
+                columns[columnId].taskIds.push(task.id.toString());
+            }
         }
     }
     
@@ -351,19 +353,12 @@ export const getProjectData = async (): Promise<ProjectData> => {
 };
 
 
-export const moveProjectTask = async (
-    taskId: string,
-    sourceColumnId: string,
-    destinationColumnId: string,
-    newIndex: number,
-    projectData: ProjectData
-): Promise<void> => {
-    // The only action required is to update the task's column_id.
-    // The newIndex is ignored as the schema doesn't support custom ordering.
-    // Tasks will be ordered by their ID on the next data fetch.
+export const moveProjectTask = async (taskId: string, destinationColumnId: string): Promise<void> => {
     const { error } = await supabase
         .from('project_tasks')
-        .update({ column_id: Number(destinationColumnId) })
+        .update({ 
+            column_id: Number(destinationColumnId),
+        })
         .eq('id', Number(taskId));
     
     if (error) throw new Error(error.message);
@@ -380,21 +375,19 @@ export const addProjectTask = async (content: string): Promise<void> => {
 
     if (columnError) throw new Error(columnError.message);
     if (!firstColumn) throw new Error("No columns found in the project board.");
-    
-    // 2. Insert the new task, linking it to the first column.
+
+    // 2. Insert the new task into the first column. Position is not stored.
     const { error: taskError } = await supabase
         .from('project_tasks')
         .insert({ 
             content: content,
-            column_id: firstColumn.id
+            column_id: firstColumn.id,
         });
         
     if (taskError) throw new Error(taskError.message);
 };
 
 export const deleteProjectTask = async (taskId: string, columnId: string): Promise<void> => {
-    // Deleting a task only requires removing it from the project_tasks table.
-    // No need to modify the project_columns table.
     const { error } = await supabase
         .from('project_tasks')
         .delete()
@@ -449,7 +442,7 @@ export const addResource = async (
     if (resourceData.type === 'DOCUMENT' && file) {
         // Sanitize the filename to remove special characters that might cause issues.
         const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const fileName = `${resourceData.uploaderUid}/${Date.now()}_${safeFileName}`;
+        const fileName = `documents/${resourceData.uploaderUid}/${Date.now()}_${safeFileName}`;
         
         const { data: uploadData, error: uploadError } = await supabase.storage
             .from(RESOURCE_BUCKET)

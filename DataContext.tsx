@@ -10,6 +10,7 @@ interface IDataContext {
   attendance: AttendanceRecord[];
   feedItems: FeedItem[];
   projectData: ProjectData | null;
+  setProjectData: React.Dispatch<React.SetStateAction<ProjectData | null>>;
   allUsers: User[];
   resources: Resource[];
   // FIX: Added notifications to the context interface.
@@ -224,6 +225,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     attendance,
     feedItems,
     projectData,
+    setProjectData,
     allUsers,
     resources,
     // FIX: Provide notification state through context.

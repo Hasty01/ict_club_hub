@@ -42,16 +42,14 @@ const ProjectColumn: React.FC<ProjectColumnProps> = (props) => {
     onDragStart, onDrop, onDeleteTask, onAssignTask
   } = props;
   
-  const tasksToRender = tasks.filter(task => task.id !== draggedItemId);
-
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (!isPatron || !draggedItemId) return;
     
     const afterElement = getDragAfterElement(e.currentTarget, e.clientY);
     const newIndex = afterElement 
-        ? tasksToRender.findIndex(t => t.id === afterElement.dataset.taskId) 
-        : tasksToRender.length;
+        ? tasks.findIndex(t => t.id === afterElement.dataset.taskId) 
+        : tasks.length;
 
     setDropIndicator({ columnId: column.id, index: newIndex });
   };
@@ -77,8 +75,8 @@ const ProjectColumn: React.FC<ProjectColumnProps> = (props) => {
         onDrop={handleDrop}
         className="space-y-3 min-h-[200px] transition-colors"
       >
-        {tasksToRender.length === 0 && <DropIndicator visible={!!dropIndicator && dropIndicator.columnId === column.id} />}
-        {tasksToRender.map((task, index) => (
+        {tasks.length === 0 && <DropIndicator visible={!!dropIndicator && dropIndicator.columnId === column.id} />}
+        {tasks.map((task, index) => (
             <React.Fragment key={task.id}>
                 <DropIndicator visible={!!dropIndicator && dropIndicator.columnId === column.id && dropIndicator.index === index} />
                 <ProjectTaskCard
@@ -93,7 +91,7 @@ const ProjectColumn: React.FC<ProjectColumnProps> = (props) => {
                 />
             </React.Fragment>
         ))}
-        <DropIndicator visible={!!dropIndicator && dropIndicator.columnId === column.id && dropIndicator.index === tasksToRender.length} />
+        <DropIndicator visible={!!dropIndicator && dropIndicator.columnId === column.id && dropIndicator.index === tasks.length} />
       </div>
     </div>
   );

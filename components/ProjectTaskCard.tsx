@@ -39,7 +39,7 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
       } : undefined}
       data-task-id={task.id}
       data-dragging={isBeingDragged}
-      className={`bg-white dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-700 transform transition-all ${isPatron ? 'cursor-grab' : ''} shadow-sm`}
+      className={`bg-white dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-700 transform transition-all ${isPatron ? 'cursor-grab' : ''} shadow-sm ${isBeingDragged ? 'opacity-40' : ''}`}
     >
       <p className="text-gray-800 dark:text-gray-200 mb-3">{task.content}</p>
       <div className="pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">

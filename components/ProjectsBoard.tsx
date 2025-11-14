@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User } from '../types';
+import { User, ProjectData } from '../types';
 import * as api from '../services/apiService';
 import ProjectColumn from './ProjectColumn';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
@@ -12,6 +12,7 @@ interface ProjectsBoardProps {
 const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
   const { 
     projectData: data, 
+    setProjectData,
     allUsers, 
     isLoadingProjects, 
     isLoadingUsers, 
@@ -34,28 +35,49 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
   const handleDrop = async (destinationColumnId: string) => {
     if (!dropIndicator || !draggedItemId || !sourceColumnId || !data) return;
     
-    const { index: newIndex } = dropIndicator;
-    
-    // Clear indicators immediately for better UX
     const currentDraggedItemId = draggedItemId;
     const currentSourceColumnId = sourceColumnId;
+    const newIndex = dropIndicator.index;
+    
+    // Immediately clear UI indicators
     setDraggedItemId(null);
     setSourceColumnId(null);
     setDropIndicator(null);
     
-    // Don't do anything if dropping in the exact same spot
-    if (destinationColumnId === currentSourceColumnId && data.columns[currentSourceColumnId].taskIds.indexOf(currentDraggedItemId) === newIndex) {
+    // Check if the item was moved to the exact same position
+    const originalIndex = data.columns[currentSourceColumnId].taskIds.indexOf(currentDraggedItemId);
+    if (currentSourceColumnId === destinationColumnId && originalIndex === newIndex) {
         return;
     }
 
-    try {
-        await api.moveProjectTask(currentDraggedItemId, currentSourceColumnId, destinationColumnId, newIndex, data);
-        await fetchProjectData(); 
-    } catch (error: any) {
-        console.error("Failed to move task:", error);
-        alert(`An error occurred while moving the task: ${error.message}`);
+    // Optimistic Update
+    const oldData = data; // For rollback on failure
+    const newData: ProjectData = JSON.parse(JSON.stringify(data));
+    const sourceCol = newData.columns[currentSourceColumnId];
+    const destCol = newData.columns[destinationColumnId];
+
+    // Remove task from source column
+    const [movedTask] = sourceCol.taskIds.splice(originalIndex, 1);
+
+    // Add task to destination column at the new index
+    destCol.taskIds.splice(newIndex, 0, movedTask);
+
+    // Update UI immediately
+    setProjectData(newData);
+
+    // Persist change to the backend only if the column has changed
+    if (currentSourceColumnId !== destinationColumnId) {
+        try {
+            await api.moveProjectTask(currentDraggedItemId, destinationColumnId);
+        } catch (error: any) {
+            console.error("Failed to move task:", error);
+            alert(`An error occurred while moving the task. Reverting changes.`);
+            // Rollback on failure
+            setProjectData(oldData); 
+        }
     }
   };
+
 
   const handleAddTask = async () => {
     if (!newTaskContent.trim() || !data) return;
