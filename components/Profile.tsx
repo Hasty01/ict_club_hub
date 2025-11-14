@@ -9,6 +9,7 @@ import { EyeIcon } from './icons/EyeIcon';
 import { EyeOffIcon } from './icons/EyeOffIcon';
 import { CameraIcon } from './icons/CameraIcon';
 import { predefinedAvatars } from '../constants';
+import { useData } from '../DataContext';
 
 
 const AvatarSelectionModal: React.FC<{
@@ -149,6 +150,7 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
     const [isLoading, setIsLoading] = useState(true);
     const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
     const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+    const { fetchUsers } = useData();
 
     useEffect(() => {
         const fetchAttendance = async () => {
@@ -187,6 +189,7 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
             await api.updateUser(currentUser.uid, { avatarUrl: newAvatarUrl });
             const updatedUser = { ...currentUser, avatarUrl: newAvatarUrl };
             onUpdateUserProfile(updatedUser);
+            await fetchUsers(); // Refresh data across the app
             setIsAvatarModalOpen(false);
         } catch (error: any) {
             console.error("Failed to update avatar:", error);
