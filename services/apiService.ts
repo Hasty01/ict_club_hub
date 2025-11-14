@@ -464,7 +464,7 @@ export const addResource = async (
     if (resourceData.type === 'DOCUMENT' && file) {
         // Sanitize the filename to remove special characters that might cause issues.
         const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const fileName = `documents/${resourceData.uploaderUid}/${Date.now()}_${safeFileName}`;
+        const fileName = `documents/${Date.now()}_${safeFileName}`;
         
         const { data: uploadData, error: uploadError } = await supabase.storage
             .from(RESOURCE_BUCKET)
