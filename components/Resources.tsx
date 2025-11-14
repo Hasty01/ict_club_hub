@@ -19,13 +19,12 @@ const Resources: React.FC<ResourcesProps> = ({ currentUser }) => {
     const [category, setCategory] = useState<ResourceCategory>('Tutorial');
     const [type, setType] = useState<ResourceType>('LINK');
     const [url, setUrl] = useState('');
-    const [file, setFile] = useState<File | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!title || !description || !category || (type !== 'DOCUMENT' && !url) || (type === 'DOCUMENT' && !file)) {
+        if (!title || !description || !category || !url) {
             setError("Please fill all required fields.");
             return;
         }
@@ -39,10 +38,10 @@ const Resources: React.FC<ResourcesProps> = ({ currentUser }) => {
                 description,
                 category,
                 type,
-                url: type === 'DOCUMENT' ? undefined : url,
+                url: url,
                 uploaderUid: currentUser.uid,
                 topic: null, // Add topic to satisfy schema
-            }, file || undefined);
+            });
 
             // Reset form
             setTitle('');
@@ -50,7 +49,6 @@ const Resources: React.FC<ResourcesProps> = ({ currentUser }) => {
             setCategory('Tutorial');
             setType('LINK');
             setUrl('');
-            setFile(null);
             
             await fetchResources(); // Refresh data
         } catch (err: any) {
@@ -137,21 +135,11 @@ const Resources: React.FC<ResourcesProps> = ({ currentUser }) => {
                                 <select id="type-select" value={type} onChange={e => setType(e.target.value as ResourceType)} className="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500">
                                     <option value="LINK">Link</option>
                                     <option value="VIDEO">Video</option>
-                                    <option value="DOCUMENT">Document</option>
                                 </select>
                             </div>
                             <div>
-                                {type === 'DOCUMENT' ? (
-                                    <>
-                                        <label htmlFor="file-upload" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Upload File</label>
-                                        <input id="file-upload" type="file" onChange={e => setFile(e.target.files ? e.target.files[0] : null)} required className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100 dark:file:bg-pink-900/50 dark:file:text-pink-300 dark:hover:file:bg-pink-900" />
-                                    </>
-                                ) : (
-                                    <>
-                                        <label htmlFor="url-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL</label>
-                                        <input id="url-input" type="url" placeholder="https://example.com" value={url} onChange={e => setUrl(e.target.value)} required className="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500" />
-                                    </>
-                                )}
+                                <label htmlFor="url-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL</label>
+                                <input id="url-input" type="url" placeholder="https://example.com" value={url} onChange={e => setUrl(e.target.value)} required className="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500" />
                             </div>
                         </div>
                         {error && <p className="text-sm text-red-500">{error}</p>}

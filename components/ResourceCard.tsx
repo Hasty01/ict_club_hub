@@ -2,7 +2,6 @@ import React from 'react';
 import { Resource, User } from '../types';
 import { LinkIcon } from './icons/LinkIcon';
 import { VideoCameraIcon } from './icons/VideoCameraIcon';
-import { DocumentTextIcon } from './icons/DocumentTextIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { supabase } from '../services/supabaseClient';
 
@@ -18,8 +17,6 @@ const getResourceIcon = (type: Resource['type']) => {
       return <LinkIcon />;
     case 'VIDEO':
       return <VideoCameraIcon />;
-    case 'DOCUMENT':
-      return <DocumentTextIcon />;
     default:
       return null;
   }
@@ -34,7 +31,7 @@ const ResourceCard: React.FC<ResourceCardProps> = ({ resource, currentUser, onDe
         return resource.url || '#';
     };
 
-    const actionText = resource.type === 'DOCUMENT' ? 'Download' : 'View';
+    const actionText = 'View';
     
     return (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 flex items-start gap-4 hover:shadow-lg transition-shadow">

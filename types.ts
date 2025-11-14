@@ -66,7 +66,7 @@ export interface ProjectData {
   columnOrder: string[];
 }
 
-export type ResourceType = 'DOCUMENT' | 'LINK' | 'VIDEO';
+export type ResourceType = 'LINK' | 'VIDEO';
 
 export type ResourceCategory = 'Documentation' | 'Tutorial' | 'Tool' | 'Article' | 'Other';
 
@@ -79,7 +79,6 @@ export interface Resource {
   category: ResourceCategory;
   topic?: string;
   url?: string; // For LINK and VIDEO types
-  filePath?: string; // For DOCUMENT type
   uploaderUid: string;
   uploaderName: string;
   uploaderAvatarUrl?: string;

@@ -426,7 +426,6 @@ export const getResources = async (): Promise<Omit<Resource, 'uploaderName' | 'u
         category: item.category,
         topic: item.topic,
         url: item.url,
-        filePath: item.file_path,
         uploaderUid: item.uploader_uid,
     }));
 };
@@ -454,48 +453,16 @@ export const getResources = async (): Promise<Omit<Resource, 'uploaderName' | 'u
 * 3. For the "USING expression", simply use: true
 */
 export const addResource = async (
-    resourceData: Omit<Resource, 'id' | 'createdAt' | 'uploaderName' | 'uploaderAvatarUrl' | 'filePath'>,
-    file?: File
+    resourceData: Omit<Resource, 'id' | 'createdAt' | 'uploaderName' | 'uploaderAvatarUrl'>
 ): Promise<void> => {
-    let filePath: string | undefined = undefined;
-    let finalUrl: string | undefined = resourceData.url;
-
-    // 1. If it's a document, upload the file and get its public URL
-    if (resourceData.type === 'DOCUMENT' && file) {
-        // Sanitize the filename to remove special characters that might cause issues.
-        const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const fileName = `documents/${Date.now()}_${safeFileName}`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-            .from(RESOURCE_BUCKET)
-            .upload(fileName, file);
-
-        if (uploadError) throw new Error(uploadError.message);
-        
-        // Add an explicit check to ensure the upload response is valid.
-        if (!uploadData || !uploadData.path) {
-            throw new Error("File upload succeeded but the storage service did not return a valid path.");
-        }
-        
-        filePath = uploadData.path;
-        
-        // Get the public URL of the uploaded file to store in the database
-        const { data: urlData } = supabase.storage
-            .from(RESOURCE_BUCKET)
-            .getPublicUrl(filePath);
-            
-        finalUrl = urlData.publicUrl;
-    }
-
-    // 2. Insert metadata into the 'resources' table
+    // Insert metadata into the 'resources' table
     const resourceToInsert = {
         title: resourceData.title,
         description: resourceData.description,
         type: resourceData.type,
         category: resourceData.category,
         topic: resourceData.topic || null,
-        url: finalUrl,
-        file_path: filePath,
+        url: resourceData.url,
         uploader_uid: resourceData.uploaderUid,
     };
 
@@ -504,18 +471,7 @@ export const addResource = async (
 };
 
 export const deleteResource = async (resource: Resource): Promise<void> => {
-    // 1. If it's a document, delete the file from storage
-    if (resource.type === 'DOCUMENT' && resource.filePath) {
-        const { error: storageError } = await supabase.storage
-            .from(RESOURCE_BUCKET)
-            .remove([resource.filePath]);
-        if (storageError) {
-            // Log the error but proceed to delete the DB record anyway
-            console.error("Could not delete file from storage, but proceeding to delete database record:", storageError);
-        }
-    }
-
-    // 2. Delete the metadata record from the 'resources' table
+    // Delete the metadata record from the 'resources' table
     const { error: dbError } = await supabase.from('resources').delete().eq('id', resource.id);
     if (dbError) throw new Error(dbError.message);
 };
