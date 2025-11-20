@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FeedItem, User } from '../types';
+import { FeedItem, User, FeedItemType } from '../types';
 import * as api from '../services/apiService';
 import AddAnnouncement from './AddAnnouncement';
 import FeedItemCard from './FeedItemCard';
@@ -21,8 +21,8 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
     }
   }, [isLoadingFeed]);
 
-  const handleAddAnnouncement = useCallback(async (data: { title: string, message: string }) => {
-    await api.addFeedItem({ type: 'NEWS_UPDATE', ...data }, currentUser.uid);
+  const handleAddAnnouncement = useCallback(async (data: { title: string, message: string, type: FeedItemType }) => {
+    await api.addFeedItem({ ...data }, currentUser.uid);
     await fetchFeedItems();
   }, [fetchFeedItems, currentUser.uid]);
 

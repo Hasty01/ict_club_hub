@@ -95,10 +95,12 @@ const App: React.FC = () => {
   const handleLogout = useCallback(async () => {
     try {
         await api.logout();
-        setUser(null);
-        setView('welcome');
     } catch (error) {
         console.error("Logout failed:", error);
+    } finally {
+        // Force clear state to ensure UI updates even if API fails
+        setUser(null);
+        setView('welcome');
     }
   }, []);
 

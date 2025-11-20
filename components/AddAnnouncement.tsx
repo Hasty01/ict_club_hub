@@ -1,28 +1,39 @@
 import React, { useState } from 'react';
-import { User } from '../types';
+import { User, FeedItemType } from '../types';
 
 interface AddAnnouncementProps {
     currentUser: User;
-    onAddAnnouncement: (data: { title: string, message: string }) => Promise<void>;
+    onAddAnnouncement: (data: { title: string, message: string, type: FeedItemType }) => Promise<void>;
 }
 
 const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnnouncement }) => {
     const [title, setTitle] = useState('');
     const [message, setMessage] = useState('');
+    const [type, setType] = useState<FeedItemType>('NEWS_UPDATE');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!title.trim() || !message.trim()) {
-            alert('Please fill out both title and message.');
+        
+        // Validation
+        if (!message.trim()) {
+            alert('Please enter a message.');
             return;
         }
+        // Title is required for News and Events
+        if ((type === 'NEWS_UPDATE' || type === 'EVENT_ANNOUNCEMENT') && !title.trim()) {
+            alert('Please enter a title for this announcement type.');
+            return;
+        }
+        
         setIsSubmitting(true);
         try {
-            await onAddAnnouncement({ title, message });
+            await onAddAnnouncement({ title, message, type });
             setTitle('');
             setMessage('');
+            setType('NEWS_UPDATE');
         } catch (error) {
+            console.error(error);
             alert('Failed to post announcement.');
         } finally {
             setIsSubmitting(false);
@@ -35,14 +46,25 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
             <div className="flex items-start space-x-4">
                  <img src={currentUser.avatarUrl || `https://i.pravatar.cc/40?u=${currentUser.username}`} alt={currentUser.name} className="w-10 h-10 rounded-full flex-shrink-0" />
                 <form onSubmit={handleSubmit} className="space-y-3 flex-grow">
-                    <input
-                        id="announcement-title"
-                        type="text"
-                        placeholder="Announcement Title"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-pink-500 focus:border-pink-500"
-                    />
+                    <div className="flex flex-col sm:flex-row gap-3">
+                         <select
+                            value={type}
+                            onChange={(e) => setType(e.target.value as FeedItemType)}
+                            className="sm:w-1/3 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-pink-500 focus:border-pink-500 text-sm"
+                        >
+                            <option value="NEWS_UPDATE">News Update</option>
+                            <option value="EVENT_ANNOUNCEMENT">Event Announcement</option>
+                            <option value="MEMBER_POST">General Post</option>
+                        </select>
+                        <input
+                            id="announcement-title"
+                            type="text"
+                            placeholder={type === 'MEMBER_POST' ? "Title (Optional)" : "Title"}
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            className="flex-grow px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-pink-500 focus:border-pink-500"
+                        />
+                    </div>
                     <textarea
                         id="announcement-message"
                         placeholder="What's on your mind?"
