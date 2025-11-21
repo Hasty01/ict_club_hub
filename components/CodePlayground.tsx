@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PlayIcon } from './icons/PlayIcon';
+import { TrashIcon } from './icons/TrashIcon';
 import Editor from '@monaco-editor/react';
 
 interface CodePlaygroundProps {
@@ -117,6 +118,10 @@ sys.stderr = Writer('error')
         }
     }
   };
+  
+  const handleClearOutput = () => {
+      setOutput([]);
+  };
 
   const editorTheme = theme === 'dark' ? 'vs-dark' : 'light';
 
@@ -171,11 +176,20 @@ sys.stderr = Writer('error')
 
         {/* Output Panel */}
         <div className="flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-          <div className="p-3 border-b border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400">
-            Output
+          <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Output</span>
+            <button 
+                onClick={handleClearOutput}
+                className="p-1 text-gray-500 hover:text-red-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="Clear Output"
+                aria-label="Clear Output"
+            >
+                <TrashIcon />
+            </button>
           </div>
           <pre className="flex-1 w-full p-4 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 font-mono text-sm whitespace-pre-wrap break-words overflow-y-auto rounded-b-lg">
             <code>
+                {output.length === 0 && <span className="text-gray-400 italic">No output</span>}
                 {output.map((line, index) => (
                     <span key={index} className={line.type === 'error' ? 'text-red-500' : ''}>
                         {line.content}
