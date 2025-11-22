@@ -33,7 +33,7 @@ const PatronSignUp: React.FC<PatronSignUpProps> = ({ onSignUp, onNavigateToLogin
     setIsLoading(true);
     try {
         await onSignUp({ name, username, email, password, phoneNumber });
-        setMessage('Registration successful! Your account is now pending approval from an existing club patron.');
+        setMessage('Registration successful! Your account is pending approval. Existing club patrons have been notified.');
         setIsSignedUp(true);
         setName('');
         setUsername('');

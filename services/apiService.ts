@@ -3,6 +3,37 @@ import { supabase } from './supabaseClient';
 import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, FeedItemType, ProjectColumn, Resource, Notification, Tab } from '../types';
 import { predefinedAvatars } from '../constants';
 
+// --- INTERNAL HELPERS ---
+
+const notifyPatronsOfNewUser = async (name: string, username: string, role: 'MEMBER' | 'PATRON') => {
+    try {
+        console.log(`Notifying patrons about new ${role} registration: ${name}`);
+        // Fetch all APPROVED patrons to notify them
+        const { data: patrons, error } = await supabase
+            .from('users')
+            .select('uid')
+            .eq('role', 'PATRON')
+            .eq('status', 'APPROVED');
+
+        if (error || !patrons || patrons.length === 0) return;
+
+        const message = `New ${role.toLowerCase()} registration: ${name} (@${username}) is pending approval.`;
+
+        const notifications = patrons.map(patron => ({
+            user_uid: patron.uid,
+            message: message,
+            is_read: false,
+            link_to: 'members', // Direct link to the Members tab
+        }));
+
+        const { error: insertError } = await supabase.from('notifications').insert(notifications);
+        if (insertError) console.error("Failed to insert notifications for patrons:", insertError);
+    } catch (err) {
+        console.error("Error in notifyPatronsOfNewUser:", err);
+        // We do not throw here to ensure the signup process completes even if notification fails
+    }
+};
+
 // --- AUTH API ---
 
 export const login = async (email: string, password?: string): Promise<User> => {
@@ -48,6 +79,9 @@ export const signUp = async (newUser: Omit<User, 'uid' | 'role' | 'status' | 'av
         status: 'PENDING',
     });
     if (profileError) throw new Error(profileError.message);
+
+    // Notify Patrons about the new member
+    await notifyPatronsOfNewUser(newUser.name, newUser.username, 'MEMBER');
 };
 
 export const signUpAsPatron = async (newUser: Omit<User, 'uid' | 'role' | 'status' | 'avatarUrl'> & { password: string }): Promise<void> => {
@@ -72,6 +106,9 @@ export const signUpAsPatron = async (newUser: Omit<User, 'uid' | 'role' | 'statu
         status: 'PENDING',
     });
     if (profileError) throw new Error(profileError.message);
+
+    // Notify existing Patrons about the new patron request
+    await notifyPatronsOfNewUser(newUser.name, newUser.username, 'PATRON');
 };
 
 export const getUserProfile = async (uid: string): Promise<User | null> => {

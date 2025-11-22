@@ -33,7 +33,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
     setIsLoading(true);
     try {
         await onSignUp({ name, username, email, password, phoneNumber });
-        setMessage('Sign up successful! Your account is now pending approval from a club patron.');
+        setMessage('Sign up successful! Your account is pending approval. We have notified the club patrons.');
         setIsSignedUp(true);
         setName('');
         setUsername('');
