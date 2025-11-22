@@ -7,6 +7,7 @@ import SignUp from './components/SignUp';
 import Welcome from './components/Welcome';
 import PatronLogin from './components/PatronLogin';
 import PatronSignUp from './components/PatronSignUp';
+import PendingApprovalModal from './components/PendingApprovalModal';
 import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
 import { MenuIcon } from './components/icons/MenuIcon';
@@ -27,6 +28,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<View>('welcome');
   const [isLoading, setIsLoading] = useState(true);
+  const [showPendingModal, setShowPendingModal] = useState(false);
   
   // Initialize activeTab from localStorage or default to 'feed'
   const [activeTab, setActiveTab] = useState<Tab>(() => {
@@ -42,32 +44,29 @@ const App: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
 
   useEffect(() => {
-    // The initial state of isLoading is true, so we don't need to set it again here.
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         try {
           const currentUser = session?.user;
           if (currentUser) {
               const userProfile = await api.getUserProfile(currentUser.id);
+              
               if (userProfile && userProfile.status === 'APPROVED') {
                   setUser(userProfile);
                   setView('dashboard');
                   
-                  // Note: We do NOT reset activeTab to 'feed' here.
-                  // This allows the app to resume the tab from localStorage on refresh.
-
-                  // Automatically mark attendance for today's activities on login
-                  try {
-                      await api.markAttendanceOnLogin(userProfile.uid);
-                  } catch (attendanceError) {
-                      console.warn("Could not mark attendance automatically:", attendanceError);
-                      // This is a non-critical error, so we don't show it to the user.
-                  }
+                  // Run attendance marking in background to prevent blocking the UI load
+                  api.markAttendanceOnLogin(userProfile.uid)
+                    .catch(err => console.warn("Background attendance check failed:", err));
 
               } else {
                   // If user has a session but no approved profile, log them out.
                   // This handles pending users or users whose profiles were removed.
                   if (session) {
+                    if (userProfile && userProfile.status === 'PENDING') {
+                        setShowPendingModal(true);
+                    }
+                    // Ensure we clean up the session so they don't get stuck
                     await api.logout();
                   }
                   setUser(null);
@@ -83,7 +82,6 @@ const App: React.FC = () => {
             setUser(null);
             setView('welcome');
         } finally {
-            // This is critical: ensure loading is always set to false after the check completes.
             setIsLoading(false);
         }
       }
@@ -98,7 +96,6 @@ const App: React.FC = () => {
   const handleLogin = useCallback(async (email: string, password?: string) => {
     try {
         // The onAuthStateChange listener will handle setting the user and view on success.
-        // This function's primary role is now to initiate the login and handle errors.
         const loggedInUser = await api.login(email, password);
         if (loggedInUser.status !== 'APPROVED') {
             await api.logout(); // Ensure session is cleared if pending approval
@@ -106,7 +103,6 @@ const App: React.FC = () => {
         }
     } catch (error: any) {
         console.error("Login failed:", error);
-        // Re-throw the error so the Login component can catch it and display a message
         throw error;
     }
   }, []);
@@ -127,8 +123,6 @@ const App: React.FC = () => {
 
   const handleSignUp = useCallback(async (newUser: Omit<User, 'uid' | 'role' | 'status' | 'avatarUrl'> & {password: string}) => {
     await api.signUp(newUser);
-    // After sign-up, the user is shown a message in the SignUp component.
-    // They will need to be approved before they can log in.
   }, []);
 
   const handlePatronSignUp = useCallback(async (newUser: Omit<User, 'uid' | 'role' | 'status' | 'avatarUrl'> & {password: string}) => {
@@ -171,8 +165,13 @@ const App: React.FC = () => {
     return classList.join(' ');
   }, [theme]);
 
+  // Render a visible loading state instead of null to avoid "blank white screen" issues
   if (isLoading) {
-    return null;
+    return (
+      <div className={`flex items-center justify-center min-h-screen ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-pink-500"></div>
+      </div>
+    );
   }
 
   const renderContent = () => {
@@ -201,7 +200,6 @@ const App: React.FC = () => {
                 <h1 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600">
                   ICT Club Hub
                 </h1>
-                {/* A small placeholder to balance the flexbox */}
                 <div className="w-6 h-6"></div> 
               </header>
               <main className="flex-1 p-4 sm:p-6 lg:p-8 h-screen overflow-y-auto">
@@ -235,6 +233,10 @@ const App: React.FC = () => {
   return (
     <div className={appClasses}>
       {renderContent()}
+      <PendingApprovalModal 
+        isOpen={showPendingModal} 
+        onClose={() => setShowPendingModal(false)} 
+      />
     </div>
   );
 };
