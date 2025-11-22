@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { EyeIcon } from './icons/EyeIcon';
 import { EyeOffIcon } from './icons/EyeOffIcon';
+import PendingApprovalModal from './PendingApprovalModal';
 
 interface SignUpProps {
   onSignUp: (newUser: Omit<User, 'uid' | 'role' | 'status' | 'avatarUrl'> & { password: string }) => Promise<void>;
@@ -19,6 +20,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSignedUp, setIsSignedUp] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +35,10 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
     setIsLoading(true);
     try {
         await onSignUp({ name, username, email, password, phoneNumber });
-        setMessage('Sign up successful! Your account is pending approval. We have notified the club patrons.');
+        // We show the modal instead of just a message, but keeping a text status is helpful if they inspect the form behind the modal
+        setMessage('Sign up successful! Your account is pending approval.');
         setIsSignedUp(true);
+        setShowPendingModal(true);
         setName('');
         setUsername('');
         setEmail('');
@@ -45,6 +49,11 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
     } finally {
         setIsLoading(false);
     }
+  };
+
+  const handleCloseModal = () => {
+      setShowPendingModal(false);
+      onNavigateToLogin();
   };
 
   return (
@@ -149,6 +158,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
           </button>
         </p>
       </div>
+      <PendingApprovalModal isOpen={showPendingModal} onClose={handleCloseModal} />
     </div>
   );
 };

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { EyeIcon } from './icons/EyeIcon';
 import { EyeOffIcon } from './icons/EyeOffIcon';
+import PendingApprovalModal from './PendingApprovalModal';
 
 interface PatronSignUpProps {
   onSignUp: (newUser: Omit<User, 'uid' | 'role' | 'status' | 'avatarUrl'> & { password: string }) => Promise<void>;
@@ -19,6 +20,7 @@ const PatronSignUp: React.FC<PatronSignUpProps> = ({ onSignUp, onNavigateToLogin
   const [isLoading, setIsLoading] = useState(false);
   const [isSignedUp, setIsSignedUp] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +35,9 @@ const PatronSignUp: React.FC<PatronSignUpProps> = ({ onSignUp, onNavigateToLogin
     setIsLoading(true);
     try {
         await onSignUp({ name, username, email, password, phoneNumber });
-        setMessage('Registration successful! Your account is pending approval. Existing club patrons have been notified.');
+        setMessage('Registration successful! Your account is pending approval.');
         setIsSignedUp(true);
+        setShowPendingModal(true);
         setName('');
         setUsername('');
         setEmail('');
@@ -45,6 +48,11 @@ const PatronSignUp: React.FC<PatronSignUpProps> = ({ onSignUp, onNavigateToLogin
     } finally {
         setIsLoading(false);
     }
+  };
+
+  const handleCloseModal = () => {
+      setShowPendingModal(false);
+      onNavigateToLogin();
   };
 
   return (
@@ -149,6 +157,7 @@ const PatronSignUp: React.FC<PatronSignUpProps> = ({ onSignUp, onNavigateToLogin
           </button>
         </p>
       </div>
+      <PendingApprovalModal isOpen={showPendingModal} onClose={handleCloseModal} />
     </div>
   );
 };
