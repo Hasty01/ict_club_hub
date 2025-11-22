@@ -21,36 +21,33 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
   }, [fetchActivities]);
 
   const filteredAndSortedActivities = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today to midnight for accurate date comparison
+    // Get today's date in EAT (YYYY-MM-DD)
+    const todayEAT = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Africa/Kampala',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(new Date());
 
     const filtered = activities.filter(activity => {
-        const activityDate = new Date(activity.date);
-        // Ensure the activity date is treated as local time or UTC consistently depending on your input method.
-        // Assuming standard YYYY-MM-DD from input type="date", it parses as UTC usually, 
-        // but for simple day comparison:
-        const activityDay = new Date(activityDate.getFullYear(), activityDate.getMonth(), activityDate.getDate());
-
+        // activity.date is YYYY-MM-DD string
         if (filter === 'UPCOMING') {
-            return activityDay >= today;
+            return activity.date >= todayEAT;
         }
         if (filter === 'PAST') {
-            return activityDay < today;
+            return activity.date < todayEAT;
         }
         return true; // 'ALL'
     });
 
-    // Sort logic
+    // Sort logic using string comparison (works for YYYY-MM-DD)
     return filtered.sort((a, b) => {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-
         if (filter === 'UPCOMING') {
             // Upcoming: Soonest first (Ascending)
-            return dateA - dateB;
+            return a.date.localeCompare(b.date);
         } else {
             // Past or All: Newest first (Descending)
-            return dateB - dateA;
+            return b.date.localeCompare(a.date);
         }
     });
   }, [activities, filter]);

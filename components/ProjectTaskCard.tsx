@@ -78,9 +78,13 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
                     ))}
                  </select>
                 <button 
-                    onClick={() => onDeleteTask(task.id, columnId)}
-                    className="p-1 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors" 
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteTask(task.id, columnId);
+                    }}
+                    className="p-1.5 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors" 
                     aria-label="Delete task"
+                    title="Delete Task"
                 >
                     <TrashIcon />
                 </button>

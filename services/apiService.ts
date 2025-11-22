@@ -237,8 +237,14 @@ export const addAttendance = async (userId: string, recordData: Omit<AttendanceR
 };
 
 export const markAttendanceOnLogin = async (userId: string): Promise<void> => {
-    // 1. Get today's date in YYYY-MM-DD format
-    const today = new Date().toISOString().split('T')[0];
+    // 1. Get today's date in YYYY-MM-DD format in EAT (East Africa Time)
+    const formatter = new Intl.DateTimeFormat('en-CA', { 
+        timeZone: 'Africa/Kampala', 
+        year: 'numeric', 
+        month: '2-digit', 
+        day: '2-digit' 
+    });
+    const today = formatter.format(new Date());
 
     // 2. Fetch all activities scheduled for today
     const { data: todaysActivities, error: activityError } = await supabase
@@ -325,7 +331,7 @@ export const getFeedItems = async (): Promise<FeedItem[]> => {
             title: item.title || undefined,
             author: authorName,
             authorAvatarUrl: authorProfile?.avatar_url || `https://i.pravatar.cc/40?u=${authorUid}`,
-            timestamp: new Date(item.created_at).toLocaleString(), // Format timestamp
+            timestamp: new Date(item.created_at).toLocaleString('en-US', { timeZone: 'Africa/Kampala' }), // Format timestamp in EAT
         };
     });
 };
@@ -513,7 +519,7 @@ export const getNotifications = async (userId: string): Promise<Notification[]> 
         id: n.id.toString(),
         message: n.message,
         isRead: n.is_read,
-        createdAt: new Date(n.created_at).toLocaleString(),
+        createdAt: new Date(n.created_at).toLocaleString('en-US', { timeZone: 'Africa/Kampala' }), // Format timestamp in EAT
         linkTo: n.link_to as Tab | undefined,
         userId: n.user_uid,
     }));

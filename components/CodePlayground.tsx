@@ -73,13 +73,13 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme }) => {
     const setupCode = `
 import sys
 import builtins
-from js import sendOutputToReact, prompt
+import js
 
 class Writer:
     def __init__(self, stream_type):
         self.stream_type = stream_type
     def write(self, text):
-        sendOutputToReact(text, self.stream_type)
+        js.sendOutputToReact(text, self.stream_type)
     def flush(self):
         pass
 
@@ -87,10 +87,11 @@ sys.stdout = Writer('log')
 sys.stderr = Writer('error')
 
 def input_override(prompt_text=""):
-    val = prompt(prompt_text)
+    s = str(prompt_text)
+    val = js.prompt(s)
     if val is None:
         val = ""
-    print(f"{prompt_text}{val}")
+    print(f"{s}{val}")
     return val
 
 builtins.input = input_override
