@@ -9,6 +9,9 @@ import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
 import { XIcon } from './icons/XIcon';
 import { SendIcon } from './icons/SendIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
+import { FaceSmileIcon } from './icons/FaceSmileIcon';
+import { TrashIcon } from './icons/TrashIcon';
+import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 
 interface ChatProps {
     currentUser: User;
@@ -132,8 +135,10 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [realtimeStatus, setRealtimeStatus] = useState<'CONNECTING' | 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR'>('CONNECTING');
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const emojiPickerRef = useRef<HTMLDivElement>(null);
 
     const activeRoom = useMemo(() => rooms.find(r => r.id === activeRoomId), [rooms, activeRoomId]);
 
@@ -146,6 +151,19 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
     useEffect(() => {
         fetchRooms();
     }, [fetchRooms]);
+    
+    // Close emoji picker on click outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+                setShowEmojiPicker(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     // Function to fetch messages (used for initial load and polling)
     const loadMessages = useCallback(async (roomId: string, showLoadingIndicator = false) => {
@@ -153,9 +171,10 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
         try {
             const msgs = await api.getRoomMessages(roomId);
             setMessages(prev => {
-                // If length matches and last ID matches, assume no change to avoid re-renders
-                if (prev.length === msgs.length && prev.length > 0 && prev[prev.length-1].id === msgs[msgs.length-1].id) {
-                    return prev;
+                // Check if arrays are identical (same length and same IDs)
+                if (prev.length === msgs.length) {
+                     const isDifferent = prev.some((m, i) => m.id !== msgs[i].id);
+                     if (!isDifferent) return prev;
                 }
                 return msgs;
             });
@@ -175,6 +194,18 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
         setIsRefreshing(false);
         scrollToBottom();
     };
+    
+    const handleDeleteMessage = async (messageId: string) => {
+        if (!confirm("Are you sure you want to delete this message?")) return;
+        try {
+            await api.deleteMessage(messageId);
+            // Optimistically remove from UI
+            setMessages(prev => prev.filter(m => m.id !== messageId));
+        } catch (error) {
+            console.error("Failed to delete message:", error);
+            alert("Failed to delete message.");
+        }
+    };
 
     // Effect for room change: Fetch initial messages & Set up Realtime
     useEffect(() => {
@@ -186,38 +217,39 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
         // 2. Real-time subscription
         setRealtimeStatus('CONNECTING');
         
-        // We subscribe to ALL message inserts on the table and filter client-side.
-        // This avoids potential issues with UUID filter string formatting or restrictive RLS on filters.
+        // We subscribe to ALL message inserts/deletes on the table and filter client-side.
         const channel = supabase.channel(`room-listener:${activeRoomId}`)
             .on(
                 'postgres_changes',
                 { 
-                    event: 'INSERT', 
+                    event: '*', // Listen to INSERT, DELETE, etc.
                     schema: 'public', 
                     table: 'messages',
-                    // REMOVED filter string to ensure we get events even if RLS/Filter syntax is tricky
                 },
                 (payload) => {
-                    const rawMsg = payload.new as any;
-                    
-                    // Client-side filtering: Only process if it belongs to this room
-                    if (rawMsg && rawMsg.room_id === activeRoomId) {
-                        console.log("New message received via realtime:", payload);
-                        
-                        const newMsg: Message = {
-                            id: rawMsg.id,
-                            roomId: rawMsg.room_id,
-                            senderId: rawMsg.sender_id,
-                            content: rawMsg.content,
-                            createdAt: rawMsg.created_at,
-                            metadata: rawMsg.metadata
-                        };
+                    if (payload.eventType === 'INSERT') {
+                        const rawMsg = payload.new as any;
+                        if (rawMsg && rawMsg.room_id === activeRoomId) {
+                            const newMsg: Message = {
+                                id: rawMsg.id,
+                                roomId: rawMsg.room_id,
+                                senderId: rawMsg.sender_id,
+                                content: rawMsg.content,
+                                createdAt: rawMsg.created_at,
+                                metadata: rawMsg.metadata
+                            };
 
-                        setMessages(prev => {
-                            if (prev.some(m => m.id === newMsg.id)) return prev;
-                            return [...prev, newMsg];
-                        });
-                        scrollToBottom();
+                            setMessages(prev => {
+                                if (prev.some(m => m.id === newMsg.id)) return prev;
+                                return [...prev, newMsg];
+                            });
+                            scrollToBottom();
+                        }
+                    } else if (payload.eventType === 'DELETE') {
+                        const deletedId = payload.old.id;
+                        if (deletedId) {
+                             setMessages(prev => prev.filter(m => m.id !== deletedId));
+                        }
                     }
                 }
             )
@@ -255,6 +287,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
 
         const content = newMessage;
         setNewMessage(''); // Optimistic clear
+        setShowEmojiPicker(false);
 
         if (activeRoomId) {
             try {
@@ -272,6 +305,10 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                 setNewMessage(content); // Restore on fail
             }
         }
+    };
+    
+    const onEmojiClick = (emojiData: EmojiClickData) => {
+        setNewMessage(prev => prev + emojiData.emoji);
     };
 
     const handleCreateRoom = async (participantIds: string[], title?: string) => {
@@ -389,7 +426,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
             </div>
 
             {/* Main Chat Area */}
-            <div className={`${!isSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col flex-1 bg-white dark:bg-gray-900`}>
+            <div className={`${!isSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col flex-1 bg-white dark:bg-gray-900 relative`}>
                 {activeRoom ? (
                     <>
                         {/* Chat Header */}
@@ -433,8 +470,13 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                 messages.map(msg => {
                                     const isMe = msg.senderId === currentUser.uid;
                                     const sender = allUsers.find(u => u.uid === msg.senderId);
+                                    
+                                    // Check if message is less than 24 hours old
+                                    const isRecent = (Date.now() - new Date(msg.createdAt).getTime()) < 24 * 60 * 60 * 1000;
+                                    const canDelete = isMe && isRecent;
+
                                     return (
-                                        <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                        <div key={msg.id} className={`flex group ${isMe ? 'justify-end' : 'justify-start'}`}>
                                             {!isMe && (
                                                 <img 
                                                     src={sender?.avatarUrl || `https://i.pravatar.cc/24?u=${msg.senderId}`} 
@@ -443,14 +485,25 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                                     title={sender?.name}
                                                 />
                                             )}
-                                            <div className={`max-w-[70%] rounded-2xl px-4 py-2 shadow-sm ${
-                                                isMe 
-                                                ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-br-none' 
-                                                : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none border border-gray-200 dark:border-gray-600'
-                                            }`}>
-                                                {!isMe && <p className="text-xs text-pink-600 dark:text-pink-400 font-bold mb-1">{sender?.name || 'Unknown'}</p>}
-                                                <p className="whitespace-pre-wrap break-words text-sm md:text-base">{msg.content}</p>
-                                                <p className={`text-[10px] mt-1 text-right ${isMe ? 'text-pink-100' : 'text-gray-400'}`}>
+                                            <div className="flex flex-col max-w-[70%]">
+                                                <div className={`relative px-4 py-2 shadow-sm rounded-2xl ${
+                                                    isMe 
+                                                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-br-none' 
+                                                    : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none border border-gray-200 dark:border-gray-600'
+                                                }`}>
+                                                    {!isMe && <p className="text-xs text-pink-600 dark:text-pink-400 font-bold mb-1">{sender?.name || 'Unknown'}</p>}
+                                                    <p className="whitespace-pre-wrap break-words text-sm md:text-base">{msg.content}</p>
+                                                    {canDelete && (
+                                                        <button 
+                                                            onClick={() => handleDeleteMessage(msg.id)}
+                                                            className={`absolute top-1 right-1 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity ${isMe ? 'text-pink-200 hover:text-white hover:bg-white/20' : 'text-gray-400 hover:text-red-500'}`}
+                                                            title="Delete message"
+                                                        >
+                                                            <TrashIcon />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <p className={`text-[10px] mt-1 ${isMe ? 'text-right text-gray-400' : 'text-left text-gray-400'}`}>
                                                     {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </p>
                                             </div>
@@ -462,8 +515,27 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                        <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 relative">
+                             {showEmojiPicker && (
+                                <div className="absolute bottom-20 left-4 z-20" ref={emojiPickerRef}>
+                                    <EmojiPicker 
+                                        onEmojiClick={onEmojiClick} 
+                                        theme={Theme.AUTO}
+                                        searchDisabled
+                                        width={300}
+                                        height={400}
+                                    />
+                                </div>
+                            )}
                             <form onSubmit={handleSendMessage} className="flex items-end space-x-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                    className="p-3 text-gray-500 dark:text-gray-400 hover:text-pink-600 dark:hover:text-pink-400 transition-colors"
+                                    aria-label="Insert Emoji"
+                                >
+                                    <FaceSmileIcon />
+                                </button>
                                 <textarea
                                     value={newMessage}
                                     onChange={e => setNewMessage(e.target.value)}

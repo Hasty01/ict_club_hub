@@ -651,3 +651,8 @@ export const createRoom = async (title: string | null, participantIds: string[])
 
     return room.id;
 };
+
+export const deleteMessage = async (messageId: string): Promise<void> => {
+    const { error } = await supabase.from('messages').delete().eq('id', messageId);
+    if (error) throw new Error(error.message);
+};
