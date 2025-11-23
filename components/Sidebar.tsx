@@ -17,6 +17,7 @@ import { ChevronsRightIcon } from './icons/ChevronsRightIcon';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
 import { useData } from '../DataContext';
+import Notifications from './Notifications';
 
 
 interface SidebarProps {
@@ -167,6 +168,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme,
             >
               {theme === 'light' ? <MoonIcon /> : <SunIcon />}
             </button>
+            <Notifications currentUser={user} setActiveTab={setActiveTab} isSidebarCollapsed={isCollapsed} />
             <button
               onClick={onLogout}
               className={isCollapsed 

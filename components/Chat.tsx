@@ -136,6 +136,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [realtimeStatus, setRealtimeStatus] = useState<'CONNECTING' | 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR'>('CONNECTING');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [contextMenuMessageId, setContextMenuMessageId] = useState<string | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -152,16 +153,17 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
         fetchRooms();
     }, [fetchRooms]);
     
-    // Close emoji picker on click outside
+    // Close emoji picker and context menu on click outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
                 setShowEmojiPicker(false);
             }
+            setContextMenuMessageId(null);
         };
-        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('click', handleClickOutside);
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('click', handleClickOutside);
         };
     }, []);
     
@@ -223,6 +225,9 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
         
         // Clear unread count immediately upon opening
         clearUnreadCount(activeRoomId);
+        
+        // Reset context menu
+        setContextMenuMessageId(null);
 
         // 2. Real-time subscription
         setRealtimeStatus('CONNECTING');
@@ -494,7 +499,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                     const canDelete = isMe && isRecent;
 
                                     return (
-                                        <div key={msg.id} className={`flex group ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                        <div key={msg.id} className={`flex group ${isMe ? 'justify-end' : 'justify-start'} relative`}>
                                             {!isMe && (
                                                 <img 
                                                     src={sender?.avatarUrl || `https://i.pravatar.cc/24?u=${msg.senderId}`} 
@@ -504,23 +509,33 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                                 />
                                             )}
 
-                                            {/* Delete Button (Me) - Positioned to the left of the message */}
-                                            {isMe && canDelete && (
-                                                <div className="flex items-center mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button 
-                                                        onClick={() => handleDeleteMessage(msg.id)}
-                                                        className="p-1.5 rounded-full text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
-                                                        title="Delete message"
-                                                    >
-                                                        <TrashIcon />
-                                                    </button>
-                                                </div>
+                                            {/* Delete Button (Me) - Shown on Context Menu Trigger */}
+                                            {isMe && canDelete && contextMenuMessageId === msg.id && (
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteMessage(msg.id);
+                                                        setContextMenuMessageId(null);
+                                                    }}
+                                                    className="absolute top-1/2 -translate-y-1/2 -left-10 p-2 rounded-full bg-white dark:bg-gray-800 text-red-500 shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/30 transition-all z-20"
+                                                    title="Delete message"
+                                                >
+                                                    <TrashIcon />
+                                                </button>
                                             )}
 
                                             <div className="flex flex-col max-w-[70%]">
-                                                <div className={`relative px-4 py-2 shadow-sm rounded-2xl ${
+                                                <div 
+                                                    onContextMenu={(e) => {
+                                                        if (isMe && canDelete) {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            setContextMenuMessageId(msg.id);
+                                                        }
+                                                    }}
+                                                    className={`relative px-4 py-2 shadow-sm rounded-2xl ${
                                                     isMe 
-                                                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-br-none' 
+                                                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-br-none cursor-context-menu' 
                                                     : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none border border-gray-200 dark:border-gray-600'
                                                 }`}>
                                                     {!isMe && <p className="text-xs text-pink-600 dark:text-pink-400 font-bold mb-1">{sender?.name || 'Unknown'}</p>}

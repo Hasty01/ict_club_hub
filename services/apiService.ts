@@ -35,6 +35,28 @@ const notifyPatronsOfNewUser = async (name: string, username: string, role: 'MEM
     }
 };
 
+const notifyAllUsers = async (message: string, linkTo: Tab, excludeUserId?: string) => {
+    try {
+        const { data: users, error } = await supabase.from('users').select('uid');
+        if (error || !users) return;
+        
+        const notifications = users
+            .filter(u => u.uid !== excludeUserId)
+            .map(u => ({
+                user_uid: u.uid,
+                message,
+                is_read: false,
+                link_to: linkTo
+            }));
+        
+        if (notifications.length > 0) {
+            await supabase.from('notifications').insert(notifications);
+        }
+    } catch (err) {
+        console.error("Error in notifyAllUsers:", err);
+    }
+};
+
 // --- AUTH API ---
 
 export const login = async (email: string, password?: string): Promise<User> => {
@@ -209,6 +231,9 @@ export const getActivities = async (): Promise<Activity[]> => {
 export const addActivity = async (activityData: Omit<Activity, 'id'>): Promise<void> => {
     const { error } = await supabase.from('activities').insert(activityData);
     if (error) throw new Error(error.message);
+
+    // Notify all users about the new activity
+    await notifyAllUsers(`New activity: ${activityData.title} on ${activityData.date}`, 'activities');
 };
 
 // --- ATTENDANCE API ---
@@ -370,6 +395,9 @@ export const addFeedItem = async (itemData: Omit<FeedItem, 'id' | 'author' | 'au
     };
     const { error } = await supabase.from('feed_items').insert(newFeedItem);
     if (error) throw new Error(error.message);
+
+    // Notify all users about the new announcement (except the author)
+    await notifyAllUsers(`New Announcement: ${itemData.title || 'Update'}`, 'feed', authorId);
 };
 
 // --- PROJECTS API ---
