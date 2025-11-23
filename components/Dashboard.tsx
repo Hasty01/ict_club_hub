@@ -1,3 +1,4 @@
+
 import React, { Suspense, lazy } from 'react';
 import { User, Tab } from '../types';
 
@@ -9,6 +10,7 @@ const Profile = lazy(() => import('./Profile'));
 const Members = lazy(() => import('./Members'));
 const CodePlayground = lazy(() => import('./CodePlayground'));
 const Resources = lazy(() => import('./Resources'));
+const Chat = lazy(() => import('./Chat'));
 
 
 type Theme = 'light' | 'dark';
@@ -27,8 +29,8 @@ const LoadingIndicator: React.FC = () => (
 );
 
 // A simple wrapper to control visibility without unmounting the component
-const TabPanel: React.FC<{ active: boolean; children: React.ReactNode }> = ({ active, children }) => (
-    <div className={active ? 'block' : 'hidden'}>
+const TabPanel: React.FC<{ active: boolean; children: React.ReactNode; className?: string }> = ({ active, children, className }) => (
+    <div className={`${active ? 'block' : 'hidden'} ${className || ''}`}>
         {children}
     </div>
 );
@@ -58,6 +60,10 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
         </TabPanel>
         <TabPanel active={activeTab === 'resources'}>
             <Resources currentUser={currentUser} />
+        </TabPanel>
+        <TabPanel active={activeTab === 'chat'} className="h-[calc(100vh-6rem)] -m-4 sm:-m-6 lg:-m-8">
+            {/* Removed default margin for chat to make it full height/width relative to main container */}
+            <Chat currentUser={currentUser} />
         </TabPanel>
         {currentUser.role === 'PATRON' && (
             <TabPanel active={activeTab === 'members'}>

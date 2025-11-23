@@ -1,4 +1,5 @@
-export type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'profile' | 'members' | 'playground' | 'resources';
+
+export type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'profile' | 'members' | 'playground' | 'resources' | 'chat';
 
 export interface User {
   uid: string; // Changed from id: number
@@ -78,7 +79,7 @@ export interface Resource {
   uploaderName: string;
   uploaderAvatarUrl?: string;
 }
-// FIX: Added Notification interface to resolve missing type error.
+
 export interface Notification {
   id: string;
   message: string;
@@ -86,4 +87,23 @@ export interface Notification {
   createdAt: string;
   linkTo?: Tab;
   userId: string;
+}
+
+// Chat Types
+export interface Message {
+  id: string;
+  roomId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+  metadata?: any;
+}
+
+export interface Room {
+  id: string;
+  title?: string;
+  createdAt: string;
+  updatedAt: string;
+  participantIds: string[];
+  lastMessage?: Message; // For display purposes in the list
 }

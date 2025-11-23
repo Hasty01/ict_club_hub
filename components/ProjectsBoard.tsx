@@ -126,7 +126,9 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
 
   return (
     <div className="flex flex-col h-full">
-      <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-6">Club Projects Board</h2>
+      <div className="mb-6">
+        <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Club Projects Board</h2>
+      </div>
       
       {currentUser.role === 'PATRON' && (
         <div className="mb-6 flex flex-col sm:flex-row gap-3">

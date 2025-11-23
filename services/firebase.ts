@@ -1,0 +1,1 @@
+// This file is unused and deprecated. The application uses Supabase (services/supabaseClient.ts) for backend services.

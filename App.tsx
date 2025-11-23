@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { User, Tab } from './types';
 import Login from './components/Login';
@@ -34,7 +35,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(() => {
       if (typeof window !== 'undefined') {
           const savedTab = localStorage.getItem('active_tab') as Tab;
-          const validTabs: Tab[] = ['feed', 'activities', 'attendance', 'projects', 'profile', 'members', 'playground', 'resources'];
+          const validTabs: Tab[] = ['feed', 'activities', 'attendance', 'projects', 'profile', 'members', 'playground', 'resources', 'chat'];
           return validTabs.includes(savedTab) ? savedTab : 'feed';
       }
       return 'feed';

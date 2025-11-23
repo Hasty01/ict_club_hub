@@ -1,6 +1,7 @@
+
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 // FIX: Imported the new Notification type.
-import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, Notification } from './types';
+import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, Notification, Room } from './types';
 import * as api from './services/apiService';
 
 // Define the shape of the context state
@@ -15,6 +16,7 @@ interface IDataContext {
   resources: Resource[];
   // FIX: Added notifications to the context interface.
   notifications: Notification[];
+  rooms: Room[];
 
   // Loading states
   isLoadingActivities: boolean;
@@ -25,6 +27,7 @@ interface IDataContext {
   isLoadingResources: boolean;
   // FIX: Added notification loading state.
   isLoadingNotifications: boolean;
+  isLoadingRooms: boolean;
   isInitialLoading: boolean;
 
   // Error states
@@ -36,6 +39,7 @@ interface IDataContext {
   resourcesError: string | null;
   // FIX: Added notification error state.
   notificationsError: string | null;
+  roomsError: string | null;
 
   // Refetch functions
   fetchActivities: () => Promise<void>;
@@ -46,6 +50,7 @@ interface IDataContext {
   fetchResources: () => Promise<void>;
   // FIX: Added notification fetch function.
   fetchNotifications: () => Promise<void>;
+  fetchRooms: () => Promise<void>;
 }
 
 // Create the context with a default value
@@ -62,6 +67,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [rawResources, setRawResources] = useState<Omit<Resource, 'uploaderName' | 'uploaderAvatarUrl'>[]>([]);
   // FIX: Added state for notifications.
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
 
   const [isLoadingActivities, setIsLoadingActivities] = useState(true);
   const [isLoadingAttendance, setIsLoadingAttendance] = useState(true);
@@ -71,6 +77,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [isLoadingResources, setIsLoadingResources] = useState(true);
   // FIX: Added loading state for notifications.
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
+  const [isLoadingRooms, setIsLoadingRooms] = useState(true);
 
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
@@ -80,6 +87,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [resourcesError, setResourcesError] = useState<string | null>(null);
   // FIX: Added error state for notifications.
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const [roomsError, setRoomsError] = useState<string | null>(null);
 
   const fetchActivities = useCallback(async () => {
     setIsLoadingActivities(true);
@@ -178,6 +186,20 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         setIsLoadingNotifications(false);
     }
   }, [currentUser.uid]);
+
+  const fetchRooms = useCallback(async () => {
+    setIsLoadingRooms(true);
+    setRoomsError(null);
+    try {
+        const data = await api.getRooms(currentUser.uid);
+        setRooms(data);
+    } catch (e: any) {
+        console.error("Failed to fetch rooms", e);
+        setRoomsError(e.message || 'An unknown error occurred.');
+    } finally {
+        setIsLoadingRooms(false);
+    }
+  }, [currentUser.uid]);
   
   // Effect to perform the client-side join for resources
   useEffect(() => {
@@ -212,13 +234,14 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         fetchUsers(),
         // FIX: Fetch notifications on initial load.
         fetchNotifications(),
+        fetchRooms(),
       ]).then(() => {
         // After users are fetched, resources can be fetched and joined
         fetchResources();
       });
     }
   // FIX: Added fetchNotifications to the dependency array.
-  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources, fetchNotifications]);
+  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources, fetchNotifications, fetchRooms]);
 
   const value = {
     activities,
@@ -230,6 +253,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     resources,
     // FIX: Provide notification state through context.
     notifications,
+    rooms,
     isLoadingActivities,
     isLoadingAttendance,
     isLoadingFeed,
@@ -238,6 +262,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     isLoadingResources,
     // FIX: Provide notification loading state.
     isLoadingNotifications,
+    isLoadingRooms,
     activitiesError,
     attendanceError,
     feedItemsError,
@@ -246,8 +271,9 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     resourcesError,
     // FIX: Provide notification error state.
     notificationsError,
+    roomsError,
     // FIX: Include notification loading state in the overall initial loading flag.
-    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources || isLoadingNotifications,
+    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources || isLoadingNotifications || isLoadingRooms,
     fetchActivities,
     fetchAttendance,
     fetchFeedItems,
@@ -256,6 +282,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     fetchResources,
     // FIX: Provide notification fetch function.
     fetchNotifications,
+    fetchRooms,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

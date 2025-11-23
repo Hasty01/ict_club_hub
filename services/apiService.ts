@@ -1,7 +1,7 @@
 
 import { supabase } from './supabaseClient';
 // FIX: Imported the new Notification type.
-import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, FeedItemType, ProjectColumn, Resource, Notification, Tab } from '../types';
+import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, FeedItemType, ProjectColumn, Resource, Notification, Tab, Room, Message } from '../types';
 import { predefinedAvatars } from '../constants';
 
 // --- INTERNAL HELPERS ---
@@ -541,4 +541,104 @@ export const markAllNotificationsAsRead = async (userId: string): Promise<void> 
         .eq('user_uid', userId)
         .eq('is_read', false);
     if (error) throw new Error(error.message);
+};
+
+// --- CHAT API ---
+
+export const getRooms = async (userId: string): Promise<Room[]> => {
+    // 1. Get all room IDs the user is a member of
+    const { data: memberships, error: membershipError } = await supabase
+        .from('room_members')
+        .select('room_id')
+        .eq('user_id', userId);
+
+    if (membershipError) throw new Error(membershipError.message);
+    if (!memberships || memberships.length === 0) return [];
+
+    const roomIds = memberships.map(m => m.room_id);
+
+    // 2. Fetch room details
+    const { data: rooms, error: roomsError } = await supabase
+        .from('rooms')
+        .select('*')
+        .in('id', roomIds)
+        .order('updated_at', { ascending: false });
+
+    if (roomsError) throw new Error(roomsError.message);
+
+    // 3. Fetch all participants for these rooms to reconstruct names in UI
+    const { data: allMembers, error: allMembersError } = await supabase
+        .from('room_members')
+        .select('room_id, user_id')
+        .in('room_id', roomIds);
+
+    if (allMembersError) throw new Error(allMembersError.message);
+
+    return rooms.map(room => {
+        const participantIds = allMembers
+            .filter(m => m.room_id === room.id)
+            .map(m => m.user_id);
+
+        return {
+            id: room.id,
+            title: room.title,
+            createdAt: room.created_at,
+            updatedAt: room.updated_at,
+            participantIds: participantIds,
+        };
+    });
+};
+
+export const getRoomMessages = async (roomId: string): Promise<Message[]> => {
+    const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: true });
+
+    if (error) throw new Error(error.message);
+
+    return data.map(msg => ({
+        id: msg.id,
+        roomId: msg.room_id,
+        senderId: msg.sender_id,
+        content: msg.content,
+        createdAt: msg.created_at,
+        metadata: msg.metadata
+    }));
+};
+
+export const sendMessage = async (roomId: string, senderId: string, content: string): Promise<void> => {
+    const { error } = await supabase.from('messages').insert({
+        room_id: roomId,
+        sender_id: senderId,
+        content: content,
+    });
+
+    if (error) throw new Error(error.message);
+
+    // Update room updated_at timestamp
+    await supabase.from('rooms').update({ updated_at: new Date().toISOString() }).eq('id', roomId);
+};
+
+export const createRoom = async (title: string | null, participantIds: string[]): Promise<string> => {
+    // 1. Create Room
+    const { data: room, error: roomError } = await supabase
+        .from('rooms')
+        .insert({ title: title })
+        .select()
+        .single();
+
+    if (roomError) throw new Error(roomError.message);
+
+    // 2. Add Members
+    const members = participantIds.map(uid => ({
+        room_id: room.id,
+        user_id: uid,
+    }));
+
+    const { error: membersError } = await supabase.from('room_members').insert(members);
+    if (membersError) throw new Error(membersError.message);
+
+    return room.id;
 };

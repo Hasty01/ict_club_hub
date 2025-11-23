@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Activity } from '../types';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
@@ -32,7 +33,9 @@ const AddActivityForm: React.FC<{ onAddActivity: (activity: Omit<Activity, 'id'>
     
     return (
         <div className="mb-8 p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">Add New Activity</h2>
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Add New Activity</h2>
+            </div>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input type="text" placeholder="Activity Title" value={title} onChange={e => setTitle(e.target.value)} className="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500" />
