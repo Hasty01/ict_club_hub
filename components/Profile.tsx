@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, AttendanceRecord, AttendanceStatus } from '../types';
 import * as api from '../services/apiService';
@@ -10,6 +11,7 @@ import { EyeOffIcon } from './icons/EyeOffIcon';
 import { CameraIcon } from './icons/CameraIcon';
 import { predefinedAvatars } from '../constants';
 import { useData } from '../DataContext';
+import { CursorVariant } from './CustomCursor';
 
 
 const AvatarSelectionModal: React.FC<{
@@ -144,12 +146,106 @@ const ChangePasswordForm: React.FC<{ currentUser: User }> = ({ currentUser }) =>
     );
 };
 
+const AppearanceSettings: React.FC = () => {
+    const [selectedCursor, setSelectedCursor] = useState<CursorVariant>('default');
+
+    useEffect(() => {
+        const saved = localStorage.getItem('app_cursor') as CursorVariant;
+        if (saved) setSelectedCursor(saved);
+    }, []);
+
+    const handleCursorSelect = (variant: CursorVariant) => {
+        setSelectedCursor(variant);
+        localStorage.setItem('app_cursor', variant);
+        // Dispatch event so CustomCursor updates immediately
+        window.dispatchEvent(new CustomEvent('cursor-change', { detail: variant }));
+    };
+
+    const cursors: { id: CursorVariant, name: string, preview: React.ReactNode }[] = [
+        { 
+            id: 'default', 
+            name: 'Modern Gradient', 
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center">
+                    <div className="w-2.5 h-2.5 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full shadow-sm z-10"></div>
+                    <div className="absolute w-8 h-8 border-2 border-gray-400/60 rounded-full"></div>
+                </div>
+            )
+        },
+        { 
+            id: 'minimal', 
+            name: 'Minimal', 
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center bg-gray-200 dark:bg-gray-800 rounded-lg">
+                    <div className="w-3 h-3 bg-gray-900 dark:bg-white rounded-full"></div>
+                </div>
+            )
+        },
+        { 
+            id: 'retro', 
+            name: 'Retro Terminal', 
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center">
+                    <div className="w-4 h-4 bg-green-500 z-10"></div>
+                    <div className="absolute w-10 h-10 border-2 border-green-500/50"></div>
+                </div>
+            )
+        },
+        { 
+            id: 'glow', 
+            name: 'Cyber Glow', 
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center">
+                    <div className="w-4 h-4 bg-blue-400 rounded-full blur-[1px] z-10"></div>
+                    <div className="absolute w-10 h-10 bg-blue-500/30 blur-md rounded-full"></div>
+                </div>
+            )
+        }
+    ];
+
+    return (
+        <div className="mt-6">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Cursor Customization</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Personalize your experience by choosing a custom cursor style. 
+                (Only visible on desktop devices)
+            </p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {cursors.map((cursor) => (
+                    <button
+                        key={cursor.id}
+                        onClick={() => handleCursorSelect(cursor.id)}
+                        className={`relative flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all duration-200 group
+                        ${selectedCursor === cursor.id 
+                            ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/10' 
+                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-pink-300 dark:hover:border-pink-700'}`}
+                    >
+                        <div className="mb-4 transform group-hover:scale-110 transition-transform duration-200">
+                            {cursor.preview}
+                        </div>
+                        <span className={`font-medium text-sm ${selectedCursor === cursor.id ? 'text-pink-700 dark:text-pink-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                            {cursor.name}
+                        </span>
+                        {selectedCursor === cursor.id && (
+                            <div className="absolute top-3 right-3 text-pink-500">
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                            </div>
+                        )}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 
 const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) => void }> = ({ currentUser, onUpdateUserProfile }) => {
     const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
     const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState<'details' | 'appearance'>('details');
     const { fetchUsers, fetchFeedItems, fetchProjectData } = useData();
 
     useEffect(() => {
@@ -209,73 +305,106 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
     return (
         <div className="max-w-4xl mx-auto">
             <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-6">My Profile</h2>
-            <div className="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-                <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-8">
-                    <div className="relative flex-shrink-0 group">
-                        <button 
-                            onClick={() => setIsAvatarModalOpen(true)}
-                            className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full ring-4 ring-pink-500/50 focus:outline-none focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-900 focus:ring-pink-500 disabled:cursor-not-allowed"
-                            aria-label="Change profile picture"
-                            disabled={isUpdatingAvatar}
-                        >
-                            <img
-                                src={currentUser.avatarUrl || `https://i.pravatar.cc/128?u=${currentUser.username}`}
-                                alt={currentUser.name}
-                                className="w-full h-full rounded-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
-                                {isUpdatingAvatar ? (
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                                ) : (
-                                    <CameraIcon />
-                                )}
-                            </div>
-                        </button>
-                    </div>
-                    <div className="text-center sm:text-left">
-                        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{currentUser.name}</h1>
-                        <p className="text-md text-gray-500 dark:text-gray-400 mt-1">@{currentUser.username}</p>
-                        <span className={`mt-3 inline-block px-3 py-1 text-sm font-semibold rounded-full ${currentUser.role === 'PATRON' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'}`}>
-                            {currentUser.role}
-                        </span>
-                    </div>
+            
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+                {/* Navigation Tabs */}
+                <div className="flex border-b border-gray-200 dark:border-gray-700">
+                    <button
+                        onClick={() => setActiveTab('details')}
+                        className={`flex-1 py-4 text-sm font-medium text-center transition-colors focus:outline-none ${
+                            activeTab === 'details'
+                                ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400 bg-gray-50 dark:bg-gray-800'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                    >
+                        My Details
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('appearance')}
+                        className={`flex-1 py-4 text-sm font-medium text-center transition-colors focus:outline-none ${
+                            activeTab === 'appearance'
+                                ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400 bg-gray-50 dark:bg-gray-800'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                    >
+                        Appearance
+                    </button>
                 </div>
 
-                <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
-                    <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Attendance Summary</h3>
-                    {isLoading ? (
-                         <p className="text-gray-500 dark:text-gray-400">Loading attendance data...</p>
-                    ) : totalActivities > 0 ? (
+                <div className="p-6 sm:p-8">
+                    {activeTab === 'details' ? (
                         <>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
-                                <StatCard
-                                    icon={<CheckCircleIcon />}
-                                    label="Present"
-                                    value={attendanceSummary.Present}
-                                    percentage={getPercentage(attendanceSummary.Present)}
-                                    color="text-pink-500"
-                                />
-                                <StatCard
-                                    icon={<XCircleIcon />}
-                                    label="Absent"
-                                    value={attendanceSummary.Absent}
-                                    percentage={getPercentage(attendanceSummary.Absent)}
-                                    color="text-red-500"
-                                />
-                                <StatCard
-                                    icon={<ExclamationCircleIcon />}
-                                    label="Excused"
-                                    value={attendanceSummary.Excused}
-                                    percentage={getPercentage(attendanceSummary.Excused)}
-                                    color="text-yellow-500"
-                                />
+                            <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-8">
+                                <div className="relative flex-shrink-0 group">
+                                    <button 
+                                        onClick={() => setIsAvatarModalOpen(true)}
+                                        className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full ring-4 ring-pink-500/50 focus:outline-none focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-900 focus:ring-pink-500 disabled:cursor-not-allowed"
+                                        aria-label="Change profile picture"
+                                        disabled={isUpdatingAvatar}
+                                    >
+                                        <img
+                                            src={currentUser.avatarUrl || `https://i.pravatar.cc/128?u=${currentUser.username}`}
+                                            alt={currentUser.name}
+                                            className="w-full h-full rounded-full object-cover"
+                                        />
+                                        <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
+                                            {isUpdatingAvatar ? (
+                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                                            ) : (
+                                                <CameraIcon />
+                                            )}
+                                        </div>
+                                    </button>
+                                </div>
+                                <div className="text-center sm:text-left">
+                                    <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{currentUser.name}</h1>
+                                    <p className="text-md text-gray-500 dark:text-gray-400 mt-1">@{currentUser.username}</p>
+                                    <span className={`mt-3 inline-block px-3 py-1 text-sm font-semibold rounded-full ${currentUser.role === 'PATRON' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'}`}>
+                                        {currentUser.role}
+                                    </span>
+                                </div>
                             </div>
+
+                            <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+                                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Attendance Summary</h3>
+                                {isLoading ? (
+                                    <p className="text-gray-500 dark:text-gray-400">Loading attendance data...</p>
+                                ) : totalActivities > 0 ? (
+                                    <>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                                            <StatCard
+                                                icon={<CheckCircleIcon />}
+                                                label="Present"
+                                                value={attendanceSummary.Present}
+                                                percentage={getPercentage(attendanceSummary.Present)}
+                                                color="text-pink-500"
+                                            />
+                                            <StatCard
+                                                icon={<XCircleIcon />}
+                                                label="Absent"
+                                                value={attendanceSummary.Absent}
+                                                percentage={getPercentage(attendanceSummary.Absent)}
+                                                color="text-red-500"
+                                            />
+                                            <StatCard
+                                                icon={<ExclamationCircleIcon />}
+                                                label="Excused"
+                                                value={attendanceSummary.Excused}
+                                                percentage={getPercentage(attendanceSummary.Excused)}
+                                                color="text-yellow-500"
+                                            />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <p className="text-center text-gray-500 dark:text-gray-400 py-4">No attendance records found.</p>
+                                )}
+                            </div>
+                            <ChangePasswordForm currentUser={currentUser} />
                         </>
                     ) : (
-                        <p className="text-center text-gray-500 dark:text-gray-400 py-4">No attendance records found.</p>
+                        <AppearanceSettings />
                     )}
                 </div>
-                <ChangePasswordForm currentUser={currentUser} />
             </div>
 
             <AvatarSelectionModal
