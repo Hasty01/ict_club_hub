@@ -13,7 +13,6 @@ import Editor from '@monaco-editor/react';
 import { User, Tab } from '../types';
 import * as api from '../services/apiService';
 import ConfirmationModal from './ConfirmationModal';
-import InputModal from './InputModal';
 import ShareCodeModal from './ShareCodeModal';
 import { useData } from '../DataContext';
 
@@ -157,11 +156,14 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   // Copy Feedback
   const [copyFeedback, setCopyFeedback] = useState(false);
 
-  // Input Modal State
-  const [inputModalOpen, setInputModalOpen] = useState(false);
+  // Inline Console Input State
+  const [isWaitingForInput, setIsWaitingForInput] = useState(false);
   const [inputPrompt, setInputPrompt] = useState('');
+  const [consoleInput, setConsoleInput] = useState('');
   const inputResolverRef = useRef<((value: string) => void) | null>(null);
-
+  
+  const consoleInputRef = useRef<HTMLInputElement>(null);
+  const outputContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef(code);
 
@@ -218,11 +220,31 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
 
   }, []);
 
-  const handleInputSubmit = (value: string) => {
-      setInputModalOpen(false);
-      if (inputResolverRef.current) {
-          inputResolverRef.current(value);
-          inputResolverRef.current = null;
+  const scrollToBottom = () => {
+      if (outputContainerRef.current) {
+          setTimeout(() => {
+              outputContainerRef.current!.scrollTop = outputContainerRef.current!.scrollHeight;
+          }, 10);
+      }
+  };
+
+  const handleConsoleInputEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+          e.preventDefault();
+          const val = consoleInput;
+          
+          // Add the full line (prompt + input) to history so it looks like a real console session
+          const fullLine = `${inputPrompt}${val}\n`;
+          setOutput(prev => [...prev, { type: 'log', content: fullLine }]);
+          
+          setIsWaitingForInput(false);
+          setConsoleInput('');
+          setInputPrompt('');
+          
+          if (inputResolverRef.current) {
+              inputResolverRef.current(val);
+              inputResolverRef.current = null;
+          }
       }
   };
 
@@ -352,6 +374,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
     setIsExecuting(true);
     setActiveTabState('output');
     setOutput([]);
+    setIsWaitingForInput(false);
 
     if (!pyodide) {
         setOutput([{ type: 'error', content: 'Error: Local interpreter (Pyodide) is not ready.' }]);
@@ -359,19 +382,30 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
         return;
     }
 
-    // Helper to communicate with React
+    // Helper to communicate with React for Input
     (window as any).playgroundAskForInput = (prompt: string) => {
         return new Promise((resolve) => {
             setInputPrompt(prompt);
-            setInputModalOpen(true);
+            setIsWaitingForInput(true);
             inputResolverRef.current = resolve;
+            
+            // Automatically switch to output and focus input
+            setActiveTabState('output');
+            setTimeout(() => {
+                if (consoleInputRef.current) {
+                    consoleInputRef.current.focus();
+                }
+                scrollToBottom();
+            }, 50);
         });
     };
 
+    // Helper to communicate with React for Printing
     (window as any).playgroundPrint = (text: string, type: 'log' | 'error') => {
         if (text) {
             setOutput(prev => {
                 const lastOutput = prev[prev.length - 1];
+                // Append to last line if types match, otherwise new line
                 if (lastOutput && lastOutput.type === type) {
                     const newOutput = [...prev];
                     newOutput[newOutput.length - 1] = { ...lastOutput, content: lastOutput.content + text };
@@ -380,6 +414,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
                     return [...prev, { type, content: text }];
                 }
             });
+            scrollToBottom();
         }
     };
 
@@ -400,8 +435,8 @@ sys.stdout = Writer('log')
 sys.stderr = Writer('error')
 
 async def custom_input_async(prompt_text=""):
+    # Pass prompt to JS to display inline with input field
     val = await js.playgroundAskForInput(prompt_text)
-    print(f"{prompt_text}{val}")
     return val
 
 builtins.input = custom_input_async
@@ -425,19 +460,18 @@ builtins.input = custom_input_async
             }
         }
         
-        if (output.length === 0) {
-             // This check might be slightly racey due to async setState, but mostly fine for UX
-        }
-
     } catch (error: any) {
         (window as any).playgroundPrint(error.message, 'error');
     } finally {
         setIsExecuting(false);
+        setIsWaitingForInput(false); // Ensure input state is cleared if script crashes
+        scrollToBottom();
     }
   };
   
   const handleClearOutput = () => {
       setOutput([]);
+      setIsWaitingForInput(false);
   };
 
   const handleCopyOutput = () => {
@@ -510,14 +544,14 @@ builtins.input = custom_input_async
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2 hidden sm:block"></div>
             <button
                 onClick={handleRunCode}
-                disabled={isExecuting || !isPyodideReady}
+                disabled={isExecuting || !isPyodideReady || isWaitingForInput}
                 className="relative flex items-center space-x-2 px-5 py-3 font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg shadow-md hover:from-pink-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 aria-label="Run Code"
-                title={!isPyodideReady ? 'Local interpreter is initializing...' : 'Run code'}
+                title={!isPyodideReady ? 'Local interpreter is initializing...' : isWaitingForInput ? 'Waiting for input...' : 'Run code'}
             >
                 {!isPyodideReady && <div className="absolute -top-1 -right-1 h-3 w-3 flex items-center justify-center"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span></div>}
                 <PlayIcon />
-                <span>{isExecuting ? 'Running...' : 'Run Code'}</span>
+                <span>{isExecuting ? (isWaitingForInput ? 'Waiting...' : 'Running...') : 'Run Code'}</span>
             </button>
         </div>
       </div>
@@ -590,8 +624,16 @@ builtins.input = custom_input_async
                     </button>
                 </div>
             </div>
-            <div className="flex-1 w-full p-4 bg-gray-900 dark:bg-black text-gray-300 font-mono text-sm whitespace-pre-wrap break-words overflow-y-auto custom-scrollbar shadow-inner">
-                {output.length === 0 ? (
+            <div 
+                ref={outputContainerRef}
+                className="flex-1 w-full p-4 bg-gray-900 dark:bg-black text-gray-300 font-mono text-sm whitespace-pre-wrap break-words overflow-y-auto custom-scrollbar shadow-inner"
+                onClick={() => {
+                    if (isWaitingForInput && consoleInputRef.current) {
+                        consoleInputRef.current.focus();
+                    }
+                }}
+            >
+                {output.length === 0 && !isWaitingForInput ? (
                     <span className="text-gray-500 italic select-none">No output</span>
                 ) : (
                     output.map((line, index) => (
@@ -604,6 +646,26 @@ builtins.input = custom_input_async
                         </div>
                     ))
                 )}
+                
+                {/* Inline Input Field */}
+                {isWaitingForInput && (
+                    <div className="flex items-center text-gray-300 leading-relaxed mt-1">
+                        <span className="whitespace-pre-wrap">{inputPrompt}</span>
+                        <input
+                            ref={consoleInputRef}
+                            value={consoleInput}
+                            onChange={e => setConsoleInput(e.target.value)}
+                            onKeyDown={handleConsoleInputEnter}
+                            className="flex-1 bg-transparent border-none outline-none text-green-400 font-bold ml-1 min-w-[50px]"
+                            autoFocus
+                            autoComplete="off"
+                            spellCheck="false"
+                        />
+                    </div>
+                )}
+                
+                {/* Blinking Cursor when running but not waiting for input */}
+                {isExecuting && !isWaitingForInput && <div className="animate-pulse mt-1 text-green-500">_</div>}
             </div>
         </div>
       </div>
@@ -716,12 +778,6 @@ builtins.input = custom_input_async
         onClose={() => setIsShareModalOpen(false)}
         code={code}
         currentUser={currentUser}
-      />
-
-      <InputModal 
-        isOpen={inputModalOpen} 
-        promptText={inputPrompt} 
-        onSubmit={handleInputSubmit} 
       />
     </div>
   );

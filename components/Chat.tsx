@@ -53,7 +53,7 @@ const getRoomAvatar = (room: Room, allUsers: User[], currentUserId: string) => {
     return undefined; 
 };
 
-const LinkPreview: React.FC<{ url: string }> = ({ url }) => {
+const LinkPreview: React.FC<{ url: string, onImageClick?: (url: string) => void }> = ({ url, onImageClick }) => {
     const [imgError, setImgError] = useState(false);
     
     // Check for image extensions
@@ -61,14 +61,24 @@ const LinkPreview: React.FC<{ url: string }> = ({ url }) => {
 
     if (isImage && !imgError) {
         return (
-            <a href={url} target="_blank" rel="noopener noreferrer" className="block mt-2 mb-1" onClick={(e) => e.stopPropagation()}>
+            <div 
+                className="block mt-2 mb-1 cursor-pointer" 
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (onImageClick) {
+                        onImageClick(url);
+                    } else {
+                        window.open(url, '_blank');
+                    }
+                }}
+            >
                 <img 
                     src={url} 
                     alt="Shared content" 
                     className="max-w-full rounded-lg border border-gray-200 dark:border-gray-600 max-h-60 object-cover hover:opacity-95 transition-opacity" 
                     onError={() => setImgError(true)}
                 />
-            </a>
+            </div>
         );
     }
 
@@ -424,6 +434,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [realtimeStatus, setRealtimeStatus] = useState<'CONNECTING' | 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR'>('CONNECTING');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [viewingImage, setViewingImage] = useState<string | null>(null);
     
     // State for Custom Context Menu
     const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
@@ -802,7 +813,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                                 src={msg.metadata.fileUrl} 
                                 alt={msg.metadata.fileName} 
                                 className="max-w-full sm:max-w-[280px] max-h-[280px] object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-200 bg-black/5 dark:bg-white/5"
-                                onClick={() => window.open(msg.metadata.fileUrl, '_blank')}
+                                onClick={() => setViewingImage(msg.metadata.fileUrl)}
                                 loading="lazy"
                             />
                         </div>
@@ -855,7 +866,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                 <div className="whitespace-pre-wrap break-words text-sm md:text-base w-full min-w-0">
                     {parts.map((part, i) => {
                         if (part.match(urlRegex)) {
-                            return <LinkPreview key={i} url={part} />;
+                            return <LinkPreview key={i} url={part} onImageClick={setViewingImage} />;
                         }
                         return <span key={i}>{part}</span>;
                     })}
@@ -1147,6 +1158,26 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                 confirmText="Delete"
                 isDangerous
             />
+
+            {viewingImage && (
+                <div 
+                    className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+                    onClick={() => setViewingImage(null)}
+                >
+                    <button 
+                        onClick={() => setViewingImage(null)}
+                        className="absolute top-4 right-4 p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                    >
+                        <XIcon />
+                    </button>
+                    <img 
+                        src={viewingImage} 
+                        alt="Full size view" 
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                        onClick={(e) => e.stopPropagation()} 
+                    />
+                </div>
+            )}
         </div>
     );
 };
