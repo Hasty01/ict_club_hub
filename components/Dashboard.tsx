@@ -63,7 +63,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
             <Resources currentUser={currentUser} setActiveTab={setActiveTab} />
         </TabPanel>
         <TabPanel active={activeTab === 'chat'} className="h-full">
-            <Chat currentUser={currentUser} />
+            <Chat currentUser={currentUser} setActiveTab={setActiveTab} />
         </TabPanel>
         {currentUser.role === 'PATRON' && (
             <TabPanel active={activeTab === 'members'}>

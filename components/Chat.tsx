@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { User, Message, Room } from '../types';
+import { User, Message, Room, Tab } from '../types';
 import { useData } from '../DataContext';
 import * as api from '../services/apiService';
 import { supabase } from '../services/supabaseClient';
@@ -18,10 +18,12 @@ import { DocumentTextIcon } from './icons/DocumentTextIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import { UserAddIcon } from './icons/UserAddIcon';
 import { CheckIcon } from './icons/CheckIcon';
+import { CodeIcon } from './icons/CodeIcon';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 
 interface ChatProps {
     currentUser: User;
+    setActiveTab: (tab: Tab) => void;
 }
 
 // Helper to get a room name. If title exists, use it. Else, list other participants.
@@ -323,7 +325,7 @@ const RoomDetailsModal: React.FC<{
     );
 };
 
-const Chat: React.FC<ChatProps> = ({ currentUser }) => {
+const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
     const { rooms, allUsers, isLoadingRooms, fetchRooms, unreadMessageCounts, clearUnreadCount } = useData();
     const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -706,10 +708,27 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
         fileInputRef.current?.click();
     };
 
+    const handleOpenPythonFile = async (url: string) => {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("Failed to load file content");
+            const text = await response.text();
+
+            const event = new CustomEvent('open-in-playground', { detail: text });
+            window.dispatchEvent(event);
+
+            setActiveTab('playground');
+        } catch (error) {
+            console.error("Error opening file:", error);
+            alert("Could not open file in playground.");
+        }
+    };
+
     const renderMessageContent = (msg: Message, isMe: boolean) => {
         if (msg.metadata && msg.metadata.type === 'file') {
             // Check if it's an image
             const isImage = msg.metadata.fileType?.startsWith('image/');
+            const isPython = msg.metadata.fileName?.endsWith('.py');
             
             return (
                 <div className="flex flex-col">
@@ -726,24 +745,40 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                     )}
                     
                     <div className="flex items-center space-x-2 mb-1">
-                        {!isImage && <DocumentTextIcon className="h-5 w-5 opacity-75 flex-shrink-0" />}
+                        {!isImage && (
+                            isPython ? <CodeIcon className="h-5 w-5 opacity-75 flex-shrink-0" /> : <DocumentTextIcon className="h-5 w-5 opacity-75 flex-shrink-0" />
+                        )}
                         <span className="font-semibold truncate max-w-[180px] text-xs opacity-90">{msg.metadata.fileName}</span>
                     </div>
 
                     <div className="flex justify-between items-center mt-1">
                         <p className="text-[10px] opacity-70">{(msg.metadata.fileSize / 1024).toFixed(1)} KB</p>
-                        <a 
-                            href={msg.metadata.fileUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className={`text-[10px] px-2 py-1 rounded font-medium inline-block text-center transition-colors ${
-                                isMe 
-                                ? 'bg-white/20 hover:bg-white/30 text-white' 
-                                : 'bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-gray-100'
-                            }`}
-                        >
-                            {isImage ? 'Open' : 'Download'}
-                        </a>
+                        <div className="flex gap-2">
+                             {isPython && (
+                                <button
+                                    onClick={() => handleOpenPythonFile(msg.metadata.fileUrl)}
+                                    className={`text-[10px] px-2 py-1 rounded font-medium inline-block text-center transition-colors ${
+                                        isMe 
+                                        ? 'bg-white/20 hover:bg-white/30 text-white' 
+                                        : 'bg-purple-100 hover:bg-purple-200 text-purple-700 dark:bg-purple-900/50 dark:hover:bg-purple-800 dark:text-purple-300'
+                                    }`}
+                                >
+                                    Open Code
+                                </button>
+                             )}
+                            <a 
+                                href={msg.metadata.fileUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className={`text-[10px] px-2 py-1 rounded font-medium inline-block text-center transition-colors ${
+                                    isMe 
+                                    ? 'bg-white/20 hover:bg-white/30 text-white' 
+                                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-gray-100'
+                                }`}
+                            >
+                                {isImage ? 'Open' : 'Download'}
+                            </a>
+                        </div>
                     </div>
                 </div>
             );
@@ -932,8 +967,8 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                     ref={fileInputRef} 
                                     className="hidden" 
                                     onChange={handleFileUpload} 
-                                    // Accept common file types that are safe and likely < 2MB
-                                    accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt"
+                                    // Accept common file types including Python files
+                                    accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt,.py"
                                 />
                                 <button
                                     type="button"
