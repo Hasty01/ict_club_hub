@@ -61,36 +61,46 @@ const ResourceCard: React.FC<ResourceCardProps> = ({ resource, currentUser, onDe
 
     const getActionText = () => {
         if (resource.type === 'PYTHON') return isLoading ? 'Loading...' : 'Open in Playground';
-        return 'View';
+        return 'View Resource';
     };
     
     return (
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 flex items-start gap-4 hover:shadow-lg transition-shadow">
-            <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-pink-500">
+        <div className="group bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm hover:shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row items-start gap-5 transition-all duration-300 transform hover:-translate-y-1 hover:border-pink-200 dark:hover:border-pink-900/50">
+            <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-gray-50 dark:bg-gray-700 flex items-center justify-center text-pink-500 dark:text-pink-400 group-hover:bg-pink-50 dark:group-hover:bg-pink-900/20 group-hover:scale-110 transition-all duration-300">
                 {getResourceIcon(resource.type)}
             </div>
-            <div className="flex-grow">
-                <h4 className="font-bold text-gray-800 dark:text-gray-200">{resource.title}</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{resource.description}</p>
-                <div className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                    Uploaded by {resource.uploaderName} on {resource.createdAt}
+            <div className="flex-grow min-w-0">
+                <div className="flex justify-between items-start">
+                     <h4 className="font-bold text-gray-900 dark:text-gray-100 text-lg mb-1 truncate group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors">{resource.title}</h4>
+                     <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                         {resource.type}
+                     </span>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 leading-relaxed">{resource.description}</p>
+                <div className="flex items-center text-xs text-gray-400 dark:text-gray-500">
+                    <span className="font-medium mr-1 text-gray-600 dark:text-gray-300">{resource.uploaderName}</span>
+                    <span className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-2"></span>
+                    <span>{resource.createdAt}</span>
+                    <span className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-2"></span>
+                    <span className="text-pink-500 dark:text-pink-400">{resource.category}</span>
                 </div>
             </div>
-            <div className="flex-shrink-0 flex items-center gap-2">
+            <div className="flex-shrink-0 flex items-center gap-2 self-end sm:self-center mt-2 sm:mt-0 w-full sm:w-auto">
                 <a
                     href={getActionLink()}
                     target={resource.type === 'PYTHON' ? undefined : "_blank"}
                     rel="noopener noreferrer"
                     onClick={handleOpenAction}
-                    className={`px-4 py-2 text-sm font-semibold text-white bg-pink-600 rounded-lg shadow-sm hover:bg-pink-700 transition-all ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
+                    className={`flex-1 sm:flex-none text-center px-5 py-2.5 text-sm font-semibold text-white bg-gray-900 dark:bg-gray-700 hover:bg-pink-600 dark:hover:bg-pink-600 rounded-xl shadow-sm hover:shadow-md transition-all ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
                 >
                     {getActionText()}
                 </a>
                 {isPatron && (
                     <button
                         onClick={() => onDelete(resource)}
-                        className="p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+                        className="p-2.5 text-gray-400 hover:text-red-600 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border border-gray-200 dark:border-gray-700 hover:border-red-200 dark:hover:border-red-900/50"
                         aria-label="Delete resource"
+                        title="Delete Resource"
                     >
                         <TrashIcon />
                     </button>

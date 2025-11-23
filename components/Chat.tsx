@@ -428,9 +428,9 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
         <div className="flex h-full bg-white dark:bg-gray-900 shadow-xl rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
             {/* Sidebar / Room List */}
             <div className={`${isSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-1/3 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800`}>
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800/50">
                     <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">Messages</h2>
-                    <button onClick={() => setIsModalOpen(true)} className="text-pink-600 hover:text-pink-700 dark:text-pink-400">
+                    <button onClick={() => setIsModalOpen(true)} className="text-pink-600 hover:text-pink-700 dark:text-pink-400 p-2 hover:bg-pink-50 dark:hover:bg-pink-900/20 rounded-full transition-colors">
                         <PlusCircleIcon />
                     </button>
                 </div>
@@ -454,13 +454,13 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                 <div 
                                     key={room.id} 
                                     onClick={() => switchToRoom(room.id)}
-                                    className={`p-4 flex items-center cursor-pointer transition-colors ${isActive ? 'bg-white dark:bg-gray-700 shadow-sm' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
+                                    className={`p-4 flex items-center cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-800/50 ${isActive ? 'bg-white dark:bg-gray-700 shadow-sm border-l-4 border-l-pink-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 border-l-4 border-l-transparent'}`}
                                 >
                                     <div className="relative flex-shrink-0 mr-3">
                                         {avatar ? (
-                                            <img src={avatar} alt={roomName} className="w-12 h-12 rounded-full object-cover" />
+                                            <img src={avatar} alt={roomName} className="w-12 h-12 rounded-full object-cover shadow-sm" />
                                         ) : (
-                                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
+                                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
                                                 {roomName.charAt(0)}
                                             </div>
                                         )}
@@ -469,7 +469,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                         <div className="flex justify-between items-center">
                                             <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{roomName}</h3>
                                             {unreadCount > 0 && (
-                                                <span className="bg-pink-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-2">
+                                                <span className="bg-pink-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-2 shadow-sm">
                                                     {unreadCount > 99 ? '99+' : unreadCount}
                                                 </span>
                                             )}
@@ -496,7 +496,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800 shadow-sm z-10">
                             <div className="flex items-center">
                                 <button 
-                                    className="md:hidden mr-3 text-gray-500"
+                                    className="md:hidden mr-3 text-gray-500 hover:text-gray-800 dark:hover:text-white"
                                     onClick={() => setIsSidebarOpen(true)}
                                 >
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
@@ -540,7 +540,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                                 <img 
                                                     src={sender?.avatarUrl || `https://i.pravatar.cc/24?u=${msg.senderId}`} 
                                                     alt={sender?.name} 
-                                                    className="w-8 h-8 rounded-full mr-2 self-end mb-1"
+                                                    className="w-8 h-8 rounded-full mr-2 self-end mb-1 border border-gray-200 dark:border-gray-700"
                                                     title={sender?.name}
                                                 />
                                             )}
@@ -550,7 +550,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                                     onContextMenu={(e) => handleContextMenu(e, msg)}
                                                     className={`relative px-4 py-2 shadow-sm rounded-2xl ${
                                                     isMe 
-                                                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-br-none cursor-context-menu' 
+                                                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-br-none cursor-context-menu shadow-md' 
                                                     : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none border border-gray-200 dark:border-gray-600'
                                                 }`}>
                                                     {!isMe && <p className="text-xs text-pink-600 dark:text-pink-400 font-bold mb-1">{sender?.name || 'Unknown'}</p>}
@@ -568,56 +568,67 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 relative">
+                        <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 relative z-20">
                              {showEmojiPicker && (
-                                <div className="absolute bottom-20 left-4 z-20" ref={emojiPickerRef}>
+                                <div className="absolute bottom-20 left-4 z-20 shadow-2xl rounded-xl overflow-hidden" ref={emojiPickerRef}>
                                     <EmojiPicker 
                                         onEmojiClick={onEmojiClick} 
                                         theme={Theme.AUTO}
                                         searchDisabled
                                         width={300}
-                                        height={400}
+                                        height={350}
+                                        previewConfig={{ showPreview: false }}
                                     />
                                 </div>
                             )}
-                            <form onSubmit={handleSendMessage} className="flex items-end space-x-2">
+                            <form onSubmit={handleSendMessage} className="flex items-end space-x-2 max-w-4xl mx-auto">
                                 <button
                                     type="button"
                                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                                    className="p-3 text-gray-500 dark:text-gray-400 hover:text-pink-600 dark:hover:text-pink-400 transition-colors"
+                                    className="p-3 text-gray-400 dark:text-gray-500 hover:text-pink-500 dark:hover:text-pink-400 transition-colors rounded-full hover:bg-white dark:hover:bg-gray-800 shadow-sm border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
                                     aria-label="Insert Emoji"
                                 >
                                     <FaceSmileIcon />
                                 </button>
-                                <textarea
-                                    value={newMessage}
-                                    onChange={e => setNewMessage(e.target.value)}
-                                    placeholder="Type a message..."
-                                    className="flex-1 max-h-32 min-h-[2.5rem] p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500 resize-none"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault();
-                                            handleSendMessage(e);
-                                        }
-                                    }}
-                                />
-                                <button 
-                                    type="submit" 
-                                    disabled={!newMessage.trim()}
-                                    className="p-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-full hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-all"
-                                >
-                                    <SendIcon className="h-5 w-5 transform rotate-90" />
-                                </button>
+                                <div className="flex-1 relative">
+                                    <textarea
+                                        value={newMessage}
+                                        onChange={e => setNewMessage(e.target.value)}
+                                        placeholder="Type a message..."
+                                        className="w-full max-h-32 min-h-[3rem] p-3 pl-4 pr-12 border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none transition-all shadow-sm focus:shadow-md"
+                                        style={{ height: '3rem' }} // Initial height
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleSendMessage(e);
+                                            }
+                                        }}
+                                    />
+                                    <div className="absolute right-2 bottom-1.5">
+                                         <button 
+                                            type="submit" 
+                                            disabled={!newMessage.trim()}
+                                            className="p-2 bg-pink-500 text-white rounded-xl hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center"
+                                        >
+                                            <SendIcon className="h-4 w-4 transform rotate-90" />
+                                        </button>
+                                    </div>
+                                </div>
                             </form>
+                            <div className="text-center mt-2">
+                                <p className="text-[10px] text-gray-400 dark:text-gray-600">
+                                    Press <span className="font-mono bg-gray-200 dark:bg-gray-800 px-1 rounded">Enter</span> to send, <span className="font-mono bg-gray-200 dark:bg-gray-800 px-1 rounded">Shift + Enter</span> for new line
+                                </p>
+                            </div>
                         </div>
                     </>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center p-8 text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-900">
-                        <div className="w-24 h-24 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center mb-4">
+                        <div className="w-24 h-24 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center mb-4 shadow-inner">
                             <ChatBubbleIcon />
                         </div>
                         <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-400">Select a conversation</h3>
-                        <p className="mt-2">Choose a chat from the sidebar or start a new one.</p>
+                        <p className="mt-2 text-center">Choose a chat from the sidebar or start a new one to collaborate.</p>
                     </div>
                 )}
             </div>

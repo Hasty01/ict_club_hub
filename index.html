@@ -1,5 +1,6 @@
+
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -7,77 +8,82 @@
     <meta name="theme-color" content="#EC4899" />
     <link rel="manifest" href="/manifest.json" />
     <title>ICT Club Hub</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
     <script src="https://cdn.tailwindcss.com"></script>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "recharts": "https://aistudiocdn.com/recharts@^3.3.0",
-    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.44.4",
-    "@monaco-editor/react": "https://aistudiocdn.com/@monaco-editor/react@^4.7.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "emoji-picker-react": "https://esm.sh/emoji-picker-react@4.9.2?external=react,react-dom"
-  }
-}
-</script>
-<script>
-    tailwind.config = {
-      darkMode: 'class', // Enable class-based dark mode
-      theme: {
-        extend: {
-          // You can extend your theme here if needed
+    <script>
+      tailwind.config = {
+        darkMode: 'class', // Enable class-based dark mode
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            colors: {
+              gray: {
+                750: '#2d3748',
+                850: '#1a202c',
+                950: '#0d1117',
+              }
+            }
+          }
         }
       }
+    </script>
+    <script type="importmap">
+    {
+      "imports": {
+        "react/": "https://aistudiocdn.com/react@^19.2.0/",
+        "react": "https://aistudiocdn.com/react@^19.2.0",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "recharts": "https://aistudiocdn.com/recharts@^3.3.0",
+        "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.44.4",
+        "@monaco-editor/react": "https://aistudiocdn.com/@monaco-editor/react@^4.7.0",
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+        "emoji-picker-react": "https://esm.sh/emoji-picker-react@4.9.2?external=react,react-dom"
+      }
     }
-  </script>
-  <style>
-    /* Custom scrollbar styles for Webkit browsers */
-    ::-webkit-scrollbar {
-      width: 8px; /* width of the entire scrollbar */
-      height: 8px; /* height of the horizontal scrollbar */
-    }
+    </script>
+    <style>
+      html, body, #root {
+        height: 100%;
+      }
+      
+      /* Custom scrollbar styles for Webkit browsers */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
 
-    ::-webkit-scrollbar-track {
-      background: #f1f5f9; /* A light gray for the track */
-    }
+      ::-webkit-scrollbar-track {
+        background: transparent; 
+      }
 
-    ::-webkit-scrollbar-thumb {
-      background: linear-gradient(to right, #EC4899, #8B5CF6); /* Themed gradient */
-      border-radius: 10px;
-    }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+      }
+      
+      .dark ::-webkit-scrollbar-thumb {
+        background: #4b5563;
+      }
 
-    ::-webkit-scrollbar-thumb:hover {
-      background: linear-gradient(to right, #db2777, #7c3aed); /* Slightly darker on hover */
-    }
-
-    /* Dark mode scrollbar styles */
-    .dark ::-webkit-scrollbar-track {
-      background: #1f2937; /* Darker track for dark mode */
-    }
-  </style>
-</head>
-  <body class="bg-gray-100 dark:bg-gray-900">
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8; 
+      }
+      
+      .dark ::-webkit-scrollbar-thumb:hover {
+        background: #6b7280;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 antialiased selection:bg-pink-500 selection:text-white">
     <div id="root"></div>
     <script src="https://cdn.jsdelivr.net/pyodide/v0.29.0/full/pyodide.js"></script>
-    <script>
-      // Service Worker registration is currently commented out to prevent origin mismatch errors 
-      // in the preview environment. Uncomment this block when deploying to production.
-      /*
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(registration => {
-              console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            })
-            .catch(err => {
-              console.log('ServiceWorker registration failed: ', err);
-            });
-        });
-      }
-      */
-    </script>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React from 'react';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { ClipboardListIcon } from './icons/ClipboardListIcon';
 import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
@@ -10,11 +11,11 @@ interface WelcomeProps {
 
 const Welcome: React.FC<WelcomeProps> = ({ onNavigateToLogin, onNavigateToPatronLogin }) => {
   return (
-    <div className="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+    <div className="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen flex flex-col">
       {/* Hero Section */}
-      <header className="h-screen flex items-center justify-center relative overflow-hidden">
+      <header className="min-h-[100dvh] flex flex-col items-center justify-center relative overflow-hidden p-6">
         {/* Animated background shapes */}
-        <div className="absolute inset-0 z-0 opacity-50 dark:opacity-30">
+        <div className="absolute inset-0 z-0 opacity-50 dark:opacity-20 pointer-events-none">
           <style>
             {`
               @keyframes float {
@@ -54,7 +55,7 @@ const Welcome: React.FC<WelcomeProps> = ({ onNavigateToLogin, onNavigateToPatron
           <span className="shape"></span>
         </div>
 
-        <div className="text-center z-10 p-4">
+        <div className="text-center z-10 p-4 max-w-4xl mx-auto flex flex-col items-center">
           <style>
             {`
               @keyframes fade-in-down {
@@ -69,81 +70,116 @@ const Welcome: React.FC<WelcomeProps> = ({ onNavigateToLogin, onNavigateToPatron
               .animate-fade-in-up { animation: fade-in-up 1s ease-out forwards; opacity: 0; }
             `}
           </style>
-          <h1 className="text-5xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600 animate-fade-in-down">
-            Welcome to ICT Club Hub
+          
+          {/* Logo or Icon could go here */}
+          
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 animate-fade-in-down drop-shadow-sm pb-2">
+            ICT Club Hub
           </h1>
-          <p className="mt-4 text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
-            Your central place for activities, attendance, and collaboration.
+          
+          <p className="mt-6 text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto animate-fade-in-up leading-relaxed" style={{ animationDelay: '0.3s' }}>
+            Empowering students to connect, code, and create. <br className="hidden md:block"/> Your central hub for all club activities.
           </p>
-          <button
-            onClick={onNavigateToLogin}
-            className="mt-10 px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-300 focus:outline-none focus:ring-4 focus:ring-pink-500/50 dark:focus:ring-purple-500/50 animate-fade-in-up"
-            style={{ animationDelay: '1s' }}
-          >
-            Enter the Hub
-          </button>
-          <div className="mt-6 animate-fade-in-up" style={{ animationDelay: '1.2s' }}>
+          
+          <div className="mt-12 flex flex-col sm:flex-row items-center gap-4 w-full justify-center animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+              <button
+                onClick={onNavigateToLogin}
+                className="w-full sm:w-auto px-10 py-4 text-lg font-bold text-white bg-gradient-to-r from-pink-600 to-purple-600 rounded-xl shadow-lg hover:shadow-purple-500/30 hover:scale-105 transform transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-pink-500/50 dark:focus:ring-purple-500/50"
+              >
+                Enter the Hub
+              </button>
+              
               <button
                 onClick={onNavigateToPatronLogin}
-                className="font-medium text-gray-600 dark:text-gray-400 hover:text-pink-500 dark:hover:text-pink-400 transition-colors"
+                className="w-full sm:w-auto px-10 py-4 text-lg font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-750 transition-all duration-300"
               >
-                Are you a Patron? Login here
+                Patron Login
               </button>
           </div>
+        </div>
+        
+        {/* Scroll indicator */}
+        <div className="absolute bottom-8 animate-bounce text-gray-400 dark:text-gray-600 hidden md:block">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
         </div>
       </header>
       
       {/* Features Section */}
-      <section className="py-20 bg-white dark:bg-gray-800">
-        <div className="container mx-auto px-6 text-center">
-            <h2 className="text-4xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600">Why ICT Club Hub?</h2>
-            <p className="mb-12 text-lg text-gray-600 dark:text-gray-400">Everything your ICT club needs, all in one place.</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <section className="py-24 bg-gray-50 dark:bg-gray-950">
+        <div className="container mx-auto px-6 max-w-6xl">
+            <div className="text-center mb-16">
+                <h2 className="text-4xl font-bold mb-4 text-gray-900 dark:text-white">Why ICT Club Hub?</h2>
+                <div className="w-24 h-1 bg-gradient-to-r from-pink-500 to-purple-600 mx-auto rounded-full"></div>
+                <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">We've built a comprehensive platform to streamline your club experience and foster collaboration.</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
                 {/* Feature 1 */}
-                <div className="p-8 rounded-lg shadow-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-center h-16 w-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-pink-100 to-purple-100 dark:from-pink-900/50 dark:to-purple-900/50 text-pink-500 dark:text-pink-400">
+                <div className="group p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl shadow-gray-200/50 dark:shadow-none hover:shadow-2xl hover:shadow-pink-500/10 transition-all duration-300 hover:-translate-y-1">
+                    <div className="w-14 h-14 mb-6 rounded-2xl bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center text-pink-600 dark:text-pink-400 group-hover:scale-110 transition-transform duration-300">
                         <CalendarIcon />
                     </div>
-                    <h3 className="text-xl font-bold mb-2">Track Activities</h3>
-                    <p className="text-gray-600 dark:text-gray-400">Stay up-to-date with all club events, workshops, and meetings. Never miss an opportunity to learn and connect.</p>
+                    <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">Track Activities</h3>
+                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                        Stay up-to-date with all club events, workshops, and meetings. View them in a list or calendar format and never miss an opportunity.
+                    </p>
                 </div>
+                
                 {/* Feature 2 */}
-                <div className="p-8 rounded-lg shadow-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-center h-16 w-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-pink-100 to-purple-100 dark:from-pink-900/50 dark:to-purple-900/50 text-purple-500 dark:text-purple-400">
+                <div className="group p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl shadow-gray-200/50 dark:shadow-none hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-300 hover:-translate-y-1">
+                    <div className="w-14 h-14 mb-6 rounded-2xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform duration-300">
                         <ClipboardListIcon />
                     </div>
-                    <h3 className="text-xl font-bold mb-2">Collaborate on Projects</h3>
-                    <p className="text-gray-600 dark:text-gray-400">Organize and manage club projects with our interactive Kanban board. Assign tasks and track progress together.</p>
+                    <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">Project Management</h3>
+                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                        Organize and manage club projects with our interactive Kanban board. Assign tasks, track progress, and collaborate effectively.
+                    </p>
                 </div>
+                
                 {/* Feature 3 */}
-                <div className="p-8 rounded-lg shadow-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-center h-16 w-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-pink-100 to-purple-100 dark:from-pink-900/50 dark:to-purple-900/50 text-pink-500 dark:text-pink-400">
+                <div className="group p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl shadow-gray-200/50 dark:shadow-none hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300 hover:-translate-y-1">
+                    <div className="w-14 h-14 mb-6 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform duration-300">
                         <ChatBubbleIcon />
                     </div>
-                    <h3 className="text-xl font-bold mb-2">Stay Connected</h3>
-                    <p className="text-gray-600 dark:text-gray-400">Engage with fellow members through the activity feed and get instant answers from our club AI assistant.</p>
+                    <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">Real-time Chat</h3>
+                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                        Engage with fellow members through direct messages and group chats. Share ideas, ask questions, and build a community.
+                    </p>
                 </div>
             </div>
         </div>
       </section>
       
       {/* Final CTA Section */}
-      <section className="py-20 bg-white dark:bg-gray-800">
-        <div className="container mx-auto px-6 text-center">
-            <h2 className="text-4xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600">Ready to Join?</h2>
-            <p className="mb-8 text-lg text-gray-600 dark:text-gray-400">Become a part of our growing community of tech enthusiasts.</p>
-            <button
-                onClick={onNavigateToLogin}
-                className="px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-300 focus:outline-none focus:ring-4 focus:ring-pink-500/50 dark:focus:ring-purple-500/50"
-            >
-                Get Started Now
-            </button>
+      <section className="py-24 bg-white dark:bg-gray-900">
+        <div className="container mx-auto px-6 text-center max-w-4xl">
+            <div className="p-12 rounded-3xl bg-gradient-to-br from-gray-900 to-gray-800 dark:from-gray-800 dark:to-gray-900 text-white shadow-2xl overflow-hidden relative">
+                {/* Decorative background circle */}
+                <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+                <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+
+                <div className="relative z-10">
+                    <h2 className="text-4xl md:text-5xl font-bold mb-6">Ready to Join?</h2>
+                    <p className="mb-10 text-xl text-gray-300 max-w-2xl mx-auto">
+                        Become a part of our growing community of tech enthusiasts, makers, and future innovators.
+                    </p>
+                    <button
+                        onClick={onNavigateToLogin}
+                        className="px-10 py-4 text-lg font-bold text-gray-900 bg-white rounded-xl shadow-lg hover:bg-gray-50 transform hover:scale-105 transition-all duration-300"
+                    >
+                        Get Started Now
+                    </button>
+                </div>
+            </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-6 text-center text-gray-500 dark:text-gray-400 text-sm">
-        <p>&copy; {new Date().getFullYear()} ICT Club Naggalama. All rights reserved.</p>
+      <footer className="py-8 bg-gray-100 dark:bg-gray-950 text-center text-gray-500 dark:text-gray-400 text-sm border-t border-gray-200 dark:border-gray-800">
+        <div className="container mx-auto px-6 flex flex-col items-center">
+            <p className="mb-2">&copy; {new Date().getFullYear()} ICT Club Naggalama. All rights reserved.</p>
+            <p className="text-xs text-gray-400">Built with <span className="text-pink-500">♥</span> for the love of tech.</p>
+        </div>
       </footer>
     </div>
   );

@@ -1,3 +1,4 @@
+
 import React, { useCallback, useState, useMemo } from 'react';
 import { Activity, User } from '../types';
 import * as api from '../services/apiService';
@@ -58,10 +59,10 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
 
   const renderListContent = () => {
     if (isLoadingActivities) {
-        return <p className="text-center text-gray-500 dark:text-gray-400">Loading activities...</p>;
+        return <p className="text-center text-gray-500 dark:text-gray-400 animate-pulse">Loading activities...</p>;
     }
     if (activitiesError) {
-        return <p className="text-center text-red-500 dark:text-red-400 py-4">{`Error fetching activities: ${activitiesError}`}</p>;
+        return <p className="text-center text-red-500 dark:text-red-400 py-4 bg-red-50 dark:bg-red-900/10 rounded-lg">{`Error fetching activities: ${activitiesError}`}</p>;
     }
     if (filteredAndSortedActivities.length > 0) {
         return (
@@ -77,7 +78,7 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
     if (filter === 'UPCOMING') emptyMessage = "No upcoming activities scheduled.";
     if (filter === 'PAST') emptyMessage = "No past activities found.";
     
-    return <p className="text-center text-gray-500 dark:text-gray-400 py-4">{emptyMessage}</p>;
+    return <p className="text-center text-gray-500 dark:text-gray-400 py-10 bg-gray-50 dark:bg-gray-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">{emptyMessage}</p>;
   };
 
   const getTitle = () => {
@@ -91,20 +92,27 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
     <div>
         {currentUser.role === 'PATRON' && <AddActivityForm onAddActivity={handleAddActivity} />}
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-            <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200">
-                {getTitle()}
-            </h2>
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+            <div>
+                 <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200 tracking-tight">
+                    {getTitle()}
+                </h2>
+                <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
+                    {viewMode === 'LIST' 
+                        ? `Showing ${filter.toLowerCase()} events` 
+                        : 'Monthly overview of club events'}
+                </p>
+            </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-white dark:bg-gray-800 p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
                  {/* View Toggle */}
-                <div className="flex bg-gray-200 dark:bg-gray-700 p-1 rounded-lg self-start sm:self-auto">
+                <div className="flex bg-gray-100 dark:bg-gray-900/50 p-1 rounded-xl">
                     <button
                         onClick={() => setViewMode('LIST')}
-                        className={`p-2 rounded-md transition-all ${
+                        className={`p-2 rounded-lg transition-all duration-200 flex items-center justify-center ${
                             viewMode === 'LIST'
-                                ? 'bg-white dark:bg-gray-600 text-pink-600 dark:text-pink-400 shadow-sm'
-                                : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'
+                                ? 'bg-white dark:bg-gray-700 text-pink-600 dark:text-pink-400 shadow-sm'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                         }`}
                         title="List View"
                     >
@@ -112,10 +120,10 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
                     </button>
                     <button
                         onClick={() => setViewMode('CALENDAR')}
-                        className={`p-2 rounded-md transition-all ${
+                        className={`p-2 rounded-lg transition-all duration-200 flex items-center justify-center ${
                             viewMode === 'CALENDAR'
-                                ? 'bg-white dark:bg-gray-600 text-pink-600 dark:text-pink-400 shadow-sm'
-                                : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'
+                                ? 'bg-white dark:bg-gray-700 text-pink-600 dark:text-pink-400 shadow-sm'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                         }`}
                         title="Calendar View"
                     >
@@ -125,37 +133,20 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
 
                 {/* Filter Controls - Only visible in List Mode */}
                 {viewMode === 'LIST' && (
-                    <div className="flex bg-gray-200 dark:bg-gray-700 p-1 rounded-lg self-start sm:self-auto">
-                        <button
-                            onClick={() => setFilter('UPCOMING')}
-                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                                filter === 'UPCOMING'
-                                    ? 'bg-white dark:bg-gray-600 text-pink-600 dark:text-pink-400 shadow-sm'
-                                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'
-                            }`}
-                        >
-                            Upcoming
-                        </button>
-                        <button
-                            onClick={() => setFilter('PAST')}
-                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                                filter === 'PAST'
-                                    ? 'bg-white dark:bg-gray-600 text-pink-600 dark:text-pink-400 shadow-sm'
-                                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'
-                            }`}
-                        >
-                            Past
-                        </button>
-                        <button
-                            onClick={() => setFilter('ALL')}
-                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                                filter === 'ALL'
-                                    ? 'bg-white dark:bg-gray-600 text-pink-600 dark:text-pink-400 shadow-sm'
-                                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'
-                            }`}
-                        >
-                            All
-                        </button>
+                    <div className="flex bg-gray-100 dark:bg-gray-900/50 p-1 rounded-xl overflow-x-auto">
+                         {(['UPCOMING', 'PAST', 'ALL'] as FilterType[]).map((f) => (
+                            <button
+                                key={f}
+                                onClick={() => setFilter(f)}
+                                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
+                                    filter === f
+                                        ? 'bg-white dark:bg-gray-700 text-pink-600 dark:text-pink-400 shadow-sm'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                }`}
+                            >
+                                {f.charAt(0) + f.slice(1).toLowerCase()}
+                            </button>
+                         ))}
                     </div>
                 )}
             </div>

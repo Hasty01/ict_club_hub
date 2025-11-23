@@ -46,6 +46,18 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
 
+  // Apply theme to html element
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    // Save to local storage
+    localStorage.setItem('app_theme', theme);
+  }, [theme]);
+
   // Centralized session handler to avoid code duplication
   const processUserSession = async (userId: string) => {
       try {
@@ -186,11 +198,7 @@ const App: React.FC = () => {
 
 
   const toggleTheme = useCallback(() => {
-    setTheme(prevTheme => {
-        const newTheme = prevTheme === 'light' ? 'dark' : 'light';
-        localStorage.setItem('app_theme', newTheme);
-        return newTheme;
-    });
+    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   }, []);
   
   const handleTabChange = useCallback((tab: Tab) => {
@@ -206,22 +214,13 @@ const App: React.FC = () => {
     setIsSidebarCollapsed(prevState => !prevState);
   }, []);
 
-  const appClasses = useMemo(() => {
-    const classList = ['min-h-screen', 'font-sans', 'transition-colors', 'duration-300'];
-    if (theme === 'light') {
-      classList.push('bg-gray-100', 'text-gray-800');
-    } else {
-      classList.push('bg-gray-900', 'text-gray-200', 'dark');
-    }
-    return classList.join(' ');
-  }, [theme]);
 
   if (isLoading) {
     return (
-      <div className={`flex items-center justify-center min-h-screen ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
+      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
         <div className="flex flex-col items-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-pink-500 mb-4"></div>
-            <p className="text-gray-500 dark:text-gray-400">Loading Club Hub...</p>
+            <p className="text-gray-500 dark:text-gray-400 font-medium">Loading Club Hub...</p>
         </div>
       </div>
     );
@@ -231,7 +230,7 @@ const App: React.FC = () => {
     if (view === 'dashboard' && user) {
       return (
         <DataProvider currentUser={user}>
-          <div className="flex min-h-screen">
+          <div className="flex h-screen bg-gray-100 dark:bg-gray-900 overflow-hidden">
             <Sidebar
               user={user}
               onLogout={handleLogout}
@@ -244,9 +243,9 @@ const App: React.FC = () => {
               isCollapsed={isSidebarCollapsed}
               onToggleCollapse={handleSidebarCollapseToggle}
             />
-            <div className="flex-1 flex flex-col w-full h-screen overflow-hidden">
+            <div className="flex-1 flex flex-col w-full h-full relative overflow-hidden transition-all duration-300">
                {/* Mobile Header */}
-              <header className="md:hidden bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between p-4 sticky top-0 z-10 flex-shrink-0">
+              <header className="md:hidden bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between p-4 sticky top-0 z-20 flex-shrink-0">
                 <button onClick={handleSidebarToggle} className="text-gray-600 dark:text-gray-300 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Open menu">
                   <MenuIcon />
                 </button>
@@ -256,7 +255,7 @@ const App: React.FC = () => {
                 <div className="w-6 h-6"></div> 
               </header>
               {/* Conditionally apply padding and overflow for chat/playground to allow full height */}
-              <main className={`flex-1 ${(activeTab === 'chat' || activeTab === 'playground') ? 'h-full overflow-hidden' : 'p-4 sm:p-6 lg:p-8 overflow-y-auto scroll-smooth'}`}>
+              <main className={`flex-1 h-full w-full ${(activeTab === 'chat' || activeTab === 'playground') ? 'overflow-hidden' : 'p-4 sm:p-6 lg:p-8 overflow-y-auto scroll-smooth custom-scrollbar'}`}>
                 <Dashboard
                   activeTab={activeTab}
                   setActiveTab={handleTabChange}
@@ -286,7 +285,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={appClasses}>
+    <div className="min-h-full font-sans text-gray-800 dark:text-gray-200">
       {renderContent()}
       <PendingApprovalModal 
         isOpen={showPendingModal} 
