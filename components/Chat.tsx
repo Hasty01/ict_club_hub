@@ -128,7 +128,8 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
     const [newMessage, setNewMessage] = useState('');
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true); // For mobile responsiveness toggle
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [realtimeStatus, setRealtimeStatus] = useState<'CONNECTING' | 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR'>('CONNECTING');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -140,12 +141,11 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
         }, 100);
     };
 
-    // Initial fetch of rooms is handled by DataContext, but we can ensure refresh here
     useEffect(() => {
         fetchRooms();
     }, [fetchRooms]);
 
-    // Fetch messages when active room changes and setup Realtime subscription
+    // Fetch messages and setup Realtime subscription
     useEffect(() => {
         if (!activeRoomId) return;
 
@@ -166,16 +166,21 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
         loadMessages();
 
         // 2. Real-time subscription
-        // We use a broader topic and filter client-side to ensure no UUID formatting issues in the filter string
-        const channel = supabase.channel(`room_chat:${activeRoomId}`)
+        setRealtimeStatus('CONNECTING');
+        const channel = supabase.channel(`room:${activeRoomId}`)
             .on(
                 'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'messages' },
+                { 
+                    event: 'INSERT', 
+                    schema: 'public', 
+                    table: 'messages',
+                    filter: `room_id=eq.${activeRoomId}`
+                },
                 (payload) => {
+                    console.log("New message received via realtime:", payload);
                     const rawMsg = payload.new as any;
                     
-                    // Client-side filter: Ensure message belongs to current room
-                    if (rawMsg && rawMsg.room_id === activeRoomId) {
+                    if (rawMsg) {
                         const newMsg: Message = {
                             id: rawMsg.id,
                             roomId: rawMsg.room_id,
@@ -186,10 +191,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                         };
 
                         setMessages(prev => {
-                            // Deduplication: Avoid adding if ID already exists (e.g. from optimistic update)
-                            if (prev.some(m => m.id === newMsg.id)) {
-                                return prev;
-                            }
+                            if (prev.some(m => m.id === newMsg.id)) return prev;
                             return [...prev, newMsg];
                         });
                         scrollToBottom();
@@ -197,19 +199,16 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                 }
             )
             .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    // console.debug('Connected to realtime chat for room:', activeRoomId);
-                }
+                console.log(`Subscription status for room ${activeRoomId}:`, status);
+                setRealtimeStatus(status);
             });
 
-        // 3. Cleanup
         return () => {
             supabase.removeChannel(channel);
         };
 
     }, [activeRoomId]);
 
-    // Auto-scroll on new message
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
@@ -223,12 +222,9 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
 
         if (activeRoomId) {
             try {
-                // Send and get the full message object back
                 const sentMsg = await api.sendMessage(activeRoomId, currentUser.uid, content);
                 
-                // Immediately update UI
                 setMessages(prev => {
-                    // Check for duplicates in case race condition with subscription
                     if (prev.some(m => m.id === sentMsg.id)) return prev;
                     return [...prev, sentMsg];
                 });
@@ -244,17 +240,15 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
 
     const handleCreateRoom = async (participantIds: string[], title?: string) => {
         try {
-            // Check if 1-on-1 room already exists
             if (participantIds.length === 1) {
                 const targetId = participantIds[0];
                 const existingRoom = rooms.find(r => 
                     r.participantIds.length === 2 && 
                     r.participantIds.includes(targetId) && 
-                    !r.title // Assuming DMs don't have titles usually
+                    !r.title 
                 );
                 if (existingRoom) {
                     setActiveRoomId(existingRoom.id);
-                    // On mobile, close sidebar
                     if (window.innerWidth < 768) setIsSidebarOpen(false);
                     return;
                 }
@@ -271,7 +265,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
         }
     };
 
-    // Mobile sidebar handling
     useEffect(() => {
         const handleResize = () => {
             if (window.innerWidth >= 768) {
@@ -287,6 +280,21 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
         if (window.innerWidth < 768) setIsSidebarOpen(false);
     };
 
+    const getConnectionStatusColor = () => {
+        switch (realtimeStatus) {
+            case 'SUBSCRIBED': return 'bg-green-500';
+            case 'CONNECTING': return 'bg-yellow-500';
+            default: return 'bg-red-500';
+        }
+    };
+
+    const getConnectionStatusText = () => {
+        switch (realtimeStatus) {
+            case 'SUBSCRIBED': return 'Online';
+            case 'CONNECTING': return 'Connecting...';
+            default: return 'Offline';
+        }
+    };
 
     return (
         <div className="flex h-full bg-white dark:bg-gray-900 shadow-xl rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
@@ -348,7 +356,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
             <div className={`${!isSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col flex-1 bg-white dark:bg-gray-900`}>
                 {activeRoom ? (
                     <>
-                        {/* Regular Chat Header */}
+                        {/* Chat Header */}
                         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800 shadow-sm z-10">
                             <div className="flex items-center">
                                 <button 
@@ -357,11 +365,19 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                 >
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                                 </button>
-                                <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">{getRoomName(activeRoom, allUsers, currentUser.uid)}</h2>
+                                <div className="flex flex-col">
+                                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 leading-tight">
+                                        {getRoomName(activeRoom, allUsers, currentUser.uid)}
+                                    </h2>
+                                    <div className="flex items-center space-x-1 mt-0.5">
+                                        <div className={`w-2 h-2 rounded-full ${getConnectionStatusColor()}`}></div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">{getConnectionStatusText()}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Regular Messages List */}
+                        {/* Messages List */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
                             {isLoadingMessages ? (
                                 <div className="text-center py-10 text-gray-500">Loading messages...</div>
@@ -401,7 +417,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Regular Input Area */}
+                        {/* Input Area */}
                         <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
                             <form onSubmit={handleSendMessage} className="flex items-end space-x-2">
                                 <textarea
