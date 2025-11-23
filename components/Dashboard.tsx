@@ -1,4 +1,5 @@
 
+
 import React, { Suspense, lazy } from 'react';
 import { User, Tab } from '../types';
 
@@ -11,6 +12,7 @@ const Members = lazy(() => import('./Members'));
 const CodePlayground = lazy(() => import('./CodePlayground'));
 const Resources = lazy(() => import('./Resources'));
 const Chat = lazy(() => import('./Chat'));
+const Showcase = lazy(() => import('./Showcase'));
 
 
 type Theme = 'light' | 'dark';
@@ -54,7 +56,10 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
             <ProjectsBoard currentUser={currentUser} />
         </TabPanel>
         <TabPanel active={activeTab === 'playground'} className="h-full">
-            <CodePlayground theme={theme} currentUser={currentUser} />
+            <CodePlayground theme={theme} currentUser={currentUser} setActiveTab={setActiveTab} />
+        </TabPanel>
+        <TabPanel active={activeTab === 'showcase'}>
+            <Showcase currentUser={currentUser} setActiveTab={setActiveTab} />
         </TabPanel>
         <TabPanel active={activeTab === 'profile'}>
             <Profile currentUser={currentUser} onUpdateUserProfile={onUpdateUserProfile} />

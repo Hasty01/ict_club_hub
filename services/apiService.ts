@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabaseClient';
-import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, FeedItemType, ProjectColumn, Resource, Notification, Tab, Room, Message, ActivityCategory, TaskPriority, FeedComment } from '../types';
+import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, FeedItemType, ProjectColumn, Resource, Notification, Tab, Room, Message, ActivityCategory, TaskPriority, FeedComment, ShowcaseItem } from '../types';
 import { predefinedAvatars } from '../constants';
 
 // --- INTERNAL HELPERS ---
@@ -1045,4 +1045,77 @@ export const deleteUserScript = async (userId: string, fileName: string): Promis
         .remove([filePath]);
 
     if (error) throw new Error(`Failed to delete script: ${error.message}`);
+};
+
+// --- SHOWCASE API ---
+
+export const getShowcaseItems = async (): Promise<ShowcaseItem[]> => {
+    const { data: items, error } = await supabase
+        .from('showcase_items')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) throw new Error(error.message);
+    if (!items || items.length === 0) return [];
+
+    // Client-side join for user details
+    const userIds = [...new Set(items.map((i: any) => i.user_uid))];
+    let userMap = new Map<string, any>();
+
+    if (userIds.length > 0) {
+        const { data: users, error: usersError } = await supabase
+            .from('users')
+            .select('uid, name, avatar_url')
+            .in('uid', userIds);
+        
+        if (!usersError && users) {
+            userMap = new Map(users.map((u: any) => [u.uid, u]));
+        }
+    }
+
+    return items.map((item: any) => {
+        const user = userMap.get(item.user_uid);
+        return {
+            id: item.id.toString(),
+            createdAt: new Date(item.created_at).toLocaleString('en-US', { timeZone: 'Africa/Kampala' }),
+            userUid: item.user_uid,
+            userName: user?.name || 'Unknown Coder',
+            userAvatarUrl: user?.avatar_url,
+            title: item.title,
+            description: item.description,
+            codeContent: item.code_content,
+            likes: item.likes || [],
+        };
+    });
+};
+
+export const addShowcaseItem = async (userUid: string, title: string, description: string, codeContent: string): Promise<void> => {
+    const { error } = await supabase.from('showcase_items').insert({
+        user_uid: userUid,
+        title,
+        description,
+        code_content: codeContent,
+        likes: []
+    });
+    
+    if (error) throw new Error(error.message);
+    await notifyAllUsers(`New code showcase: ${title}`, 'showcase', userUid);
+};
+
+export const toggleShowcaseLike = async (itemId: string, userUid: string, currentLikes: string[]): Promise<void> => {
+    const likesSet = new Set(currentLikes);
+    if (likesSet.has(userUid)) {
+        likesSet.delete(userUid);
+    } else {
+        likesSet.add(userUid);
+    }
+    
+    const newLikes = Array.from(likesSet);
+    
+    const { error } = await supabase
+        .from('showcase_items')
+        .update({ likes: newLikes })
+        .eq('id', itemId);
+
+    if (error) throw new Error(error.message);
 };

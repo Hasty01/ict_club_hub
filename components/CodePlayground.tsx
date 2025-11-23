@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { PlayIcon } from './icons/PlayIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -7,14 +8,16 @@ import { DownloadIcon } from './icons/DownloadIcon';
 import { CloudIcon } from './icons/CloudIcon';
 import { XIcon } from './icons/XIcon';
 import { CopyIcon } from './icons/CopyIcon';
+import { GlobeIcon } from './icons/GlobeIcon'; // Reusing GlobeIcon for publish button
 import Editor from '@monaco-editor/react';
-import { User } from '../types';
+import { User, Tab } from '../types';
 import * as api from '../services/apiService';
 import ConfirmationModal from './ConfirmationModal';
 
 interface CodePlaygroundProps {
     theme: 'light' | 'dark';
     currentUser: User;
+    setActiveTab?: (tab: Tab) => void; // Optional prop to switch tabs
 }
 
 interface OutputLine {
@@ -74,7 +77,63 @@ const SyntaxHighlightedText: React.FC<{ text: string }> = ({ text }) => {
     );
 };
 
-const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) => {
+const PublishModal: React.FC<{ isOpen: boolean, onClose: () => void, onPublish: (title: string, desc: string) => Promise<void> }> = ({ isOpen, onClose, onPublish }) => {
+    const [title, setTitle] = useState('');
+    const [desc, setDesc] = useState('');
+    const [isPublishing, setIsPublishing] = useState(false);
+
+    if (!isOpen) return null;
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!title || !desc) return;
+        setIsPublishing(true);
+        await onPublish(title, desc);
+        setIsPublishing(false);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-gray-200 dark:border-gray-700">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400"><XIcon /></button>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Publish to Showcase</h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+                        <input 
+                            type="text" 
+                            value={title} 
+                            onChange={e => setTitle(e.target.value)} 
+                            required 
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-pink-500" 
+                            placeholder="My Awesome Script"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                        <textarea 
+                            value={desc} 
+                            onChange={e => setDesc(e.target.value)} 
+                            required 
+                            rows={3}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-pink-500" 
+                            placeholder="What does this code do?"
+                        />
+                    </div>
+                    <button 
+                        type="submit" 
+                        disabled={isPublishing}
+                        className="w-full py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 disabled:opacity-50"
+                    >
+                        {isPublishing ? 'Publishing...' : 'Publish'}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, setActiveTab }) => {
   const [code, setCode] = useState<string>(() => {
       if (typeof window !== 'undefined') {
           return localStorage.getItem('playground_code') || DEFAULT_CODE;
@@ -86,7 +145,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
   const [pyodide, setPyodide] = useState<any | null>(null);
   const [isPyodideReady, setIsPyodideReady] = useState(false);
-  const [activeTab, setActiveTab] = useState<'editor' | 'output'>('editor');
+  const [activeTab, setActiveTabState] = useState<'editor' | 'output'>('editor');
   
   // Cloud Save/Load State
   const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
@@ -102,6 +161,9 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
   
   // Delete Confirmation State
   const [scriptToDelete, setScriptToDelete] = useState<string | null>(null);
+
+  // Publish State
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
 
   // Copy Feedback
   const [copyFeedback, setCopyFeedback] = useState(false);
@@ -119,7 +181,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
       
       if (!currentCode || currentCode.trim() === '' || currentCode.trim() === DEFAULT_CODE.trim()) {
            setCode(importedCode);
-           setActiveTab('editor');
+           setActiveTabState('editor');
            setOutput([{ type: 'log', content: 'Loaded code from external source.' }]);
       } else {
            setPendingCode(importedCode);
@@ -172,7 +234,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
       if (typeof content === 'string') {
         setCode(content);
         setOutput([{ type: 'log', content: `Loaded file: ${file.name}` }]);
-        setActiveTab('editor');
+        setActiveTabState('editor');
       }
     };
     reader.readAsText(file);
@@ -198,7 +260,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
   const confirmReplace = () => {
     if (pendingCode) {
         setCode(pendingCode);
-        setActiveTab('editor');
+        setActiveTabState('editor');
         setOutput([{ type: 'log', content: 'Loaded code from external source.' }]);
     }
     setPendingCode(null);
@@ -266,9 +328,25 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
       }
   };
 
+  const handlePublish = async (title: string, desc: string) => {
+      try {
+          await api.addShowcaseItem(currentUser.uid, title, desc, code);
+          setIsPublishModalOpen(false);
+          if (setActiveTab) {
+              // Trigger a fetch on next load or via context if accessible,
+              // but here we just redirect for simplicity
+              setActiveTab('showcase');
+          }
+          alert("Code published successfully!");
+      } catch (error: any) {
+          console.error("Publish failed:", error);
+          alert("Failed to publish code: " + error.message);
+      }
+  };
+
   const handleRunCode = async () => {
     setIsExecuting(true);
-    setActiveTab('output');
+    setActiveTabState('output');
     setOutput([]);
 
     if (!pyodide) {
@@ -405,6 +483,14 @@ builtins.input = input_override
                 <CloudIcon />
                 <span className="hidden sm:inline">Cloud Save</span>
             </button>
+            <button
+                onClick={() => setIsPublishModalOpen(true)}
+                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
+                title="Publish to Showcase"
+            >
+                <GlobeIcon />
+                <span className="hidden sm:inline">Publish</span>
+            </button>
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2 hidden sm:block"></div>
             <button
                 onClick={handleRunCode}
@@ -422,13 +508,13 @@ builtins.input = input_override
 
       <div className="flex border-b border-gray-200 dark:border-gray-700">
         <button
-            onClick={() => setActiveTab('editor')}
+            onClick={() => setActiveTabState('editor')}
             className={`flex-1 sm:flex-none text-center px-6 py-3 font-medium text-sm border-b-2 transition-colors focus:outline-none ${activeTab === 'editor' ? 'border-pink-500 text-pink-600 dark:text-pink-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
         >
             Code Editor
         </button>
         <button
-            onClick={() => setActiveTab('output')}
+            onClick={() => setActiveTabState('output')}
             className={`flex-1 sm:flex-none text-center px-6 py-3 font-medium text-sm border-b-2 transition-colors focus:outline-none flex justify-center items-center gap-2 ${activeTab === 'output' ? 'border-pink-500 text-pink-600 dark:text-pink-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
         >
             Output
@@ -601,6 +687,12 @@ builtins.input = input_override
         message={`Are you sure you want to delete "${scriptToDelete}"? This action cannot be undone.`}
         confirmText="Delete"
         isDangerous
+      />
+
+      <PublishModal 
+        isOpen={isPublishModalOpen}
+        onClose={() => setIsPublishModalOpen(false)}
+        onPublish={handlePublish}
       />
     </div>
   );

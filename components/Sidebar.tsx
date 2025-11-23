@@ -1,4 +1,5 @@
 
+
 import React, { useMemo, useEffect, useRef } from 'react';
 import { User, Tab } from '../types';
 import { LogoutIcon } from './icons/LogoutIcon';
@@ -16,6 +17,7 @@ import { ChevronsLeftIcon } from './icons/ChevronsLeftIcon';
 import { ChevronsRightIcon } from './icons/ChevronsRightIcon';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
+import { GlobeIcon } from './icons/GlobeIcon';
 import { useData } from '../DataContext';
 import Notifications from './Notifications';
 
@@ -209,10 +211,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme,
           ]
       },
       {
-          title: "Learn",
+          title: "Learn & Share",
           items: [
               { tab: 'resources' as Tab, label: 'Resources', icon: <BookOpenIcon /> },
               { tab: 'playground' as Tab, label: 'Playground', icon: <CodeIcon /> },
+              { tab: 'showcase' as Tab, label: 'Showcase', icon: <GlobeIcon /> },
           ]
       },
       {

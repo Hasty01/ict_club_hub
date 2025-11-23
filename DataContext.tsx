@@ -1,7 +1,8 @@
 
+
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
 // FIX: Imported the new Notification type.
-import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, Notification, Room } from './types';
+import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, Notification, Room, ShowcaseItem } from './types';
 import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
 
@@ -18,6 +19,7 @@ interface IDataContext {
   // FIX: Added notifications to the context interface.
   notifications: Notification[];
   rooms: Room[];
+  showcaseItems: ShowcaseItem[];
   
   // Chat Unread State
   unreadMessageCounts: Record<string, number>;
@@ -33,6 +35,7 @@ interface IDataContext {
   // FIX: Added notification loading state.
   isLoadingNotifications: boolean;
   isLoadingRooms: boolean;
+  isLoadingShowcase: boolean;
   isInitialLoading: boolean;
 
   // Error states
@@ -45,6 +48,7 @@ interface IDataContext {
   // FIX: Added notification error state.
   notificationsError: string | null;
   roomsError: string | null;
+  showcaseError: string | null;
 
   // Refetch functions
   fetchActivities: () => Promise<void>;
@@ -56,6 +60,7 @@ interface IDataContext {
   // FIX: Added notification fetch function.
   fetchNotifications: () => Promise<void>;
   fetchRooms: () => Promise<void>;
+  fetchShowcaseItems: () => Promise<void>;
 }
 
 // Create the context with a default value
@@ -73,6 +78,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   // FIX: Added state for notifications.
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [showcaseItems, setShowcaseItems] = useState<ShowcaseItem[]>([]);
   const [unreadMessageCounts, setUnreadMessageCounts] = useState<Record<string, number>>({});
 
   const [isLoadingActivities, setIsLoadingActivities] = useState(true);
@@ -84,6 +90,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   // FIX: Added loading state for notifications.
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
   const [isLoadingRooms, setIsLoadingRooms] = useState(true);
+  const [isLoadingShowcase, setIsLoadingShowcase] = useState(true);
 
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
@@ -94,6 +101,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   // FIX: Added error state for notifications.
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
   const [roomsError, setRoomsError] = useState<string | null>(null);
+  const [showcaseError, setShowcaseError] = useState<string | null>(null);
 
   const fetchActivities = useCallback(async () => {
     setIsLoadingActivities(true);
@@ -206,6 +214,20 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         setIsLoadingRooms(false);
     }
   }, [currentUser.uid]);
+
+  const fetchShowcaseItems = useCallback(async () => {
+    setIsLoadingShowcase(true);
+    setShowcaseError(null);
+    try {
+        const data = await api.getShowcaseItems();
+        setShowcaseItems(data);
+    } catch (e: any) {
+        console.error("Failed to fetch showcase items", e);
+        setShowcaseError(e.message || 'An unknown error occurred.');
+    } finally {
+        setIsLoadingShowcase(false);
+    }
+  }, []);
   
   const clearUnreadCount = useCallback((roomId: string) => {
     setUnreadMessageCounts(prev => {
@@ -313,13 +335,14 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         // FIX: Fetch notifications on initial load.
         fetchNotifications(),
         fetchRooms(),
+        fetchShowcaseItems(),
       ]).then(() => {
         // After users are fetched, resources can be fetched and joined
         fetchResources();
       });
     }
   // FIX: Added fetchNotifications to the dependency array.
-  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources, fetchNotifications, fetchRooms]);
+  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources, fetchNotifications, fetchRooms, fetchShowcaseItems]);
 
   const value = {
     activities,
@@ -332,6 +355,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     // FIX: Provide notification state through context.
     notifications,
     rooms,
+    showcaseItems,
     unreadMessageCounts,
     clearUnreadCount,
     isLoadingActivities,
@@ -343,6 +367,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     // FIX: Provide notification loading state.
     isLoadingNotifications,
     isLoadingRooms,
+    isLoadingShowcase,
     activitiesError,
     attendanceError,
     feedItemsError,
@@ -352,8 +377,9 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     // FIX: Provide notification error state.
     notificationsError,
     roomsError,
+    showcaseError,
     // FIX: Include notification loading state in the overall initial loading flag.
-    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources || isLoadingNotifications || isLoadingRooms,
+    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources || isLoadingNotifications || isLoadingRooms || isLoadingShowcase,
     fetchActivities,
     fetchAttendance,
     fetchFeedItems,
@@ -363,6 +389,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     // FIX: Provide notification fetch function.
     fetchNotifications,
     fetchRooms,
+    fetchShowcaseItems,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

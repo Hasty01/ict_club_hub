@@ -1,6 +1,6 @@
 
 
-export type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'profile' | 'members' | 'playground' | 'resources' | 'chat';
+export type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'profile' | 'members' | 'playground' | 'resources' | 'chat' | 'showcase';
 
 export interface User {
   uid: string; // Changed from id: number
@@ -129,4 +129,16 @@ export interface Room {
   participantIds: string[];
   createdBy: string; // ID of the user who created the group
   lastMessage?: Message; // For display purposes in the list
+}
+
+export interface ShowcaseItem {
+  id: string;
+  createdAt: string;
+  userUid: string;
+  userName: string;
+  userAvatarUrl?: string;
+  title: string;
+  description: string;
+  codeContent: string;
+  likes: string[]; // Array of user IDs who liked the post
 }
