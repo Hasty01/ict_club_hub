@@ -9,7 +9,7 @@ import { XIcon } from './icons/XIcon';
 import Editor from '@monaco-editor/react';
 import { User } from '../types';
 import * as api from '../services/apiService';
-import { ExclamationCircleIcon } from './icons/ExclamationCircleIcon';
+import ConfirmationModal from './ConfirmationModal';
 
 interface CodePlaygroundProps {
     theme: 'light' | 'dark';
@@ -39,7 +39,6 @@ math.pi`;
 
 const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) => {
   const [code, setCode] = useState<string>(() => {
-      // Load from local storage if available, otherwise use default
       if (typeof window !== 'undefined') {
           return localStorage.getItem('playground_code') || DEFAULT_CODE;
       }
@@ -63,13 +62,13 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
   // Overwrite Confirmation State
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
+  
+  // Delete Confirmation State
+  const [scriptToDelete, setScriptToDelete] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // Keep track of current code in ref for event listeners
   const codeRef = useRef(code);
 
-  // Auto-save code to local storage and update ref
   useEffect(() => {
       localStorage.setItem('playground_code', code);
       codeRef.current = code;
@@ -78,8 +77,6 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
   const handleImportCode = (importedCode: string) => {
       const currentCode = codeRef.current;
       
-      // If the current code is just the default or empty, replace immediately.
-      // Otherwise, ask for confirmation to prevent accidental loss.
       if (!currentCode || currentCode.trim() === '' || currentCode.trim() === DEFAULT_CODE.trim()) {
            setCode(importedCode);
            setActiveTab('editor');
@@ -91,7 +88,6 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
   };
 
   useEffect(() => {
-    // Check for any pending code import (e.g. from Chat/Resources tab switch)
     const pendingImport = localStorage.getItem('playground_pending_code');
     if (pendingImport) {
         localStorage.removeItem('playground_pending_code');
@@ -100,7 +96,6 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
 
     const setupPyodide = async () => {
       try {
-        // loadPyodide is globally available from the script tag in index.html
         const pyodideInstance = await (window as any).loadPyodide({
           indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/"
         });
@@ -114,7 +109,6 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
     };
     setupPyodide();
 
-    // Listen for code opening events from Resources or Chat (if Playground is already mounted)
     const handleOpenCode = (e: CustomEvent<string>) => {
         if (e.detail) {
             handleImportCode(e.detail);
@@ -137,13 +131,11 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
       const content = e.target?.result;
       if (typeof content === 'string') {
         setCode(content);
-        // Clear output to indicate new context
         setOutput([{ type: 'log', content: `Loaded file: ${file.name}` }]);
         setActiveTab('editor');
       }
     };
     reader.readAsText(file);
-    // Reset input so the same file can be selected again if needed
     event.target.value = '';
   };
 
@@ -163,8 +155,6 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
     fileInputRef.current?.click();
   };
 
-  // --- Confirmation Handlers ---
-
   const confirmReplace = () => {
     if (pendingCode) {
         setCode(pendingCode);
@@ -174,13 +164,6 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
     setPendingCode(null);
     setIsConfirmOpen(false);
   };
-
-  const cancelReplace = () => {
-    setPendingCode(null);
-    setIsConfirmOpen(false);
-  };
-
-  // --- Cloud Functions ---
 
   const fetchCloudScripts = async () => {
       setIsLoadingScripts(true);
@@ -223,32 +206,31 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
       setCloudMessage(null);
       try {
           const content = await api.downloadUserScript(currentUser.uid, fileName);
-          setCode(content);
+          // Use handleImportCode to prompt if current work is dirty
+          handleImportCode(content);
           setIsCloudModalOpen(false);
-          setOutput([{ type: 'log', content: `Loaded cloud file: ${fileName}` }]);
-          setActiveTab('editor');
       } catch (err: any) {
           setCloudMessage({ text: err.message, type: 'error' });
       }
   };
 
-  const handleCloudDelete = async (fileName: string) => {
-      if (!confirm(`Are you sure you want to delete ${fileName}?`)) return;
+  const confirmCloudDelete = async () => {
+      if (!scriptToDelete) return;
       setCloudMessage(null);
       try {
-          await api.deleteUserScript(currentUser.uid, fileName);
+          await api.deleteUserScript(currentUser.uid, scriptToDelete);
           await fetchCloudScripts();
       } catch (err: any) {
           setCloudMessage({ text: err.message, type: 'error' });
+      } finally {
+          setScriptToDelete(null);
       }
   };
 
-  // --- End Cloud Functions ---
-
   const handleRunCode = async () => {
     setIsExecuting(true);
-    setActiveTab('output'); // Auto-switch to output tab
-    setOutput([]); // Clear previous output
+    setActiveTab('output');
+    setOutput([]);
 
     if (!pyodide) {
         setOutput([{ type: 'error', content: 'Error: Local interpreter (Pyodide) is not ready.' }]);
@@ -256,15 +238,13 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
         return;
     }
 
-    let hasOutput = false; // To track if any output was generated
+    let hasOutput = false;
 
-    // 1. Expose JS callback to Pyodide for streaming output
     (window as any).sendOutputToReact = (text: string, type: 'log' | 'error') => {
         if (text) {
             hasOutput = true;
             setOutput(prev => {
                 const lastOutput = prev[prev.length - 1];
-                // Append to the last message if it's the same type to avoid creating many separate spans
                 if (lastOutput && lastOutput.type === type) {
                     const newOutput = [...prev];
                     newOutput[newOutput.length - 1] = { ...lastOutput, content: lastOutput.content + text };
@@ -276,7 +256,6 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
         }
     };
 
-    // 2. Python code to redirect stdout/stderr and override input()
     const setupCode = `
 import sys
 import builtins
@@ -305,16 +284,12 @@ builtins.input = input_override
     `;
 
     try {
-        // Load packages based on imports
         await pyodide.loadPackagesFromImports(code);
-
         await pyodide.runPythonAsync(setupCode);
         const result = await pyodide.runPythonAsync(code);
 
-        // 3. Handle the return value of the last expression
         if (result !== undefined) {
             pyodide.globals.set('last_result', result);
-            // Use print(repr()) to mimic a REPL, which will be caught by our stdout handler
             await pyodide.runPythonAsync(`print(repr(last_result))`);
             pyodide.globals.delete('last_result');
             if (typeof result.destroy === 'function') {
@@ -322,18 +297,14 @@ builtins.input = input_override
             }
         }
         
-        // 4. Handle no output case
         if (!hasOutput) {
             setOutput([{ type: 'log', content: 'Code executed successfully with no output.' }]);
         }
 
     } catch (error: any) {
-        // Python tracebacks are handled by the stderr writer.
-        // This catches compilation errors or other JS exceptions from pyodide.
         (window as any).sendOutputToReact(error.message, 'error');
     } finally {
         setIsExecuting(false);
-        // Clean up the global function to avoid memory leaks
         if ((window as any).sendOutputToReact) {
           delete (window as any).sendOutputToReact;
         }
@@ -349,7 +320,6 @@ builtins.input = input_override
 
   return (
     <div className="flex flex-col h-full relative p-4 sm:p-6">
-      {/* Hidden file input */}
       <input
         type="file"
         ref={fileInputRef}
@@ -358,7 +328,6 @@ builtins.input = input_override
         className="hidden"
       />
 
-      {/* Header Actions */}
       <div className="flex-shrink-0 mb-4 flex flex-wrap justify-between items-center gap-4">
         <div>
             <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Code Playground</h2>
@@ -404,7 +373,6 @@ builtins.input = input_override
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b border-gray-200 dark:border-gray-700">
         <button
             onClick={() => setActiveTab('editor')}
@@ -426,10 +394,7 @@ builtins.input = input_override
         </button>
       </div>
 
-      {/* Content Area */}
       <div className="flex-1 bg-white dark:bg-gray-800 shadow-md border-x border-b border-gray-200 dark:border-gray-700 rounded-b-lg relative overflow-hidden">
-        
-        {/* Editor Tab */}
         <div className={`w-full h-full flex flex-col ${activeTab === 'editor' ? '' : 'hidden'}`}>
             <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
                 <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">main.py</span>
@@ -455,7 +420,6 @@ builtins.input = input_override
             </div>
         </div>
 
-        {/* Output Tab */}
         <div className={`w-full h-full flex flex-col ${activeTab === 'output' ? '' : 'hidden'}`}>
             <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
                 <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Console Output</span>
@@ -479,10 +443,8 @@ builtins.input = input_override
                 </code>
             </pre>
         </div>
-
       </div>
 
-      {/* Cloud Save Modal */}
       {isCloudModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 relative border border-gray-200 dark:border-gray-700">
@@ -497,14 +459,12 @@ builtins.input = input_override
                        <CloudIcon /> Cloud Scripts
                    </h3>
 
-                   {/* Message Area */}
                    {cloudMessage && (
                        <div className={`mb-4 p-3 rounded text-sm ${cloudMessage.type === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'}`}>
                            {cloudMessage.text}
                        </div>
                    )}
 
-                   {/* Save Section */}
                    <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Save Current Code</h4>
                        <div className="flex gap-2">
@@ -525,7 +485,6 @@ builtins.input = input_override
                        </div>
                    </div>
 
-                   {/* File List */}
                    <div>
                        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Your Scripts</h4>
                        <div className="max-h-60 overflow-y-auto space-y-2">
@@ -548,7 +507,7 @@ builtins.input = input_override
                                                Load
                                            </button>
                                            <button 
-                                                onClick={() => handleCloudDelete(script.name)}
+                                                onClick={() => setScriptToDelete(script.name)}
                                                 className="text-gray-400 hover:text-red-500 transition-colors"
                                                 title="Delete"
                                            >
@@ -564,34 +523,24 @@ builtins.input = input_override
           </div>
       )}
 
-      {/* Confirmation Modal for Replacing Code */}
-      {isConfirmOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 relative border border-gray-200 dark:border-gray-700 text-center animate-fade-in-up">
-                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 mb-4">
-                    <ExclamationCircleIcon className="h-6 w-6" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Unsaved Changes</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                    Your current code in the playground will be overwritten. Do you want to continue?
-                </p>
-                <div className="flex gap-3">
-                    <button 
-                        onClick={cancelReplace}
-                        className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                    >
-                        Cancel
-                    </button>
-                    <button 
-                        onClick={confirmReplace}
-                        className="flex-1 px-4 py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 transition-colors shadow-sm"
-                    >
-                        Replace
-                    </button>
-                </div>
-             </div>
-        </div>
-      )}
+      <ConfirmationModal 
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={confirmReplace}
+        title="Unsaved Changes"
+        message="Your current code in the playground will be overwritten. Do you want to continue?"
+        confirmText="Replace"
+      />
+
+      <ConfirmationModal
+        isOpen={!!scriptToDelete}
+        onClose={() => setScriptToDelete(null)}
+        onConfirm={confirmCloudDelete}
+        title="Delete Script"
+        message={`Are you sure you want to delete "${scriptToDelete}"? This action cannot be undone.`}
+        confirmText="Delete"
+        isDangerous
+      />
     </div>
   );
 };

@@ -205,7 +205,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme,
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-100 dark:border-gray-800">
+        <div className="p-4">
           {/* Collapse Toggle (Desktop) */}
           <div className="hidden md:flex justify-end mb-4">
             <button

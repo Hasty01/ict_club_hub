@@ -21,6 +21,7 @@ import { CheckIcon } from './icons/CheckIcon';
 import { CodeIcon } from './icons/CodeIcon';
 import { LinkIcon } from './icons/LinkIcon';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
+import ConfirmationModal from './ConfirmationModal';
 
 interface ChatProps {
     currentUser: User;
@@ -427,6 +428,9 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
     // State for Custom Context Menu
     const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
 
+    // State for delete confirmation modal
+    const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const emojiPickerRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -435,7 +439,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
     const activeRoom = useMemo(() => rooms.find(r => r.id === activeRoomId), [rooms, activeRoomId]);
 
     const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
-        // Use setTimeout to allow DOM updates to complete before scrolling
         setTimeout(() => {
             messagesEndRef.current?.scrollIntoView({ behavior });
         }, 50);
@@ -445,7 +448,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
         fetchRooms();
     }, [fetchRooms]);
 
-    // Auto-resize textarea
     useEffect(() => {
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
@@ -453,19 +455,15 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
         }
     }, [newMessage]);
     
-    // Close emoji picker and context menu on click outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
                 setShowEmojiPicker(false);
             }
-            // Close context menu on any click
             setContextMenu(null);
         };
         document.addEventListener('click', handleClickOutside);
         document.addEventListener('contextmenu', (e) => {
-            // Optional: Close our custom menu if right clicking elsewhere, 
-            // but we usually let the browser handle standard right clicks unless on a message
             if (contextMenu) setContextMenu(null);
         });
         return () => {
@@ -474,29 +472,24 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
         };
     }, [contextMenu]);
     
-    // Clear unread count when room becomes active or if messages come while active
     useEffect(() => {
         if (activeRoomId && unreadMessageCounts[activeRoomId] > 0) {
             clearUnreadCount(activeRoomId);
         }
     }, [activeRoomId, unreadMessageCounts, clearUnreadCount]);
 
-    // Function to fetch messages (used for initial load and polling)
     const loadMessages = useCallback(async (roomId: string, showLoadingIndicator = false) => {
         if (showLoadingIndicator) setIsLoadingMessages(true);
         try {
             const msgs = await api.getRoomMessages(roomId);
             setMessages(prev => {
-                // Check if arrays are identical (same length and same IDs)
                 if (prev.length === msgs.length) {
                      const isDifferent = prev.some((m, i) => m.id !== msgs[i].id);
                      if (!isDifferent) return prev;
                 }
                 return msgs;
             });
-            // If loading for the first time or refreshing, we want to jump to bottom immediately
             if (showLoadingIndicator) {
-                 // Slight delay to ensure render
                  setTimeout(() => scrollToBottom('auto'), 100);
             }
         } catch (error) {
@@ -506,7 +499,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
         }
     }, []);
 
-    // Manual Refresh Handler
     const handleRefresh = async () => {
         if (!activeRoomId) return;
         setIsRefreshing(true);
@@ -515,22 +507,24 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
         scrollToBottom('smooth');
     };
     
-    const handleDeleteMessage = async (messageId: string) => {
-        if (!confirm("Are you sure you want to delete this message?")) return;
+    const handleDeleteMessage = async () => {
+        if (!messageToDelete) return;
+        
         try {
-            await api.deleteMessage(messageId);
-            // Optimistically remove from UI
-            setMessages(prev => prev.filter(m => m.id !== messageId));
+            await api.deleteMessage(messageToDelete);
+            setMessages(prev => prev.filter(m => m.id !== messageToDelete));
         } catch (error) {
             console.error("Failed to delete message:", error);
             alert("Failed to delete message.");
+        } finally {
+            setMessageToDelete(null);
         }
     };
 
     const handleRemoveMember = async (roomId: string, userId: string) => {
         try {
             await api.removeGroupMember(roomId, userId);
-            await fetchRooms(); // Refresh room data
+            await fetchRooms(); 
         } catch (error: any) {
             console.error("Failed to remove member:", error);
             alert("Failed to remove member: " + error.message);
@@ -559,14 +553,12 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
     
     const handleContextMenu = (e: React.MouseEvent, msg: Message) => {
         const isMe = msg.senderId === currentUser.uid;
-        // Allow delete if it's my message and less than 24h old
         const isRecent = (Date.now() - new Date(msg.createdAt).getTime()) < 24 * 60 * 60 * 1000;
         
         if (isMe && isRecent) {
              e.preventDefault();
              e.stopPropagation();
              
-             // Smart positioning logic to prevent menu going off screen
              const menuWidth = 160;
              const menuHeight = 50;
              let x = e.clientX;
@@ -584,28 +576,19 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
         }
     };
 
-    // Effect for room change: Fetch initial messages & Set up Realtime
     useEffect(() => {
         if (!activeRoomId) return;
 
-        // 1. Initial Load
         loadMessages(activeRoomId, true);
-        
-        // Clear unread count immediately upon opening
         clearUnreadCount(activeRoomId);
-        
-        // Reset context menu
         setContextMenu(null);
-
-        // 2. Real-time subscription
         setRealtimeStatus('CONNECTING');
         
-        // We subscribe to ALL message inserts/deletes on the table and filter client-side.
         const channel = supabase.channel(`room-listener:${activeRoomId}`)
             .on(
                 'postgres_changes',
                 { 
-                    event: '*', // Listen to INSERT, DELETE, etc.
+                    event: '*', 
                     schema: 'public', 
                     table: 'messages',
                 },
@@ -626,7 +609,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                                 if (prev.some(m => m.id === newMsg.id)) return prev;
                                 return [...prev, newMsg];
                             });
-                            // Scroll to bottom on new message
                             scrollToBottom('smooth');
                         }
                     } else if (payload.eventType === 'DELETE') {
@@ -648,14 +630,12 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
 
     }, [activeRoomId, loadMessages, clearUnreadCount]);
 
-    // 3. Polling Fallback (Crucial for when Realtime fails due to RLS or Network)
     useEffect(() => {
         if (!activeRoomId) return;
 
         const intervalId = setInterval(() => {
-            // Poll silently without showing loading indicator
             loadMessages(activeRoomId, false);
-        }, 5000); // Poll every 5 seconds
+        }, 5000); 
 
         return () => clearInterval(intervalId);
     }, [activeRoomId, loadMessages]);
@@ -665,7 +645,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
         if (!newMessage.trim()) return;
 
         const content = newMessage;
-        setNewMessage(''); // Optimistic clear
+        setNewMessage('');
         setShowEmojiPicker(false);
 
         if (activeRoomId) {
@@ -679,7 +659,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
             } catch (error) {
                 console.error("Failed to send message", error);
                 alert("Failed to send message");
-                setNewMessage(content); // Restore on fail
+                setNewMessage(content);
             }
         }
     };
@@ -719,7 +699,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
         const file = event.target.files?.[0];
         if (!file || !activeRoomId) return;
 
-        // Reset input value to allow selecting same file again
         event.target.value = '';
 
         if (file.size > 2 * 1024 * 1024) {
@@ -728,10 +707,8 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
         }
 
         try {
-            // Pass currentUser.uid to ensure the file path includes the user ID for RLS compatibility
             const url = await api.uploadChatFile(file, activeRoomId, currentUser.uid);
             
-            // Send message with file metadata
             const metadata = {
                 type: 'file',
                 fileName: file.name,
@@ -799,10 +776,9 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
             if (!response.ok) throw new Error("Failed to load file content");
             const text = await response.text();
 
-            // SAVE TO PENDING STORAGE to avoid overwriting user's current work if they don't confirm
+            // SAVE TO PENDING STORAGE to ensure availability if Playground is lazy loaded
             localStorage.setItem('playground_pending_code', text);
 
-            // Dispatch event for hot-swapping if Playground is already mounted
             const event = new CustomEvent('open-in-playground', { detail: text });
             window.dispatchEvent(event);
 
@@ -815,7 +791,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
 
     const renderMessageContent = (msg: Message, isMe: boolean) => {
         if (msg.metadata && msg.metadata.type === 'file') {
-            // Check if it's an image
             const isImage = msg.metadata.fileType?.startsWith('image/');
             const isPython = msg.metadata.fileName?.endsWith('.py');
             
@@ -873,7 +848,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
             );
         }
 
-        // Link detection
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         if (urlRegex.test(msg.content)) {
             const parts = msg.content.split(urlRegex);
@@ -894,7 +868,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
 
     return (
         <div className="flex h-full bg-white dark:bg-gray-900 shadow-xl rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-            {/* Sidebar / Room List */}
             <div className={`${isSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-1/3 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800`}>
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800/50">
                     <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">Messages</h2>
@@ -956,11 +929,9 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                 </div>
             </div>
 
-            {/* Main Chat Area */}
             <div className={`${!isSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col flex-1 bg-white dark:bg-gray-900 relative`}>
                 {activeRoom ? (
                     <>
-                        {/* Chat Header */}
                         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800 shadow-sm z-10">
                             <div className="flex items-center">
                                 <button 
@@ -998,7 +969,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                             </div>
                         </div>
 
-                        {/* Messages List */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
                             {isLoadingMessages ? (
                                 <div className="text-center py-10 text-gray-500">Loading messages...</div>
@@ -1044,7 +1014,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Input Area */}
                         <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 relative z-20">
                              {showEmojiPicker && (
                                 <div className="absolute bottom-20 left-4 z-20 shadow-2xl rounded-xl overflow-hidden" ref={emojiPickerRef}>
@@ -1073,7 +1042,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                                     ref={fileInputRef} 
                                     className="hidden" 
                                     onChange={handleFileUpload} 
-                                    // Accept common file types including Python files
                                     accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt,.py"
                                 />
                                 <button
@@ -1151,16 +1119,15 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                 />
             )}
 
-            {/* Custom Context Menu */}
             {contextMenu && (
                 <div 
                     className="fixed z-50 bg-white dark:bg-gray-800 shadow-xl rounded-lg py-1 border border-gray-200 dark:border-gray-700 min-w-[160px] animate-fade-in-up"
                     style={{ top: contextMenu.y, left: contextMenu.x }}
-                    onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
+                    onClick={(e) => e.stopPropagation()} 
                 >
                     <button 
                         onClick={() => {
-                            handleDeleteMessage(contextMenu.id);
+                            setMessageToDelete(contextMenu.id);
                             setContextMenu(null);
                         }}
                         className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2 transition-colors"
@@ -1170,6 +1137,16 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                     </button>
                 </div>
             )}
+
+            <ConfirmationModal
+                isOpen={!!messageToDelete}
+                onClose={() => setMessageToDelete(null)}
+                onConfirm={handleDeleteMessage}
+                title="Delete Message"
+                message="Are you sure you want to delete this message? This action cannot be undone."
+                confirmText="Delete"
+                isDangerous
+            />
         </div>
     );
 };
