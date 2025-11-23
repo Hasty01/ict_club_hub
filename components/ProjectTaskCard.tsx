@@ -1,16 +1,20 @@
+
 import React, { memo } from 'react';
 import { ProjectTask, User } from '../types';
 import { TrashIcon } from './icons/TrashIcon';
+import { CheckIcon } from './icons/CheckIcon';
 
 interface ProjectTaskCardProps {
   task: ProjectTask;
   columnId: string;
   isBeingDragged: boolean;
   isPatron: boolean;
+  currentUser: User;
   allUsers: User[];
   onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string, sourceColumnId: string) => void;
   onDeleteTask: (taskId: string, columnId: string) => void;
   onAssignTask: (taskId: string, assigneeId: string | undefined) => void;
+  onToggleTaskCompletion: (taskId: string, currentStatus: boolean) => void;
 }
 
 // These classes are applied to the element being dragged to style the browser's drag preview.
@@ -18,12 +22,16 @@ const DRAGGING_CLASSES = ['opacity-75', 'ring-2', 'ring-pink-500', 'rotate-3', '
 
 const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
     const { 
-        task, columnId, isBeingDragged, isPatron, allUsers, 
-        onDragStart, onDeleteTask, onAssignTask
+        task, columnId, isBeingDragged, isPatron, currentUser, allUsers, 
+        onDragStart, onDeleteTask, onAssignTask, onToggleTaskCompletion
     } = props;
 
   const assignee = task.assigneeId ? allUsers.find(u => u.uid === task.assigneeId) : null;
   const approvedMembers = allUsers.filter(u => u.status === 'APPROVED');
+  const isCompleted = task.isCompleted;
+
+  // Allow completion toggling if user is a Patron OR the assigned user
+  const canToggleCompletion = isPatron || (task.assigneeId === currentUser.uid);
 
   return (
     <div
@@ -39,9 +47,34 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
       } : undefined}
       data-task-id={task.id}
       data-dragging={isBeingDragged}
-      className={`bg-white dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-700 transform transition-all ${isPatron ? 'cursor-grab' : ''} shadow-sm ${isBeingDragged ? 'opacity-40' : ''}`}
+      className={`bg-white dark:bg-gray-800 p-4 rounded-md border transform transition-all shadow-sm ${
+          isPatron ? 'cursor-grab' : ''
+      } ${
+          isBeingDragged ? 'opacity-40' : ''
+      } ${
+          isCompleted 
+            ? 'border-green-200 dark:border-green-900/50 bg-green-50/30 dark:bg-green-900/10' 
+            : 'border-gray-200 dark:border-gray-700'
+      }`}
     >
-      <p className="text-gray-800 dark:text-gray-200 mb-3">{task.content}</p>
+      <div className="flex items-start gap-3">
+          <button 
+             onClick={() => canToggleCompletion && onToggleTaskCompletion(task.id, !!isCompleted)}
+             disabled={!canToggleCompletion}
+             className={`flex-shrink-0 mt-0.5 h-5 w-5 rounded-full border flex items-center justify-center transition-all ${
+                 isCompleted 
+                 ? 'bg-green-500 border-green-500 text-white' 
+                 : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-transparent hover:border-green-400'
+             } ${!canToggleCompletion ? 'cursor-default opacity-60' : 'cursor-pointer'}`}
+             title={canToggleCompletion ? (isCompleted ? "Mark as incomplete" : "Mark as complete") : "Status"}
+          >
+              <CheckIcon />
+          </button>
+          <p className={`text-gray-800 dark:text-gray-200 mb-3 flex-grow ${isCompleted ? 'line-through text-gray-500 dark:text-gray-500' : ''}`}>
+              {task.content}
+          </p>
+      </div>
+
       <div className="pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <div className="flex items-center min-w-0">
             {assignee ? (

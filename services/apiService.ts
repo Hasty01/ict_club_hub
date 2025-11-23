@@ -422,6 +422,7 @@ export const getProjectData = async (): Promise<ProjectData> => {
             id: task.id.toString(),
             content: task.content,
             assigneeId: task.assignee_uid,
+            isCompleted: task.is_completed || false, // Map is_completed to isCompleted
         };
         return acc;
     }, {} as {[key: string]: ProjectTask});
@@ -502,6 +503,15 @@ export const assignProjectTask = async (taskId: string, assigneeId: string | und
         .from('project_tasks')
         .update({ assignee_uid: assigneeId })
         .eq('id', taskId);
+    if (error) throw new Error(error.message);
+};
+
+export const toggleProjectTaskCompletion = async (taskId: string, isCompleted: boolean): Promise<void> => {
+    const { error } = await supabase
+        .from('project_tasks')
+        .update({ is_completed: isCompleted })
+        .eq('id', taskId);
+    
     if (error) throw new Error(error.message);
 };
 

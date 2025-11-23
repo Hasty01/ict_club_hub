@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ProjectColumn as ProjectColumnType, ProjectTask, User } from '../types';
 import ProjectTaskCard from './ProjectTaskCard';
@@ -8,6 +9,7 @@ interface ProjectColumnProps {
   tasks: ProjectTask[];
   allUsers: User[];
   isPatron: boolean;
+  currentUser: User;
   draggedItemId: string | null;
   dropIndicator: { columnId: string; index: number } | null;
   setDropIndicator: (indicator: { columnId: string; index: number } | null) => void;
@@ -15,6 +17,7 @@ interface ProjectColumnProps {
   onDrop: (destinationColumnId: string) => void;
   onDeleteTask: (taskId: string, columnId: string) => void;
   onAssignTask: (taskId: string, assigneeId: string | undefined) => void;
+  onToggleTaskCompletion: (taskId: string, currentStatus: boolean) => void;
 }
 
 const getDragAfterElement = (container: HTMLElement, y: number) => {
@@ -38,8 +41,8 @@ const getDragAfterElement = (container: HTMLElement, y: number) => {
 
 const ProjectColumn: React.FC<ProjectColumnProps> = (props) => {
   const { 
-    column, tasks, allUsers, isPatron, draggedItemId, dropIndicator, setDropIndicator,
-    onDragStart, onDrop, onDeleteTask, onAssignTask
+    column, tasks, allUsers, isPatron, currentUser, draggedItemId, dropIndicator, setDropIndicator,
+    onDragStart, onDrop, onDeleteTask, onAssignTask, onToggleTaskCompletion
   } = props;
   
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -84,10 +87,12 @@ const ProjectColumn: React.FC<ProjectColumnProps> = (props) => {
                     columnId={column.id}
                     isBeingDragged={draggedItemId === task.id}
                     isPatron={isPatron}
+                    currentUser={currentUser}
                     allUsers={allUsers}
                     onDragStart={onDragStart}
                     onDeleteTask={onDeleteTask}
                     onAssignTask={onAssignTask}
+                    onToggleTaskCompletion={onToggleTaskCompletion}
                 />
             </React.Fragment>
         ))}

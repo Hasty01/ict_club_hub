@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { User, ProjectData } from '../types';
 import * as api from '../services/apiService';
@@ -112,6 +113,24 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     }
   };
 
+  const handleToggleTaskCompletion = async (taskId: string, currentStatus: boolean) => {
+    // Optimistic Update
+    if (data) {
+        const newData = JSON.parse(JSON.stringify(data));
+        if (newData.tasks[taskId]) {
+            newData.tasks[taskId].isCompleted = !currentStatus;
+            setProjectData(newData);
+        }
+    }
+    
+    try {
+        await api.toggleProjectTaskCompletion(taskId, !currentStatus);
+    } catch (error: any) {
+        console.error("Failed to toggle task:", error);
+        await fetchProjectData(); // Revert on error
+    }
+  };
+
   if (isLoadingProjects || isLoadingUsers) {
     return <div className="text-center p-8 text-gray-500 dark:text-gray-400">Loading project board...</div>;
   }
@@ -162,6 +181,7 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
               tasks={tasks}
               allUsers={allUsers}
               isPatron={currentUser.role === 'PATRON'}
+              currentUser={currentUser}
               draggedItemId={draggedItemId}
               dropIndicator={dropIndicator}
               setDropIndicator={setDropIndicator}
@@ -169,6 +189,7 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
               onDrop={handleDrop}
               onDeleteTask={handleDeleteTask}
               onAssignTask={handleAssignTask}
+              onToggleTaskCompletion={handleToggleTaskCompletion}
             />
           );
         })}

@@ -48,6 +48,7 @@ export interface ProjectTask {
   id: string;
   content: string;
   assigneeId?: string; // Changed to string to store user UID
+  isCompleted?: boolean;
 }
 
 export interface ProjectColumn {
