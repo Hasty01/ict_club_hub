@@ -74,8 +74,30 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
       localStorage.setItem('playground_code', code);
       codeRef.current = code;
   }, [code]);
+  
+  const handleImportCode = (importedCode: string) => {
+      const currentCode = codeRef.current;
+      
+      // If the current code is just the default or empty, replace immediately.
+      // Otherwise, ask for confirmation to prevent accidental loss.
+      if (!currentCode || currentCode.trim() === '' || currentCode.trim() === DEFAULT_CODE.trim()) {
+           setCode(importedCode);
+           setActiveTab('editor');
+           setOutput([{ type: 'log', content: 'Loaded code from external source.' }]);
+      } else {
+           setPendingCode(importedCode);
+           setIsConfirmOpen(true);
+      }
+  };
 
   useEffect(() => {
+    // Check for any pending code import (e.g. from Chat/Resources tab switch)
+    const pendingImport = localStorage.getItem('playground_pending_code');
+    if (pendingImport) {
+        localStorage.removeItem('playground_pending_code');
+        handleImportCode(pendingImport);
+    }
+
     const setupPyodide = async () => {
       try {
         // loadPyodide is globally available from the script tag in index.html
@@ -92,20 +114,10 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser }) =
     };
     setupPyodide();
 
-    // Listen for code opening events from Resources or Chat
+    // Listen for code opening events from Resources or Chat (if Playground is already mounted)
     const handleOpenCode = (e: CustomEvent<string>) => {
         if (e.detail) {
-            const currentCode = codeRef.current;
-            // If the code is just the default or empty, replace immediately.
-            // Otherwise, ask for confirmation to prevent accidental loss.
-            if (!currentCode || currentCode.trim() === '' || currentCode.trim() === DEFAULT_CODE.trim()) {
-                setCode(e.detail);
-                setActiveTab('editor');
-                setOutput([{ type: 'log', content: 'Loaded code from external source.' }]);
-            } else {
-                setPendingCode(e.detail);
-                setIsConfirmOpen(true);
-            }
+            handleImportCode(e.detail);
         }
     };
     

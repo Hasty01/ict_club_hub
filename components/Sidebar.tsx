@@ -113,7 +113,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme,
   // Grouped Navigation Structure
   const navGroups = [
       {
-          title: "Overview",
+          title: "General",
           items: [
               { tab: 'feed' as Tab, label: 'Feed', icon: <HomeIcon /> },
               { tab: 'chat' as Tab, label: 'Messages', icon: <ChatBubbleIcon />, badge: totalUnread },

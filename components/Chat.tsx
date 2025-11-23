@@ -799,9 +799,10 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
             if (!response.ok) throw new Error("Failed to load file content");
             const text = await response.text();
 
-            // Save code to localStorage so it persists when switching tabs, even if Playground component unmounts/remounts
-            localStorage.setItem('playground_code', text);
+            // SAVE TO PENDING STORAGE to avoid overwriting user's current work if they don't confirm
+            localStorage.setItem('playground_pending_code', text);
 
+            // Dispatch event for hot-swapping if Playground is already mounted
             const event = new CustomEvent('open-in-playground', { detail: text });
             window.dispatchEvent(event);
 
