@@ -1,11 +1,12 @@
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { User, Resource, ResourceType, ResourceCategory, Tab } from '../types';
 import * as api from '../services/apiService';
 import { useData } from '../DataContext';
 import ResourceCard from './ResourceCard';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
 import { UploadIcon } from './icons/UploadIcon';
+import ConfirmationModal from './ConfirmationModal';
 
 interface ResourcesProps {
     currentUser: User;
@@ -25,6 +26,9 @@ const Resources: React.FC<ResourcesProps> = ({ currentUser, setActiveTab }) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Delete Modal State
+    const [resourceToDelete, setResourceToDelete] = useState<Resource | null>(null);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -98,14 +102,20 @@ const Resources: React.FC<ResourcesProps> = ({ currentUser, setActiveTab }) => {
         }
     };
 
-    const handleDelete = async (resource: Resource) => {
-        if (!window.confirm(`Are you sure you want to delete "${resource.title}"?`)) return;
+    const handleDeleteClick = (resource: Resource) => {
+        setResourceToDelete(resource);
+    };
+
+    const confirmDelete = async () => {
+        if (!resourceToDelete) return;
         try {
-            await api.deleteResource(resource);
+            await api.deleteResource(resourceToDelete);
             await fetchResources();
         } catch (err: any) {
             console.error("Failed to delete resource:", err);
             alert(err.message || "An error occurred.");
+        } finally {
+            setResourceToDelete(null);
         }
     };
     
@@ -138,7 +148,7 @@ const Resources: React.FC<ResourcesProps> = ({ currentUser, setActiveTab }) => {
                                         key={resource.id} 
                                         resource={resource} 
                                         currentUser={currentUser} 
-                                        onDelete={handleDelete}
+                                        onDelete={handleDeleteClick}
                                         setActiveTab={setActiveTab}
                                     />
                                 ))}
@@ -220,6 +230,16 @@ const Resources: React.FC<ResourcesProps> = ({ currentUser, setActiveTab }) => {
             )}
             
             {renderContent()}
+
+            <ConfirmationModal 
+                isOpen={!!resourceToDelete}
+                onClose={() => setResourceToDelete(null)}
+                onConfirm={confirmDelete}
+                title="Delete Resource"
+                message={`Are you sure you want to delete "${resourceToDelete?.title}"? This action cannot be undone.`}
+                confirmText="Delete"
+                isDangerous
+            />
         </div>
     );
 };

@@ -6,6 +6,7 @@ import ProjectColumn from './ProjectColumn';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
 import { useData } from '../DataContext';
 import EditTaskModal from './EditTaskModal';
+import ConfirmationModal from './ConfirmationModal';
 
 interface ProjectsBoardProps {
   currentUser: User;
@@ -30,6 +31,9 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
   // Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<ProjectTask | undefined>(undefined);
+  
+  // Delete Confirmation State
+  const [taskToDelete, setTaskToDelete] = useState<{taskId: string, columnId: string} | null>(null);
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string, colId: string) => {
     if (currentUser.role !== 'PATRON') return;
@@ -95,14 +99,20 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     await fetchProjectData();
   };
 
-  const handleDeleteTask = async (taskId: string, columnId: string) => {
-    if (!window.confirm("Are you sure you want to delete this task?")) return;
+  const handleDeleteTaskClick = (taskId: string, columnId: string) => {
+      setTaskToDelete({ taskId, columnId });
+  };
+
+  const confirmDeleteTask = async () => {
+    if (!taskToDelete) return;
     try {
-        await api.deleteProjectTask(taskId, columnId);
+        await api.deleteProjectTask(taskToDelete.taskId, taskToDelete.columnId);
         await fetchProjectData();
     } catch (error: any) {
         console.error("Failed to delete task:", error);
         alert(`Could not delete the task: ${error.message}`);
+    } finally {
+        setTaskToDelete(null);
     }
   };
 
@@ -176,7 +186,7 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
               setDropIndicator={setDropIndicator}
               onDragStart={handleDragStart}
               onDrop={handleDrop}
-              onDeleteTask={handleDeleteTask}
+              onDeleteTask={handleDeleteTaskClick}
               onAssignTask={handleAssignTask}
               onToggleTaskCompletion={handleToggleTaskCompletion}
               // Pass the edit handler down
@@ -193,6 +203,16 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
         currentUser={currentUser}
         task={editingTask}
         onSave={handleSaveTask}
+      />
+
+      <ConfirmationModal 
+        isOpen={!!taskToDelete}
+        onClose={() => setTaskToDelete(null)}
+        onConfirm={confirmDeleteTask}
+        title="Delete Task"
+        message="Are you sure you want to delete this task? This cannot be undone."
+        confirmText="Delete"
+        isDangerous
       />
     </div>
   );
