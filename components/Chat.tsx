@@ -148,6 +148,7 @@ const RoomDetailsModal: React.FC<{
     const [isAddingMode, setIsAddingMode] = useState(false);
     const [selectedUsersToAdd, setSelectedUsersToAdd] = useState<string[]>([]);
     const [userSearchTerm, setUserSearchTerm] = useState('');
+    const [memberToRemove, setMemberToRemove] = useState<{ id: string, name: string } | null>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -156,6 +157,7 @@ const RoomDetailsModal: React.FC<{
             setTempTitle(room.title || '');
             setSelectedUsersToAdd([]);
             setUserSearchTerm('');
+            setMemberToRemove(null);
         }
     }, [isOpen, room]);
 
@@ -171,9 +173,19 @@ const RoomDetailsModal: React.FC<{
         u.name.toLowerCase().includes(userSearchTerm.toLowerCase())
     );
 
-    const handleRemove = async (userId: string, userName: string) => {
-        if (!confirm(`Are you sure you want to remove ${userName} from this group?`)) return;
-        await onRemoveMember(room.id, userId);
+    const handleRemoveClick = (userId: string, userName: string) => {
+        setMemberToRemove({ id: userId, name: userName });
+    };
+
+    const confirmRemove = async () => {
+        if (memberToRemove) {
+            await onRemoveMember(room.id, memberToRemove.id);
+            setMemberToRemove(null);
+        }
+    };
+
+    const cancelRemove = () => {
+        setMemberToRemove(null);
     };
 
     const handleSaveTitle = async () => {
@@ -297,7 +309,7 @@ const RoomDetailsModal: React.FC<{
                                 </div>
                                 {isCreator && user.uid !== currentUser.uid && (
                                     <button 
-                                        onClick={() => handleRemove(user.uid, user.name)}
+                                        onClick={() => handleRemoveClick(user.uid, user.name)}
                                         className="ml-2 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors flex-shrink-0"
                                         title="Remove member from group"
                                         aria-label="Remove member"
@@ -319,6 +331,33 @@ const RoomDetailsModal: React.FC<{
                             Add Selected ({selectedUsersToAdd.length})
                         </button>
                      </div>
+                )}
+
+                {/* Remove Confirmation Overlay */}
+                {memberToRemove && (
+                    <div className="absolute inset-0 bg-white/90 dark:bg-gray-800/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-6 rounded-2xl animate-fade-in text-center">
+                        <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full mb-3">
+                            <UserRemoveIcon className="w-8 h-8" />
+                        </div>
+                        <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Remove Member?</h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+                            Are you sure you want to remove <span className="font-semibold">{memberToRemove.name}</span> from this group?
+                        </p>
+                        <div className="flex gap-3 w-full">
+                            <button 
+                                onClick={cancelRemove}
+                                className="flex-1 py-2 px-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={confirmRemove}
+                                className="flex-1 py-2 px-4 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors shadow-md"
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>
