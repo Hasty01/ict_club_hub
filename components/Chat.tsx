@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { User, Message, Room } from '../types';
 import { useData } from '../DataContext';
 import * as api from '../services/apiService';
@@ -8,6 +8,7 @@ import { PlusCircleIcon } from './icons/PlusCircleIcon';
 import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
 import { XIcon } from './icons/XIcon';
 import { SendIcon } from './icons/SendIcon';
+import { RefreshIcon } from './icons/RefreshIcon';
 
 interface ChatProps {
     currentUser: User;
@@ -127,6 +128,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
     
     const [newMessage, setNewMessage] = useState('');
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [realtimeStatus, setRealtimeStatus] = useState<'CONNECTING' | 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR'>('CONNECTING');
@@ -145,42 +147,63 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
         fetchRooms();
     }, [fetchRooms]);
 
-    // Fetch messages and setup Realtime subscription
+    // Function to fetch messages (used for initial load and polling)
+    const loadMessages = useCallback(async (roomId: string, showLoadingIndicator = false) => {
+        if (showLoadingIndicator) setIsLoadingMessages(true);
+        try {
+            const msgs = await api.getRoomMessages(roomId);
+            setMessages(prev => {
+                // If length matches and last ID matches, assume no change to avoid re-renders
+                if (prev.length === msgs.length && prev.length > 0 && prev[prev.length-1].id === msgs[msgs.length-1].id) {
+                    return prev;
+                }
+                return msgs;
+            });
+            if (showLoadingIndicator) scrollToBottom();
+        } catch (error) {
+            console.error("Failed to load messages", error);
+        } finally {
+            if (showLoadingIndicator) setIsLoadingMessages(false);
+        }
+    }, []);
+
+    // Manual Refresh Handler
+    const handleRefresh = async () => {
+        if (!activeRoomId) return;
+        setIsRefreshing(true);
+        await loadMessages(activeRoomId, false);
+        setIsRefreshing(false);
+        scrollToBottom();
+    };
+
+    // Effect for room change: Fetch initial messages & Set up Realtime
     useEffect(() => {
         if (!activeRoomId) return;
 
         // 1. Initial Load
-        const loadMessages = async () => {
-            setIsLoadingMessages(true);
-            try {
-                const msgs = await api.getRoomMessages(activeRoomId);
-                setMessages(msgs);
-                scrollToBottom();
-            } catch (error) {
-                console.error("Failed to load messages", error);
-            } finally {
-                setIsLoadingMessages(false);
-            }
-        };
-
-        loadMessages();
+        loadMessages(activeRoomId, true);
 
         // 2. Real-time subscription
         setRealtimeStatus('CONNECTING');
-        const channel = supabase.channel(`room:${activeRoomId}`)
+        
+        // We subscribe to ALL message inserts on the table and filter client-side.
+        // This avoids potential issues with UUID filter string formatting or restrictive RLS on filters.
+        const channel = supabase.channel(`room-listener:${activeRoomId}`)
             .on(
                 'postgres_changes',
                 { 
                     event: 'INSERT', 
                     schema: 'public', 
                     table: 'messages',
-                    filter: `room_id=eq.${activeRoomId}`
+                    // REMOVED filter string to ensure we get events even if RLS/Filter syntax is tricky
                 },
                 (payload) => {
-                    console.log("New message received via realtime:", payload);
                     const rawMsg = payload.new as any;
                     
-                    if (rawMsg) {
+                    // Client-side filtering: Only process if it belongs to this room
+                    if (rawMsg && rawMsg.room_id === activeRoomId) {
+                        console.log("New message received via realtime:", payload);
+                        
                         const newMsg: Message = {
                             id: rawMsg.id,
                             roomId: rawMsg.room_id,
@@ -207,11 +230,24 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
             supabase.removeChannel(channel);
         };
 
-    }, [activeRoomId]);
+    }, [activeRoomId, loadMessages]);
+
+    // 3. Polling Fallback (Crucial for when Realtime fails due to RLS or Network)
+    useEffect(() => {
+        if (!activeRoomId) return;
+
+        const intervalId = setInterval(() => {
+            // Poll silently without showing loading indicator
+            loadMessages(activeRoomId, false);
+        }, 5000); // Poll every 5 seconds
+
+        return () => clearInterval(intervalId);
+    }, [activeRoomId, loadMessages]);
+
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [messages.length, activeRoomId]); // Scroll when message count changes or room changes
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -290,7 +326,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
 
     const getConnectionStatusText = () => {
         switch (realtimeStatus) {
-            case 'SUBSCRIBED': return 'Online';
+            case 'SUBSCRIBED': return 'Live';
             case 'CONNECTING': return 'Connecting...';
             default: return 'Offline';
         }
@@ -369,12 +405,20 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                     <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 leading-tight">
                                         {getRoomName(activeRoom, allUsers, currentUser.uid)}
                                     </h2>
-                                    <div className="flex items-center space-x-1 mt-0.5">
+                                    <div className="flex items-center space-x-2 mt-0.5">
                                         <div className={`w-2 h-2 rounded-full ${getConnectionStatusColor()}`}></div>
                                         <span className="text-xs text-gray-500 dark:text-gray-400">{getConnectionStatusText()}</span>
                                     </div>
                                 </div>
                             </div>
+                            <button 
+                                onClick={handleRefresh}
+                                disabled={isRefreshing}
+                                className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-all ${isRefreshing ? 'animate-spin' : ''}`}
+                                title="Refresh messages"
+                            >
+                                <RefreshIcon />
+                            </button>
                         </div>
 
                         {/* Messages List */}
