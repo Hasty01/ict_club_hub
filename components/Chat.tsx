@@ -503,6 +503,20 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                                     title={sender?.name}
                                                 />
                                             )}
+
+                                            {/* Delete Button (Me) - Positioned to the left of the message */}
+                                            {isMe && canDelete && (
+                                                <div className="flex items-center mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button 
+                                                        onClick={() => handleDeleteMessage(msg.id)}
+                                                        className="p-1.5 rounded-full text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+                                                        title="Delete message"
+                                                    >
+                                                        <TrashIcon />
+                                                    </button>
+                                                </div>
+                                            )}
+
                                             <div className="flex flex-col max-w-[70%]">
                                                 <div className={`relative px-4 py-2 shadow-sm rounded-2xl ${
                                                     isMe 
@@ -511,15 +525,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                                 }`}>
                                                     {!isMe && <p className="text-xs text-pink-600 dark:text-pink-400 font-bold mb-1">{sender?.name || 'Unknown'}</p>}
                                                     <p className="whitespace-pre-wrap break-words text-sm md:text-base">{msg.content}</p>
-                                                    {canDelete && (
-                                                        <button 
-                                                            onClick={() => handleDeleteMessage(msg.id)}
-                                                            className={`absolute top-1 right-1 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity ${isMe ? 'text-pink-200 hover:text-white hover:bg-white/20' : 'text-gray-400 hover:text-red-500'}`}
-                                                            title="Delete message"
-                                                        >
-                                                            <TrashIcon />
-                                                        </button>
-                                                    )}
                                                 </div>
                                                 <p className={`text-[10px] mt-1 ${isMe ? 'text-right text-gray-400' : 'text-left text-gray-400'}`}>
                                                     {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
