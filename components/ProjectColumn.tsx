@@ -18,15 +18,12 @@ interface ProjectColumnProps {
   onDeleteTask: (taskId: string, columnId: string) => void;
   onAssignTask: (taskId: string, assigneeId: string | undefined) => void;
   onToggleTaskCompletion: (taskId: string, currentStatus: boolean) => void;
+  onEditTask: (task: ProjectTask) => void;
 }
 
 const getDragAfterElement = (container: HTMLElement, y: number) => {
     const draggableElements = [...container.querySelectorAll('[data-task-id]:not([data-dragging="true"])')] as HTMLElement[];
 
-    // FIX: Correctly type the accumulator for the reduce function.
-    // The initial value now includes `element: undefined`, and a generic type is provided to `reduce`.
-    // This ensures the `closest` object always has the same shape (`{offset, element}`),
-    // and prevents a type error when accessing `.element` on the final result.
     return draggableElements.reduce<{ offset: number; element: HTMLElement | undefined }>((closest, child) => {
         const box = child.getBoundingClientRect();
         const offset = y - box.top - box.height / 2;
@@ -42,7 +39,7 @@ const getDragAfterElement = (container: HTMLElement, y: number) => {
 const ProjectColumn: React.FC<ProjectColumnProps> = (props) => {
   const { 
     column, tasks, allUsers, isPatron, currentUser, draggedItemId, dropIndicator, setDropIndicator,
-    onDragStart, onDrop, onDeleteTask, onAssignTask, onToggleTaskCompletion
+    onDragStart, onDrop, onDeleteTask, onAssignTask, onToggleTaskCompletion, onEditTask
   } = props;
   
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -69,14 +66,14 @@ const ProjectColumn: React.FC<ProjectColumnProps> = (props) => {
 
   return (
     <div
-      className="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-4 w-80 flex-shrink-0 border border-gray-200 dark:border-gray-700"
+      className="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-4 w-80 flex-shrink-0 border border-gray-200 dark:border-gray-700 h-full flex flex-col"
     >
-      <h3 className="font-bold text-gray-700 dark:text-gray-300 mb-4">{column.title} ({tasks.length})</h3>
+      <h3 className="font-bold text-gray-700 dark:text-gray-300 mb-4 flex-shrink-0">{column.title} ({tasks.length})</h3>
       <div 
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className="space-y-3 min-h-[200px] transition-colors"
+        className="space-y-3 flex-1 overflow-y-auto min-h-[100px] transition-colors custom-scrollbar"
       >
         {tasks.length === 0 && <DropIndicator visible={!!dropIndicator && dropIndicator.columnId === column.id} />}
         {tasks.map((task, index) => (
@@ -93,6 +90,7 @@ const ProjectColumn: React.FC<ProjectColumnProps> = (props) => {
                     onDeleteTask={onDeleteTask}
                     onAssignTask={onAssignTask}
                     onToggleTaskCompletion={onToggleTaskCompletion}
+                    onEditTask={onEditTask}
                 />
             </React.Fragment>
         ))}

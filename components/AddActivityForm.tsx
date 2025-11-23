@@ -1,13 +1,14 @@
 
 import React, { useState } from 'react';
-import { Activity } from '../types';
+import { Activity, ActivityCategory } from '../types';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
 
-const AddActivityForm: React.FC<{ onAddActivity: (activity: Omit<Activity, 'id'>) => Promise<void> }> = ({ onAddActivity }) => {
+const AddActivityForm: React.FC<{ onAddActivity: (activity: Omit<Activity, 'id' | 'rsvpUserIds'>) => Promise<void> }> = ({ onAddActivity }) => {
     const [title, setTitle] = useState('');
     const [date, setDate] = useState('');
     const [location, setLocation] = useState('');
     const [description, setDescription] = useState('');
+    const [category, setCategory] = useState<ActivityCategory>('OTHER');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -18,11 +19,12 @@ const AddActivityForm: React.FC<{ onAddActivity: (activity: Omit<Activity, 'id'>
         }
         setIsSubmitting(true);
         try {
-            await onAddActivity({ title, date, location, description });
+            await onAddActivity({ title, date, location, description, category });
             setTitle('');
             setDate('');
             setLocation('');
             setDescription('');
+            setCategory('OTHER');
         } catch (error) {
             console.error("Failed to add activity", error);
             alert("Failed to add activity. Please try again.");
@@ -41,7 +43,20 @@ const AddActivityForm: React.FC<{ onAddActivity: (activity: Omit<Activity, 'id'>
                     <input type="text" placeholder="Activity Title" value={title} onChange={e => setTitle(e.target.value)} className="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500" />
                     <input type="date" placeholder="Date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500" />
                 </div>
-                <input type="text" placeholder="Location" value={location} onChange={e => setLocation(e.target.value)} className="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" placeholder="Location" value={location} onChange={e => setLocation(e.target.value)} className="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500" />
+                    <select 
+                        value={category} 
+                        onChange={e => setCategory(e.target.value as ActivityCategory)} 
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    >
+                        <option value="WORKSHOP">Workshop</option>
+                        <option value="SOCIAL">Social</option>
+                        <option value="COMPETITION">Competition</option>
+                        <option value="GUEST_SPEAKER">Guest Speaker</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
                 <textarea placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} rows={3} className="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500" />
                 <div className="text-right">
                     <button type="submit" disabled={isSubmitting} className="flex items-center justify-center space-x-2 px-5 py-2 font-semibold text-white bg-pink-600 rounded-lg shadow-md hover:bg-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">

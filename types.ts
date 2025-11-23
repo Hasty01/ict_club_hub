@@ -12,12 +12,16 @@ export interface User {
   phoneNumber?: string;
 }
 
+export type ActivityCategory = 'WORKSHOP' | 'SOCIAL' | 'COMPETITION' | 'GUEST_SPEAKER' | 'OTHER';
+
 export interface Activity {
   id: string; // Use Firestore document ID
   title: string;
   date: string;
   description: string;
   location: string;
+  category: ActivityCategory;
+  rsvpUserIds: string[]; // List of user IDs who have RSVP'd
 }
 
 export type AttendanceStatus = 'Present' | 'Absent' | 'Excused';
@@ -44,11 +48,16 @@ export interface FeedItem {
 }
 
 // New types for Project Board
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
+
 export interface ProjectTask {
   id: string;
   content: string;
   assigneeId?: string; // Changed to string to store user UID
   isCompleted?: boolean;
+  priority: TaskPriority;
+  dueDate?: string;
+  tags: string[];
 }
 
 export interface ProjectColumn {

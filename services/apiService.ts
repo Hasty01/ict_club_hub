@@ -1,7 +1,6 @@
 
 import { supabase } from './supabaseClient';
-// FIX: Imported the new Notification type.
-import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, FeedItemType, ProjectColumn, Resource, Notification, Tab, Room, Message } from '../types';
+import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, FeedItemType, ProjectColumn, Resource, Notification, Tab, Room, Message, ActivityCategory, TaskPriority } from '../types';
 import { predefinedAvatars } from '../constants';
 
 // --- INTERNAL HELPERS ---
@@ -219,21 +218,76 @@ export const changePassword = async (newPassword: string): Promise<void> => {
 // --- ACTIVITIES API ---
 
 export const getActivities = async (): Promise<Activity[]> => {
-    const { data, error } = await supabase.from('activities').select('*').order('date', { ascending: false });
-    if (error) throw new Error(error.message);
-    // Explicitly map the ID to a string to ensure type consistency with the app's `Activity` interface.
-    return (data || []).map(activity => ({
-        ...activity,
+    // 1. Fetch activities
+    const { data: activities, error: activityError } = await supabase
+        .from('activities')
+        .select('*')
+        .order('date', { ascending: false });
+
+    if (activityError) throw new Error(activityError.message);
+
+    // 2. Fetch RSVPs separately. 
+    // This avoids "Could not find a relationship" errors if the foreign key isn't perfectly cached by PostgREST.
+    let rsvpMap: Record<string, string[]> = {};
+    
+    try {
+        const { data: rsvps, error: rsvpsError } = await supabase
+            .from('activity_rsvps')
+            .select('activity_id, user_uid');
+            
+        if (!rsvpsError && rsvps) {
+            rsvps.forEach((r: any) => {
+                const aId = r.activity_id.toString();
+                if (!rsvpMap[aId]) rsvpMap[aId] = [];
+                rsvpMap[aId].push(r.user_uid);
+            });
+        }
+    } catch (e) {
+        console.warn("Could not fetch RSVPs, defaulting to empty.", e);
+    }
+    
+    return (activities || []).map(activity => ({
         id: activity.id.toString(),
+        title: activity.title,
+        date: activity.date,
+        description: activity.description,
+        location: activity.location,
+        category: activity.category || 'OTHER', 
+        rsvpUserIds: rsvpMap[activity.id.toString()] || []
     }));
 };
 
-export const addActivity = async (activityData: Omit<Activity, 'id'>): Promise<void> => {
-    const { error } = await supabase.from('activities').insert(activityData);
+export const addActivity = async (activityData: Omit<Activity, 'id' | 'rsvpUserIds'>): Promise<void> => {
+    const { error } = await supabase.from('activities').insert({
+        title: activityData.title,
+        date: activityData.date,
+        location: activityData.location,
+        description: activityData.description,
+        category: activityData.category
+    });
     if (error) throw new Error(error.message);
 
     // Notify all users about the new activity
     await notifyAllUsers(`New activity: ${activityData.title} on ${activityData.date}`, 'activities');
+};
+
+export const toggleRSVP = async (activityId: string, userId: string, isJoining: boolean): Promise<void> => {
+    // Ensure ID is numeric for DB if it's a BigInt column
+    const dbActivityId = Number(activityId);
+
+    if (isJoining) {
+        const { error } = await supabase.from('activity_rsvps').insert({
+            activity_id: dbActivityId,
+            user_uid: userId
+        });
+        if (error) throw new Error(error.message);
+    } else {
+        const { error } = await supabase.from('activity_rsvps').delete().match({
+            activity_id: dbActivityId,
+            user_uid: userId
+        });
+        if (error) throw new Error(error.message);
+    }
 };
 
 // --- ATTENDANCE API ---
@@ -406,7 +460,6 @@ export const getProjectData = async (): Promise<ProjectData> => {
     // 1. Fetch columns and tasks in parallel.
     const [columnsRes, tasksRes] = await Promise.all([
         supabase.from('project_columns').select('*').order('position', { ascending: true }),
-        // Fetch tasks without position ordering, as it does not exist in the schema.
         supabase.from('project_tasks').select('*') 
     ]);
 
@@ -422,7 +475,10 @@ export const getProjectData = async (): Promise<ProjectData> => {
             id: task.id.toString(),
             content: task.content,
             assigneeId: task.assignee_uid,
-            isCompleted: task.is_completed || false, // Map is_completed to isCompleted
+            isCompleted: task.is_completed || false, 
+            priority: task.priority || 'MEDIUM',
+            dueDate: task.due_date,
+            tags: task.tags || [],
         };
         return acc;
     }, {} as {[key: string]: ProjectTask});
@@ -466,7 +522,12 @@ export const moveProjectTask = async (taskId: string, destinationColumnId: strin
     if (error) throw new Error(error.message);
 };
 
-export const addProjectTask = async (content: string): Promise<void> => {
+export const addProjectTask = async (taskData: { 
+    content: string, 
+    priority: TaskPriority, 
+    dueDate?: string, 
+    tags: string[] 
+}): Promise<void> => {
     // 1. Find the first column (e.g., 'Backlog') based on its position.
     const { data: firstColumn, error: columnError } = await supabase
         .from('project_columns')
@@ -482,11 +543,29 @@ export const addProjectTask = async (content: string): Promise<void> => {
     const { error: taskError } = await supabase
         .from('project_tasks')
         .insert({ 
-            content: content,
+            content: taskData.content,
+            priority: taskData.priority,
+            due_date: taskData.dueDate || null,
+            tags: taskData.tags,
             column_id: firstColumn.id,
         });
         
     if (taskError) throw new Error(taskError.message);
+};
+
+export const updateProjectTask = async (taskId: string, updates: Partial<ProjectTask>): Promise<void> => {
+    const dbUpdates: any = {};
+    if (updates.content) dbUpdates.content = updates.content;
+    if (updates.priority) dbUpdates.priority = updates.priority;
+    if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate || null;
+    if (updates.tags) dbUpdates.tags = updates.tags;
+
+    const { error } = await supabase
+        .from('project_tasks')
+        .update(dbUpdates)
+        .eq('id', taskId);
+    
+    if (error) throw new Error(error.message);
 };
 
 export const deleteProjectTask = async (taskId: string, columnId: string): Promise<void> => {

@@ -53,13 +53,20 @@ const getRoomAvatar = (room: Room, allUsers: User[], currentUserId: string) => {
 };
 
 const LinkPreview: React.FC<{ url: string }> = ({ url }) => {
+    const [imgError, setImgError] = useState(false);
+    
     // Check for image extensions
     const isImage = /\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i.test(url);
 
-    if (isImage) {
+    if (isImage && !imgError) {
         return (
             <a href={url} target="_blank" rel="noopener noreferrer" className="block mt-2 mb-1" onClick={(e) => e.stopPropagation()}>
-                <img src={url} alt="Shared content" className="max-w-full rounded-lg border border-gray-200 dark:border-gray-600 max-h-60 object-cover hover:opacity-95 transition-opacity" />
+                <img 
+                    src={url} 
+                    alt="Shared content" 
+                    className="max-w-full rounded-lg border border-gray-200 dark:border-gray-600 max-h-60 object-cover hover:opacity-95 transition-opacity" 
+                    onError={() => setImgError(true)}
+                />
             </a>
         );
     }
@@ -374,7 +381,7 @@ const RoomDetailsModal: React.FC<{
 
                 {/* Remove Confirmation Overlay */}
                 {memberToRemove && (
-                    <div className="absolute inset-0 bg-white/90 dark:bg-gray-800/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-6 rounded-2xl animate-fade-in text-center">
+                    <div className="absolute inset-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-6 rounded-2xl animate-fade-in text-center">
                         <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full mb-3">
                             <UserRemoveIcon className="w-8 h-8" />
                         </div>

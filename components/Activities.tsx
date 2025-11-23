@@ -20,10 +20,20 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
   const [filter, setFilter] = useState<FilterType>('UPCOMING');
   const [viewMode, setViewMode] = useState<'LIST' | 'CALENDAR'>('LIST');
 
-  const handleAddActivity = useCallback(async (newActivity: Omit<Activity, 'id'>) => {
+  const handleAddActivity = useCallback(async (newActivity: Omit<Activity, 'id' | 'rsvpUserIds'>) => {
     await api.addActivity(newActivity);
     await fetchActivities(); // Refetch from context
   }, [fetchActivities]);
+
+  const handleToggleRSVP = useCallback(async (activityId: string, isJoining: boolean) => {
+      try {
+          await api.toggleRSVP(activityId, currentUser.uid, isJoining);
+          await fetchActivities();
+      } catch (error) {
+          console.error("RSVP failed", error);
+          alert("Failed to update RSVP status.");
+      }
+  }, [currentUser.uid, fetchActivities]);
 
   const filteredAndSortedActivities = useMemo(() => {
     // Get today's date in EAT (YYYY-MM-DD)
@@ -68,7 +78,12 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
         return (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {filteredAndSortedActivities.map((activity) => (
-                    <ActivityCard key={activity.id} activity={activity} />
+                    <ActivityCard 
+                        key={activity.id} 
+                        activity={activity} 
+                        currentUser={currentUser}
+                        onToggleRSVP={handleToggleRSVP}
+                    />
                 ))}
             </div>
         );

@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
-import { User, ProjectData } from '../types';
+import { User, ProjectData, ProjectTask, TaskPriority } from '../types';
 import * as api from '../services/apiService';
 import ProjectColumn from './ProjectColumn';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
 import { useData } from '../DataContext';
+import EditTaskModal from './EditTaskModal';
 
 interface ProjectsBoardProps {
   currentUser: User;
@@ -25,7 +26,10 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [sourceColumnId, setSourceColumnId] = useState<string | null>(null);
   const [dropIndicator, setDropIndicator] = useState<{columnId: string; index: number} | null>(null);
-  const [newTaskContent, setNewTaskContent] = useState('');
+  
+  // Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<ProjectTask | undefined>(undefined);
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string, colId: string) => {
     if (currentUser.role !== 'PATRON') return;
@@ -40,56 +44,55 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     const currentSourceColumnId = sourceColumnId;
     const newIndex = dropIndicator.index;
     
-    // Immediately clear UI indicators
     setDraggedItemId(null);
     setSourceColumnId(null);
     setDropIndicator(null);
     
-    // Check if the item was moved to the exact same position
     const originalIndex = data.columns[currentSourceColumnId].taskIds.indexOf(currentDraggedItemId);
     if (currentSourceColumnId === destinationColumnId && originalIndex === newIndex) {
         return;
     }
 
-    // Optimistic Update
-    const oldData = data; // For rollback on failure
+    const oldData = data;
     const newData: ProjectData = JSON.parse(JSON.stringify(data));
     const sourceCol = newData.columns[currentSourceColumnId];
     const destCol = newData.columns[destinationColumnId];
 
-    // Remove task from source column
     const [movedTask] = sourceCol.taskIds.splice(originalIndex, 1);
-
-    // Add task to destination column at the new index
     destCol.taskIds.splice(newIndex, 0, movedTask);
 
-    // Update UI immediately
     setProjectData(newData);
 
-    // Persist change to the backend only if the column has changed
     if (currentSourceColumnId !== destinationColumnId) {
         try {
             await api.moveProjectTask(currentDraggedItemId, destinationColumnId);
         } catch (error: any) {
             console.error("Failed to move task:", error);
             alert(`An error occurred while moving the task. Reverting changes.`);
-            // Rollback on failure
             setProjectData(oldData); 
         }
     }
   };
 
+  const handleOpenNewTaskModal = () => {
+      setEditingTask(undefined);
+      setIsEditModalOpen(true);
+  };
 
-  const handleAddTask = async () => {
-    if (!newTaskContent.trim() || !data) return;
-    try {
-      await api.addProjectTask(newTaskContent);
-      setNewTaskContent('');
-      await fetchProjectData();
-    } catch (error: any) {
-      console.error("Failed to add task:", error);
-      alert(`An error occurred while adding the task: ${error.message}`);
+  const handleOpenEditTaskModal = (task: ProjectTask) => {
+      setEditingTask(task);
+      setIsEditModalOpen(true);
+  };
+
+  const handleSaveTask = async (taskData: { content: string, priority: TaskPriority, dueDate?: string, tags: string[] }) => {
+    if (editingTask) {
+        // Edit existing
+        await api.updateProjectTask(editingTask.id, taskData);
+    } else {
+        // Create new
+        await api.addProjectTask(taskData);
     }
+    await fetchProjectData();
   };
 
   const handleDeleteTask = async (taskId: string, columnId: string) => {
@@ -114,7 +117,6 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
   };
 
   const handleToggleTaskCompletion = async (taskId: string, currentStatus: boolean) => {
-    // Optimistic Update
     if (data) {
         const newData = JSON.parse(JSON.stringify(data));
         if (newData.tasks[taskId]) {
@@ -122,12 +124,11 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
             setProjectData(newData);
         }
     }
-    
     try {
         await api.toggleProjectTaskCompletion(taskId, !currentStatus);
     } catch (error: any) {
         console.error("Failed to toggle task:", error);
-        await fetchProjectData(); // Revert on error
+        await fetchProjectData();
     }
   };
 
@@ -145,32 +146,20 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="mb-6">
+      <div className="mb-6 flex justify-between items-center">
         <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Club Projects Board</h2>
+        {currentUser.role === 'PATRON' && (
+             <button
+                onClick={handleOpenNewTaskModal}
+                className="flex items-center justify-center space-x-2 px-5 py-2 font-semibold text-white bg-pink-600 rounded-lg shadow-md hover:bg-pink-700 transition-all"
+              >
+                <PlusCircleIcon />
+                <span>New Task</span>
+              </button>
+        )}
       </div>
-      
-      {currentUser.role === 'PATRON' && (
-        <div className="mb-6 flex flex-col sm:flex-row gap-3">
-          <input
-            type="text"
-            value={newTaskContent}
-            onChange={(e) => setNewTaskContent(e.target.value)}
-            placeholder="Enter new task content..."
-            className="flex-grow w-full p-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500"
-            onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
-          />
-          <button
-            onClick={handleAddTask}
-            disabled={!newTaskContent.trim()}
-            className="flex items-center justify-center space-x-2 px-5 py-3 font-semibold text-white bg-pink-600 rounded-lg shadow-md hover:bg-pink-700 disabled:opacity-50 transition-all"
-          >
-            <PlusCircleIcon />
-            <span>Add Task</span>
-          </button>
-        </div>
-      )}
 
-      <div className="flex-1 flex space-x-4 overflow-x-auto pb-4">
+      <div className="flex-1 flex space-x-4 overflow-x-auto pb-4 custom-scrollbar">
         {data.columnOrder.map(columnId => {
           const column = data.columns[columnId];
           const tasks = (column.taskIds || []).map(taskId => data.tasks[taskId]).filter(Boolean);
@@ -190,10 +179,21 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
               onDeleteTask={handleDeleteTask}
               onAssignTask={handleAssignTask}
               onToggleTaskCompletion={handleToggleTaskCompletion}
+              // Pass the edit handler down
+              onEditTask={handleOpenEditTaskModal}
             />
           );
         })}
       </div>
+
+      {/* Reused Modal for Create and Edit */}
+      <EditTaskModal 
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        currentUser={currentUser}
+        task={editingTask}
+        onSave={handleSaveTask}
+      />
     </div>
   );
 };
