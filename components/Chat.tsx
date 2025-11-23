@@ -11,6 +11,13 @@ import { SendIcon } from './icons/SendIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { FaceSmileIcon } from './icons/FaceSmileIcon';
 import { TrashIcon } from './icons/TrashIcon';
+import { PaperClipIcon } from './icons/PaperClipIcon';
+import { InformationCircleIcon } from './icons/InformationCircleIcon';
+import { UserRemoveIcon } from './icons/UserRemoveIcon';
+import { DocumentTextIcon } from './icons/DocumentTextIcon';
+import { PencilIcon } from './icons/PencilIcon';
+import { UserAddIcon } from './icons/UserAddIcon';
+import { CheckIcon } from './icons/CheckIcon';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 
 interface ChatProps {
@@ -124,6 +131,198 @@ const NewChatModal: React.FC<{
     );
 };
 
+const RoomDetailsModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    room: Room;
+    allUsers: User[];
+    currentUser: User;
+    onRemoveMember: (roomId: string, userId: string) => Promise<void>;
+    onAddMembers: (roomId: string, userIds: string[]) => Promise<void>;
+    onRenameGroup: (roomId: string, newTitle: string) => Promise<void>;
+}> = ({ isOpen, onClose, room, allUsers, currentUser, onRemoveMember, onAddMembers, onRenameGroup }) => {
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [tempTitle, setTempTitle] = useState(room.title || '');
+    const [isAddingMode, setIsAddingMode] = useState(false);
+    const [selectedUsersToAdd, setSelectedUsersToAdd] = useState<string[]>([]);
+    const [userSearchTerm, setUserSearchTerm] = useState('');
+
+    useEffect(() => {
+        if (isOpen) {
+            setIsEditingTitle(false);
+            setIsAddingMode(false);
+            setTempTitle(room.title || '');
+            setSelectedUsersToAdd([]);
+            setUserSearchTerm('');
+        }
+    }, [isOpen, room]);
+
+    if (!isOpen) return null;
+
+    const participants = room.participantIds.map(uid => allUsers.find(u => u.uid === uid)).filter(Boolean) as User[];
+    const isCreator = room.createdBy === currentUser.uid;
+
+    // Potential members to add (approved users not already in room)
+    const availableUsers = allUsers.filter(u => 
+        !room.participantIds.includes(u.uid) && 
+        u.status === 'APPROVED' &&
+        u.name.toLowerCase().includes(userSearchTerm.toLowerCase())
+    );
+
+    const handleRemove = async (userId: string, userName: string) => {
+        if (!confirm(`Are you sure you want to remove ${userName} from this group?`)) return;
+        await onRemoveMember(room.id, userId);
+    };
+
+    const handleSaveTitle = async () => {
+        if (tempTitle.trim() !== room.title) {
+            await onRenameGroup(room.id, tempTitle);
+        }
+        setIsEditingTitle(false);
+    };
+
+    const toggleUserSelection = (uid: string) => {
+        setSelectedUsersToAdd(prev => 
+            prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]
+        );
+    };
+
+    const handleSubmitAddMembers = async () => {
+        if (selectedUsersToAdd.length > 0) {
+            await onAddMembers(room.id, selectedUsersToAdd);
+            setIsAddingMode(false);
+            setSelectedUsersToAdd([]);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[85vh]">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400"><XIcon /></button>
+                
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Group Info</h3>
+                
+                {/* Title Section */}
+                <div className="mb-4">
+                    {isEditingTitle ? (
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="text" 
+                                value={tempTitle}
+                                onChange={(e) => setTempTitle(e.target.value)}
+                                className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+                                autoFocus
+                            />
+                            <button onClick={handleSaveTitle} className="text-green-500 hover:text-green-600"><CheckIcon /></button>
+                            <button onClick={() => { setIsEditingTitle(false); setTempTitle(room.title || ''); }} className="text-red-500 hover:text-red-600"><XIcon /></button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-between group">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium truncate flex-1">
+                                {room.title || 'Untitled Group'}
+                            </p>
+                            {isCreator && (
+                                <button 
+                                    onClick={() => setIsEditingTitle(true)}
+                                    className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <PencilIcon className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex items-center justify-between mb-3 border-t border-gray-100 dark:border-gray-700 pt-3">
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                        {isAddingMode ? 'Add Members' : `Members (${participants.length})`}
+                    </h4>
+                    {isCreator && !isAddingMode && (
+                        <button 
+                            onClick={() => setIsAddingMode(true)}
+                            className="flex items-center gap-1 text-xs font-medium text-pink-600 hover:text-pink-700 dark:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-900/20 px-2 py-1 rounded transition-colors"
+                        >
+                            <UserAddIcon className="h-4 w-4" /> Add
+                        </button>
+                    )}
+                    {isAddingMode && (
+                        <button 
+                            onClick={() => setIsAddingMode(false)}
+                            className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                            Cancel
+                        </button>
+                    )}
+                </div>
+                
+                <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+                    {isAddingMode ? (
+                        <>
+                            <input 
+                                type="text" 
+                                placeholder="Search users..." 
+                                value={userSearchTerm}
+                                onChange={(e) => setUserSearchTerm(e.target.value)}
+                                className="w-full px-3 py-2 mb-2 border border-gray-200 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-pink-500"
+                            />
+                            {availableUsers.length === 0 ? (
+                                <p className="text-center text-gray-500 text-sm py-4">No users found to add.</p>
+                            ) : (
+                                availableUsers.map(user => (
+                                    <div 
+                                        key={user.uid} 
+                                        onClick={() => toggleUserSelection(user.uid)}
+                                        className={`flex items-center p-2 rounded-lg cursor-pointer border ${selectedUsersToAdd.includes(user.uid) ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-750'}`}
+                                    >
+                                        <img src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`} className="w-8 h-8 rounded-full mr-3" alt={user.name} />
+                                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user.name}</span>
+                                        {selectedUsersToAdd.includes(user.uid) && <span className="ml-auto text-pink-500"><CheckIcon /></span>}
+                                    </div>
+                                ))
+                            )}
+                        </>
+                    ) : (
+                        participants.map(user => (
+                            <div key={user.uid} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 group">
+                                <div className="flex items-center">
+                                    <img src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`} className="w-10 h-10 rounded-full mr-3 border border-gray-200 dark:border-gray-700" alt={user.name} />
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.name}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            {user.uid === room.createdBy ? 'Group Creator' : 'Member'}
+                                        </p>
+                                    </div>
+                                </div>
+                                {isCreator && user.uid !== currentUser.uid && (
+                                    <button 
+                                        onClick={() => handleRemove(user.uid, user.name)}
+                                        className="ml-2 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors flex-shrink-0"
+                                        title="Remove member from group"
+                                        aria-label="Remove member"
+                                    >
+                                        <UserRemoveIcon className="w-5 h-5" />
+                                    </button>
+                                )}
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                {isAddingMode && selectedUsersToAdd.length > 0 && (
+                     <div className="mt-4 pt-2 border-t border-gray-100 dark:border-gray-700">
+                        <button 
+                            onClick={handleSubmitAddMembers}
+                            className="w-full py-2 bg-pink-600 text-white rounded-lg font-medium text-sm hover:bg-pink-700 transition-colors"
+                        >
+                            Add Selected ({selectedUsersToAdd.length})
+                        </button>
+                     </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const Chat: React.FC<ChatProps> = ({ currentUser }) => {
     const { rooms, allUsers, isLoadingRooms, fetchRooms, unreadMessageCounts, clearUnreadCount } = useData();
     const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
@@ -133,6 +332,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isRoomDetailsOpen, setIsRoomDetailsOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [realtimeStatus, setRealtimeStatus] = useState<'CONNECTING' | 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR'>('CONNECTING');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -142,6 +342,8 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const emojiPickerRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const activeRoom = useMemo(() => rooms.find(r => r.id === activeRoomId), [rooms, activeRoomId]);
 
@@ -155,6 +357,14 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
     useEffect(() => {
         fetchRooms();
     }, [fetchRooms]);
+
+    // Auto-resize textarea
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 128)}px`;
+        }
+    }, [newMessage]);
     
     // Close emoji picker and context menu on click outside
     useEffect(() => {
@@ -227,6 +437,36 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
         } catch (error) {
             console.error("Failed to delete message:", error);
             alert("Failed to delete message.");
+        }
+    };
+
+    const handleRemoveMember = async (roomId: string, userId: string) => {
+        try {
+            await api.removeGroupMember(roomId, userId);
+            await fetchRooms(); // Refresh room data
+        } catch (error: any) {
+            console.error("Failed to remove member:", error);
+            alert("Failed to remove member: " + error.message);
+        }
+    };
+
+    const handleAddMembers = async (roomId: string, userIds: string[]) => {
+        try {
+            await api.addRoomMembers(roomId, userIds);
+            await fetchRooms();
+        } catch (error: any) {
+            console.error("Failed to add members:", error);
+            alert("Failed to add members: " + error.message);
+        }
+    };
+
+    const handleRenameGroup = async (roomId: string, newTitle: string) => {
+        try {
+            await api.updateRoomTitle(roomId, newTitle);
+            await fetchRooms();
+        } catch (error: any) {
+            console.error("Failed to rename group:", error);
+            alert("Failed to rename group: " + error.message);
         }
     };
     
@@ -343,17 +583,12 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
 
         if (activeRoomId) {
             try {
-                // Optimistically add to UI first for instant feedback (optional but good UX)
-                // However, our realtime listener handles insertion, so we avoid duplicates by waiting
-                // or deduping. The api call returns the full object.
                 const sentMsg = await api.sendMessage(activeRoomId, currentUser.uid, content);
-                
                 setMessages(prev => {
                     if (prev.some(m => m.id === sentMsg.id)) return prev;
                     return [...prev, sentMsg];
                 });
                 scrollToBottom('smooth');
-                
             } catch (error) {
                 console.error("Failed to send message", error);
                 alert("Failed to send message");
@@ -392,6 +627,49 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
             alert("Could not create chat.");
         }
     };
+    
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !activeRoomId) return;
+
+        // Reset input value to allow selecting same file again
+        event.target.value = '';
+
+        if (file.size > 2 * 1024 * 1024) {
+            alert("File size must be less than 2MB.");
+            return;
+        }
+
+        try {
+            // Pass currentUser.uid to ensure the file path includes the user ID for RLS compatibility
+            const url = await api.uploadChatFile(file, activeRoomId, currentUser.uid);
+            
+            // Send message with file metadata
+            const metadata = {
+                type: 'file',
+                fileName: file.name,
+                fileSize: file.size,
+                fileUrl: url,
+                fileType: file.type
+            };
+
+            const sentMsg = await api.sendMessage(
+                activeRoomId, 
+                currentUser.uid, 
+                `Sent a file: ${file.name}`, 
+                metadata
+            );
+             setMessages(prev => {
+                if (prev.some(m => m.id === sentMsg.id)) return prev;
+                return [...prev, sentMsg];
+            });
+            scrollToBottom('smooth');
+
+        } catch (error: any) {
+            console.error("Upload failed", error);
+            alert("Failed to upload file: " + error.message);
+        }
+    };
 
     useEffect(() => {
         const handleResize = () => {
@@ -422,6 +700,55 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
             case 'CONNECTING': return 'Connecting...';
             default: return 'Offline';
         }
+    };
+
+    const triggerFileUpload = () => {
+        fileInputRef.current?.click();
+    };
+
+    const renderMessageContent = (msg: Message, isMe: boolean) => {
+        if (msg.metadata && msg.metadata.type === 'file') {
+            // Check if it's an image
+            const isImage = msg.metadata.fileType?.startsWith('image/');
+            
+            return (
+                <div className="flex flex-col">
+                    {isImage && (
+                         <div className="mb-2 mt-1 relative group rounded-lg overflow-hidden">
+                             <img 
+                                src={msg.metadata.fileUrl} 
+                                alt={msg.metadata.fileName} 
+                                className="max-w-full sm:max-w-[280px] max-h-[280px] object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-200 bg-black/5 dark:bg-white/5"
+                                onClick={() => window.open(msg.metadata.fileUrl, '_blank')}
+                                loading="lazy"
+                            />
+                        </div>
+                    )}
+                    
+                    <div className="flex items-center space-x-2 mb-1">
+                        {!isImage && <DocumentTextIcon className="h-5 w-5 opacity-75 flex-shrink-0" />}
+                        <span className="font-semibold truncate max-w-[180px] text-xs opacity-90">{msg.metadata.fileName}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center mt-1">
+                        <p className="text-[10px] opacity-70">{(msg.metadata.fileSize / 1024).toFixed(1)} KB</p>
+                        <a 
+                            href={msg.metadata.fileUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className={`text-[10px] px-2 py-1 rounded font-medium inline-block text-center transition-colors ${
+                                isMe 
+                                ? 'bg-white/20 hover:bg-white/30 text-white' 
+                                : 'bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-gray-100'
+                            }`}
+                        >
+                            {isImage ? 'Open' : 'Download'}
+                        </a>
+                    </div>
+                </div>
+            );
+        }
+        return <p className="whitespace-pre-wrap break-words text-sm md:text-base">{msg.content}</p>;
     };
 
     return (
@@ -501,8 +828,8 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                 >
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                                 </button>
-                                <div className="flex flex-col">
-                                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 leading-tight">
+                                <div className="flex flex-col cursor-pointer" onClick={() => setIsRoomDetailsOpen(true)}>
+                                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 leading-tight hover:text-pink-600 transition-colors flex items-center gap-2">
                                         {getRoomName(activeRoom, allUsers, currentUser.uid)}
                                     </h2>
                                     <div className="flex items-center space-x-2 mt-0.5">
@@ -511,14 +838,23 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                     </div>
                                 </div>
                             </div>
-                            <button 
-                                onClick={handleRefresh}
-                                disabled={isRefreshing}
-                                className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-all ${isRefreshing ? 'animate-spin' : ''}`}
-                                title="Refresh messages"
-                            >
-                                <RefreshIcon />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setIsRoomDetailsOpen(true)}
+                                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-all"
+                                    title="Room Details"
+                                >
+                                    <InformationCircleIcon />
+                                </button>
+                                <button 
+                                    onClick={handleRefresh}
+                                    disabled={isRefreshing}
+                                    className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-all ${isRefreshing ? 'animate-spin' : ''}`}
+                                    title="Refresh messages"
+                                >
+                                    <RefreshIcon />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Messages List */}
@@ -554,7 +890,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                                     : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none border border-gray-200 dark:border-gray-600'
                                                 }`}>
                                                     {!isMe && <p className="text-xs text-pink-600 dark:text-pink-400 font-bold mb-1">{sender?.name || 'Unknown'}</p>}
-                                                    <p className="whitespace-pre-wrap break-words text-sm md:text-base">{msg.content}</p>
+                                                    {renderMessageContent(msg, isMe)}
                                                 </div>
                                                 <p className={`text-[10px] mt-1 ${isMe ? 'text-right text-gray-400' : 'text-left text-gray-400'}`}>
                                                     {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -590,13 +926,33 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                                 >
                                     <FaceSmileIcon />
                                 </button>
+                                
+                                <input 
+                                    type="file" 
+                                    ref={fileInputRef} 
+                                    className="hidden" 
+                                    onChange={handleFileUpload} 
+                                    // Accept common file types that are safe and likely < 2MB
+                                    accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={triggerFileUpload}
+                                    className="p-3 text-gray-400 dark:text-gray-500 hover:text-purple-500 dark:hover:text-purple-400 transition-colors rounded-full hover:bg-white dark:hover:bg-gray-800 shadow-sm border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
+                                    aria-label="Attach File"
+                                    title="Attach File (< 2MB)"
+                                >
+                                    <PaperClipIcon />
+                                </button>
+
                                 <div className="flex-1 relative">
                                     <textarea
+                                        ref={textareaRef}
                                         value={newMessage}
                                         onChange={e => setNewMessage(e.target.value)}
+                                        rows={1}
                                         placeholder="Type a message..."
-                                        className="w-full max-h-32 min-h-[3rem] p-3 pl-4 pr-12 border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none transition-all shadow-sm focus:shadow-md"
-                                        style={{ height: '3rem' }} // Initial height
+                                        className="w-full max-h-32 min-h-[3rem] py-3 pl-4 pr-12 border border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none transition-all shadow-sm focus:shadow-md overflow-hidden"
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter' && !e.shiftKey) {
                                                 e.preventDefault();
@@ -640,6 +996,19 @@ const Chat: React.FC<ChatProps> = ({ currentUser }) => {
                 allUsers={allUsers}
                 onCreate={handleCreateRoom}
             />
+
+            {activeRoom && (
+                <RoomDetailsModal 
+                    isOpen={isRoomDetailsOpen}
+                    onClose={() => setIsRoomDetailsOpen(false)}
+                    room={activeRoom}
+                    allUsers={allUsers}
+                    currentUser={currentUser}
+                    onRemoveMember={handleRemoveMember}
+                    onAddMembers={handleAddMembers}
+                    onRenameGroup={handleRenameGroup}
+                />
+            )}
 
             {/* Custom Context Menu */}
             {contextMenu && (

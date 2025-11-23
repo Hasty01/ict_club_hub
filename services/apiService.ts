@@ -679,6 +679,7 @@ export const getRooms = async (userId: string): Promise<Room[]> => {
             title: room.title,
             createdAt: room.created_at,
             updatedAt: room.updated_at,
+            createdBy: room.created_by,
             participantIds: participantIds,
         };
     });
@@ -703,11 +704,12 @@ export const getRoomMessages = async (roomId: string): Promise<Message[]> => {
     }));
 };
 
-export const sendMessage = async (roomId: string, senderId: string, content: string): Promise<Message> => {
+export const sendMessage = async (roomId: string, senderId: string, content: string, metadata?: any): Promise<Message> => {
     const { data, error } = await supabase.from('messages').insert({
         room_id: roomId,
         sender_id: senderId,
         content: content,
+        metadata: metadata
     }).select().single();
 
     if (error) throw new Error(error.message);
@@ -726,10 +728,15 @@ export const sendMessage = async (roomId: string, senderId: string, content: str
 };
 
 export const createRoom = async (title: string | null, participantIds: string[]): Promise<string> => {
+    const creatorId = participantIds[0]; // Assumption: The first ID is the creator.
+    
     // 1. Create Room
     const { data: room, error: roomError } = await supabase
         .from('rooms')
-        .insert({ title: title })
+        .insert({ 
+            title: title,
+            created_by: creatorId 
+        })
         .select()
         .single();
 
@@ -745,6 +752,57 @@ export const createRoom = async (title: string | null, participantIds: string[])
     if (membersError) throw new Error(membersError.message);
 
     return room.id;
+};
+
+export const removeGroupMember = async (roomId: string, userId: string): Promise<void> => {
+    const { error } = await supabase
+        .from('room_members')
+        .delete()
+        .eq('room_id', roomId)
+        .eq('user_id', userId);
+    
+    if (error) throw new Error(error.message);
+};
+
+export const addRoomMembers = async (roomId: string, userIds: string[]): Promise<void> => {
+    const members = userIds.map(uid => ({
+        room_id: roomId,
+        user_id: uid,
+    }));
+
+    const { error } = await supabase.from('room_members').insert(members);
+    if (error) throw new Error(error.message);
+};
+
+export const updateRoomTitle = async (roomId: string, title: string): Promise<void> => {
+    const { error } = await supabase.from('rooms').update({ title, updated_at: new Date().toISOString() }).eq('id', roomId);
+    if (error) throw new Error(error.message);
+}
+
+export const uploadChatFile = async (file: File, roomId: string, userId: string): Promise<string> => {
+    // Check file size (2MB limit)
+    if (file.size > 2 * 1024 * 1024) {
+        throw new Error("File size exceeds the 2MB limit.");
+    }
+
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'dat';
+    const cleanFileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${fileExt}`;
+    // Store in resource_files bucket under a chat directory, prefixed with userId to allow RLS to pass if it checks for user folder ownership
+    const filePath = `${userId}/chat/${roomId}/${cleanFileName}`;
+
+    const { data, error } = await supabase.storage
+        .from('resource_files')
+        .upload(filePath, file, {
+            upsert: false
+        });
+
+    if (error) throw new Error(`Failed to upload file: ${error.message}`);
+
+    const { data: { publicUrl } } = supabase.storage
+        .from('resource_files')
+        .getPublicUrl(filePath);
+
+    return publicUrl;
 };
 
 export const deleteMessage = async (messageId: string): Promise<void> => {

@@ -106,5 +106,6 @@ export interface Room {
   createdAt: string;
   updatedAt: string;
   participantIds: string[];
+  createdBy: string; // ID of the user who created the group
   lastMessage?: Message; // For display purposes in the list
 }
