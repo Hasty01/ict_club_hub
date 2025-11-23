@@ -1,7 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PlayIcon } from './icons/PlayIcon';
 import { TrashIcon } from './icons/TrashIcon';
+import { UploadIcon } from './icons/UploadIcon';
+import { DownloadIcon } from './icons/DownloadIcon';
 import Editor from '@monaco-editor/react';
 
 interface CodePlaygroundProps {
@@ -13,12 +15,34 @@ interface OutputLine {
     content: string;
 }
 
+const DEFAULT_CODE = `print("Hello from the ICT Club Hub Playground!")
+
+name = input("What is your name? ")
+print(f"Nice to meet you, {name}!")
+
+# The return value of the last expression is also displayed
+import math
+math.pi`;
+
 const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme }) => {
-  const [code, setCode] = useState<string>('print("Hello from the ICT Club Hub Playground!")\n\nname = input("What is your name? ")\nprint(f"Nice to meet you, {name}!")\n\n# The return value of the last expression is also displayed\nimport math\nmath.pi');
+  const [code, setCode] = useState<string>(() => {
+      // Load from local storage if available, otherwise use default
+      if (typeof window !== 'undefined') {
+          return localStorage.getItem('playground_code') || DEFAULT_CODE;
+      }
+      return DEFAULT_CODE;
+  });
+  
   const [output, setOutput] = useState<OutputLine[]>([{ type: 'log', content: 'Click "Run Code" to see the output here.' }]);
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
   const [pyodide, setPyodide] = useState<any | null>(null);
   const [isPyodideReady, setIsPyodideReady] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-save code to local storage
+  useEffect(() => {
+      localStorage.setItem('playground_code', code);
+  }, [code]);
 
   useEffect(() => {
     const setupPyodide = async () => {
@@ -38,6 +62,39 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme }) => {
     setupPyodide();
   }, []);
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result;
+      if (typeof content === 'string') {
+        setCode(content);
+        // Clear output to indicate new context
+        setOutput([{ type: 'log', content: `Loaded file: ${file.name}` }]);
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so the same file can be selected again if needed
+    event.target.value = '';
+  };
+
+  const handleDownloadCode = () => {
+    const blob = new Blob([code], { type: 'text/x-python' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'script.py';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
 
   const handleRunCode = async () => {
     setIsExecuting(true);
@@ -141,12 +198,38 @@ builtins.input = input_override
 
   return (
     <div className="flex flex-col h-[calc(100vh-10rem)]">
+      {/* Hidden file input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept=".py,.txt"
+        className="hidden"
+      />
+
       <div className="flex-shrink-0 mb-4 flex flex-wrap justify-between items-center gap-4">
-        <div >
+        <div>
             <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Code Playground</h2>
             <p className="text-gray-600 dark:text-gray-400 mt-1">Execute Python code locally in your browser.</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
+            <button
+                onClick={triggerFileUpload}
+                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors shadow-sm"
+                title="Upload Python file"
+            >
+                <UploadIcon />
+                <span className="hidden sm:inline">Upload</span>
+            </button>
+            <button
+                onClick={handleDownloadCode}
+                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors shadow-sm"
+                title="Save as .py file"
+            >
+                <DownloadIcon />
+                <span className="hidden sm:inline">Save</span>
+            </button>
+            <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2 hidden sm:block"></div>
             <button
                 onClick={handleRunCode}
                 disabled={isExecuting || !isPyodideReady}
@@ -164,8 +247,9 @@ builtins.input = input_override
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
         {/* Editor Panel */}
         <div className="flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="p-3 border-b border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400">
-            main.py
+          <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">main.py</span>
+            <span className="text-xs text-gray-400 italic">Auto-saved to browser</span>
           </div>
           <div className="flex-1 w-full h-full relative">
             <Editor
