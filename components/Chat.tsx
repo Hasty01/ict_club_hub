@@ -84,7 +84,7 @@ const LinkPreview: React.FC<{ url: string }> = ({ url }) => {
             href={url} 
             target="_blank" 
             rel="noopener noreferrer" 
-            className="flex items-center gap-3 mt-2 mb-1 p-3 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group max-w-full sm:max-w-sm backdrop-blur-sm"
+            className="flex items-center gap-3 mt-2 mb-1 p-3 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group w-full max-w-full backdrop-blur-sm overflow-hidden"
             onClick={(e) => e.stopPropagation()}
         >
             <div className="p-2.5 bg-gray-200 dark:bg-gray-700 rounded-lg text-gray-500 dark:text-gray-400 group-hover:text-pink-500 transition-colors flex-shrink-0">
@@ -795,7 +795,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
             const isPython = msg.metadata.fileName?.endsWith('.py');
             
             return (
-                <div className="flex flex-col">
+                <div className="flex flex-col w-full min-w-0">
                     {isImage && (
                          <div className="mb-2 mt-1 relative group rounded-lg overflow-hidden">
                              <img 
@@ -852,7 +852,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
         if (urlRegex.test(msg.content)) {
             const parts = msg.content.split(urlRegex);
             return (
-                <div className="whitespace-pre-wrap break-words text-sm md:text-base">
+                <div className="whitespace-pre-wrap break-words text-sm md:text-base w-full min-w-0">
                     {parts.map((part, i) => {
                         if (part.match(urlRegex)) {
                             return <LinkPreview key={i} url={part} />;
@@ -929,7 +929,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                 </div>
             </div>
 
-            <div className={`${!isSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col flex-1 bg-white dark:bg-gray-900 relative`}>
+            <div className={`${!isSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col flex-1 bg-white dark:bg-gray-900 relative min-w-0`}>
                 {activeRoom ? (
                     <>
                         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800 shadow-sm z-10">
@@ -992,7 +992,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                                                 />
                                             )}
 
-                                            <div className="flex flex-col max-w-[85%] sm:max-w-[70%]">
+                                            <div className="flex flex-col max-w-[75%] sm:max-w-[70%] min-w-0">
                                                 <div 
                                                     onContextMenu={(e) => handleContextMenu(e, msg)}
                                                     className={`relative px-4 py-2 shadow-sm rounded-2xl ${
