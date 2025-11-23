@@ -173,11 +173,73 @@ const AppearanceSettings: React.FC = () => {
             )
         },
         { 
+            id: 'bubble', 
+            name: 'Soap Bubble', 
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center">
+                    <div className="w-2.5 h-2.5 bg-cyan-300 rounded-full z-10"></div>
+                    <div className="absolute w-10 h-10 bg-cyan-400/20 border-2 border-cyan-400/50 rounded-full"></div>
+                </div>
+            )
+        },
+        { 
+            id: 'crosshair', 
+            name: 'Precision', 
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center">
+                    <div className="absolute w-6 h-0.5 bg-red-500"></div>
+                    <div className="absolute h-6 w-0.5 bg-red-500"></div>
+                    <div className="absolute w-8 h-8 border border-red-500/50"></div>
+                </div>
+            )
+        },
+        { 
+            id: 'magic', 
+            name: 'Magic', 
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center">
+                    <div className="w-3 h-3 bg-purple-500 rounded-full z-10 shadow-[0_0_5px_purple]"></div>
+                    <div className="absolute w-8 h-8 border-2 border-yellow-400 rounded-full rotate-45"></div>
+                </div>
+            )
+        },
+        { 
             id: 'minimal', 
             name: 'Minimal', 
             preview: (
                 <div className="relative w-12 h-12 flex items-center justify-center bg-gray-200 dark:bg-gray-800 rounded-lg">
                     <div className="w-3 h-3 bg-gray-900 dark:bg-white rounded-full"></div>
+                </div>
+            )
+        },
+        { 
+            id: 'pixel', 
+            name: '8-Bit Pixel', 
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center">
+                    <div className="w-3 h-3 bg-gray-800 dark:bg-white z-10"></div>
+                    <div className="absolute w-8 h-8 border-2 border-dashed border-gray-500"></div>
+                </div>
+            )
+        },
+        { 
+            id: 'eclipse', 
+            name: 'Eclipse', 
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center bg-gray-800 rounded-lg">
+                    <div className="w-4 h-4 bg-black rounded-full z-10 border border-white/20"></div>
+                    <div className="absolute w-8 h-8 bg-white/30 blur-md rounded-full"></div>
+                </div>
+            )
+        },
+        { 
+            id: 'sonar', 
+            name: 'Sonar', 
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center bg-black rounded-lg">
+                    <div className="w-2 h-2 bg-green-400 rounded-full z-10"></div>
+                    <div className="absolute w-8 h-8 border border-green-500/50 rounded-full"></div>
+                    <div className="absolute w-6 h-6 border border-green-500/30 rounded-full"></div>
                 </div>
             )
         },
@@ -200,6 +262,16 @@ const AppearanceSettings: React.FC = () => {
                     <div className="absolute w-10 h-10 bg-blue-500/30 blur-md rounded-full"></div>
                 </div>
             )
+        },
+        { 
+            id: 'heart', 
+            name: 'Lovely', 
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center text-pink-500">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                    <div className="absolute w-10 h-10 border border-pink-300 rounded-full"></div>
+                </div>
+            )
         }
     ];
 
@@ -211,7 +283,7 @@ const AppearanceSettings: React.FC = () => {
                 (Only visible on desktop devices)
             </p>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {cursors.map((cursor) => (
                     <button
                         key={cursor.id}
