@@ -8,6 +8,7 @@ import CalendarView from './CalendarView';
 import { useData } from '../DataContext';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { ViewListIcon } from './icons/ViewListIcon';
+import ConfirmationModal from './ConfirmationModal';
 
 interface ActivitiesProps {
   currentUser: User;
@@ -15,25 +16,54 @@ interface ActivitiesProps {
 
 type FilterType = 'UPCOMING' | 'PAST' | 'ALL';
 
+interface RSVPActionState {
+    isOpen: boolean;
+    activityId: string;
+    activityTitle: string;
+    isJoining: boolean;
+}
+
 const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
   const { activities, isLoadingActivities, activitiesError, fetchActivities } = useData();
   const [filter, setFilter] = useState<FilterType>('UPCOMING');
   const [viewMode, setViewMode] = useState<'LIST' | 'CALENDAR'>('LIST');
+  
+  // RSVP Confirmation State
+  const [rsvpState, setRsvpState] = useState<RSVPActionState>({
+      isOpen: false,
+      activityId: '',
+      activityTitle: '',
+      isJoining: false
+  });
 
   const handleAddActivity = useCallback(async (newActivity: Omit<Activity, 'id' | 'rsvpUserIds'>) => {
     await api.addActivity(newActivity);
     await fetchActivities(); // Refetch from context
   }, [fetchActivities]);
 
-  const handleToggleRSVP = useCallback(async (activityId: string, isJoining: boolean) => {
+  const initiateRSVP = useCallback((activityId: string, isJoining: boolean) => {
+      const activity = activities.find(a => a.id === activityId);
+      if (!activity) return;
+
+      setRsvpState({
+          isOpen: true,
+          activityId,
+          activityTitle: activity.title,
+          isJoining
+      });
+  }, [activities]);
+
+  const confirmRSVP = useCallback(async () => {
       try {
-          await api.toggleRSVP(activityId, currentUser.uid, isJoining);
+          await api.toggleRSVP(rsvpState.activityId, currentUser.uid, rsvpState.isJoining);
           await fetchActivities();
       } catch (error) {
           console.error("RSVP failed", error);
           alert("Failed to update RSVP status.");
+      } finally {
+          setRsvpState(prev => ({ ...prev, isOpen: false }));
       }
-  }, [currentUser.uid, fetchActivities]);
+  }, [rsvpState.activityId, rsvpState.isJoining, currentUser.uid, fetchActivities]);
 
   const filteredAndSortedActivities = useMemo(() => {
     // Get today's date in EAT (YYYY-MM-DD)
@@ -82,7 +112,7 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
                         key={activity.id} 
                         activity={activity} 
                         currentUser={currentUser}
-                        onToggleRSVP={handleToggleRSVP}
+                        onToggleRSVP={initiateRSVP}
                     />
                 ))}
             </div>
@@ -168,6 +198,16 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
         </div>
 
         {viewMode === 'LIST' ? renderListContent() : <CalendarView activities={activities} />}
+
+        <ConfirmationModal
+            isOpen={rsvpState.isOpen}
+            onClose={() => setRsvpState(prev => ({ ...prev, isOpen: false }))}
+            onConfirm={confirmRSVP}
+            title={rsvpState.isJoining ? "Join Activity" : "Cancel RSVP"}
+            message={`Are you sure you want to ${rsvpState.isJoining ? "join" : "leave"} "${rsvpState.activityTitle}"?`}
+            confirmText={rsvpState.isJoining ? "Confirm Join" : "Confirm Leave"}
+            isDangerous={!rsvpState.isJoining}
+        />
     </div>
   );
 };

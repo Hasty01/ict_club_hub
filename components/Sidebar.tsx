@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { User, Tab } from '../types';
 import { LogoutIcon } from './icons/LogoutIcon';
 import { SunIcon } from './icons/SunIcon';
@@ -97,10 +97,80 @@ const ClubHubLogo = () => (
 
 const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme, activeTab, setActiveTab, isOpen, onClose, isCollapsed, onToggleCollapse }) => {
   const { unreadMessageCounts } = useData();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const totalUnread = useMemo(() => {
       return Object.values(unreadMessageCounts).reduce((acc: number, count: number) => acc + count, 0);
   }, [unreadMessageCounts]);
+
+  // Matrix Animation Effect
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let width = canvas.parentElement?.clientWidth || 0;
+    let height = canvas.parentElement?.clientHeight || 0;
+    
+    const resize = () => {
+        width = canvas.parentElement?.clientWidth || 0;
+        height = canvas.parentElement?.clientHeight || 0;
+        canvas.width = width;
+        canvas.height = height;
+    };
+    
+    window.addEventListener('resize', resize);
+    resize();
+
+    const columns = Math.floor(width / 20) + 1;
+    const drops: number[] = [];
+
+    for (let i = 0; i < columns; i++) {
+      drops[i] = Math.random() * -100; // Random start positions above canvas
+    }
+
+    const characters = "01ICTCLUBHUB<>/{};[]";
+    
+    const draw = () => {
+      // Fade out effect for trails
+      ctx.fillStyle = theme === 'dark' ? 'rgba(17, 24, 39, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+      ctx.fillRect(0, 0, width, height);
+
+      // Set text color (Subtle Pink/Purple)
+      ctx.fillStyle = theme === 'dark' ? '#db2777' : '#d946ef'; // Pink-600/Fuchsia-500
+      ctx.font = '12px monospace';
+
+      for (let i = 0; i < drops.length; i++) {
+        const text = characters[Math.floor(Math.random() * characters.length)];
+        const x = i * 20;
+        const y = drops[i] * 20;
+
+        // Draw the character only if it's within view
+        if (y > 0 && y < height) {
+            // Add randomness to opacity for "glitch" feel
+            ctx.globalAlpha = Math.random() * 0.5 + 0.1; 
+            ctx.fillText(text, x, y);
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Reset drop to top randomly after it crosses screen
+        if (y > height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+
+        drops[i]++;
+      }
+    };
+
+    const interval = setInterval(draw, 50);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('resize', resize);
+    };
+  }, [theme, isCollapsed]); // Re-run if theme or width changes
 
   const handleNavClick = (tab: Tab) => {
     setActiveTab(tab);
@@ -153,10 +223,16 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme,
         aria-hidden="true"
       />
 
-      <aside className={`bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col h-screen transform transition-all md:transition-all duration-300 ease-in-out md:sticky md:top-0 ${isCollapsed ? 'md:w-[5.5rem]' : 'w-72'} ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} fixed inset-y-0 left-0 z-30 shadow-2xl md:shadow-none`}>
+      <aside className={`bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col h-screen transform transition-all md:transition-all duration-300 ease-in-out md:sticky md:top-0 ${isCollapsed ? 'md:w-[5.5rem]' : 'w-72'} ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} fixed inset-y-0 left-0 z-30 shadow-2xl md:shadow-none overflow-hidden`}>
         
+        {/* Matrix Background Canvas */}
+        <canvas 
+            ref={canvasRef}
+            className="absolute inset-0 z-0 opacity-10 pointer-events-none"
+        />
+
         {/* Header */}
-        <div className={`flex items-center h-20 flex-shrink-0 px-6 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+        <div className={`flex items-center h-20 flex-shrink-0 px-6 relative z-10 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
           <div className={`flex items-center gap-3 overflow-hidden transition-all duration-300 ${isCollapsed ? 'justify-center w-full' : ''}`}>
              <ClubHubLogo />
              {!isCollapsed && (
@@ -176,7 +252,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme,
         </div>
         
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-4 overflow-y-auto overflow-x-hidden custom-scrollbar space-y-6">
+        <nav className="flex-1 px-4 py-4 overflow-y-auto overflow-x-hidden custom-scrollbar space-y-6 relative z-10">
             {navGroups.map((group, groupIndex) => (
                 <div key={group.title}>
                     {!isCollapsed && (
@@ -205,7 +281,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme,
         </nav>
 
         {/* Footer */}
-        <div className="p-4">
+        <div className="p-4 relative z-10">
           {/* Collapse Toggle (Desktop) */}
           <div className="hidden md:flex justify-end mb-4">
             <button
