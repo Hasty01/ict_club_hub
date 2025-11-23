@@ -63,14 +63,14 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
       onClick={() => isPatron && onEditTask(task)} // Click to edit
       data-task-id={task.id}
       data-dragging={isBeingDragged}
-      className={`bg-white dark:bg-gray-800 p-4 rounded-md border transform transition-all shadow-sm relative group ${
+      className={`bg-white dark:bg-gray-800 p-4 rounded-md border transform transition-all duration-300 shadow-sm relative group ${
           isPatron ? 'cursor-grab hover:border-pink-300 dark:hover:border-pink-700' : ''
       } ${
           isBeingDragged ? 'opacity-40' : ''
       } ${
           isCompleted 
-            ? 'border-green-200 dark:border-green-900/50 bg-green-50/30 dark:bg-green-900/10' 
-            : 'border-gray-200 dark:border-gray-700'
+            ? 'border-green-200 dark:border-green-900/50 bg-green-50/40 dark:bg-green-900/20' 
+            : 'border-gray-200 dark:border-gray-700 hover:shadow-md hover:-translate-y-0.5'
       }`}
     >
       {/* Priority & Edit Hint */}
@@ -86,22 +86,24 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
                  canToggleCompletion && onToggleTaskCompletion(task.id, !!isCompleted);
              }}
              disabled={!canToggleCompletion}
-             className={`flex-shrink-0 mt-0.5 h-5 w-5 rounded-full border flex items-center justify-center transition-all ${
+             className={`relative flex-shrink-0 mt-0.5 h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 ease-out ${
                  isCompleted 
                  ? 'bg-green-500 border-green-500 text-white' 
-                 : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-transparent hover:border-green-400'
-             } ${!canToggleCompletion ? 'cursor-default opacity-60' : 'cursor-pointer'}`}
+                 : 'bg-transparent border-gray-300 dark:border-gray-600 text-transparent hover:border-green-400 dark:hover:border-green-400'
+             } ${!canToggleCompletion ? 'cursor-default opacity-60' : 'cursor-pointer active:scale-90'}`}
           >
-              <CheckIcon />
+              <div className={`transform transition-all duration-300 ease-in-out ${isCompleted ? 'scale-100 rotate-0' : 'scale-0 -rotate-90'}`}>
+                <CheckIcon />
+              </div>
           </button>
-          <p className={`text-gray-800 dark:text-gray-200 mb-1 flex-grow text-sm font-medium ${isCompleted ? 'line-through text-gray-500 dark:text-gray-500' : ''}`}>
+          <p className={`text-gray-800 dark:text-gray-200 mb-1 flex-grow text-sm font-medium transition-all duration-300 ${isCompleted ? 'line-through text-gray-500 dark:text-gray-500 opacity-75' : ''}`}>
               {task.content}
           </p>
       </div>
 
       {/* Metadata Row: Due Date & Tags */}
       {(task.dueDate || (task.tags && task.tags.length > 0)) && (
-          <div className="mt-2 pl-8 flex flex-wrap gap-2">
+          <div className="mt-2 pl-9 flex flex-wrap gap-2 transition-opacity duration-300" style={{ opacity: isCompleted ? 0.6 : 1 }}>
               {task.dueDate && (
                   <span className={`text-[10px] px-1.5 py-0.5 rounded border ${isOverdue ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400' : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-700 dark:text-gray-400'}`}>
                       📅 {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
