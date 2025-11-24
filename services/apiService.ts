@@ -628,7 +628,7 @@ export const getProjectData = async (): Promise<ProjectData> => {
     }
 };
 
-export const addProjectTask = async (taskData: { content: string, priority: TaskPriority, dueDate?: string, tags: string[] }): Promise<void> => {
+export const addProjectTask = async (taskData: { content: string, priority: TaskPriority, dueDate?: string, tags: string[] }, creatorId: string): Promise<void> => {
     const { data: columns } = await supabase.from('project_columns').select('id').limit(1);
     if (!columns || columns.length === 0) throw new Error("No columns found");
     
@@ -642,6 +642,8 @@ export const addProjectTask = async (taskData: { content: string, priority: Task
         is_completed: false
     });
     if (error) throw new Error(error.message);
+
+    await notifyAllUsers(`New Project Task: ${taskData.content}`, 'projects', creatorId);
 };
 
 export const updateProjectTask = async (taskId: string, taskData: Partial<ProjectTask>): Promise<void> => {
@@ -670,9 +672,13 @@ export const updateTaskAssignees = async (taskId: string, assigneeIds: string[])
     if (error) throw new Error(error.message);
 };
 
-export const toggleProjectTaskCompletion = async (taskId: string, isCompleted: boolean): Promise<void> => {
-    const { error } = await supabase.from('project_tasks').update({ is_completed: isCompleted }).eq('id', taskId);
+export const toggleProjectTaskCompletion = async (taskId: string, isCompleted: boolean, userId: string): Promise<void> => {
+    const { data, error } = await supabase.from('project_tasks').update({ is_completed: isCompleted }).eq('id', taskId).select().single();
     if (error) throw new Error(error.message);
+
+    if (isCompleted && data) {
+        await notifyAllUsers(`Task Completed: ${data.content}`, 'projects', userId);
+    }
 };
 
 // --- RESOURCES ---
@@ -1069,6 +1075,10 @@ export const addSuggestion = async (suggestion: Omit<Suggestion, 'id' | 'created
     try {
         const { error } = await supabase.from('suggestions').insert(newSuggestion);
         if (error) throw new Error(error.message);
+        
+        // Notify users of new suggestion/bug
+        await notifyAllUsers(`New ${suggestion.type === 'BUG' ? 'Bug Report' : 'Suggestion'}: ${suggestion.title}`, 'suggestions', suggestion.userId);
+
     } catch (error: any) {
         console.warn("Cloud suggestion save failed, saving locally:", error.message);
         const localSuggestion: Suggestion = {
@@ -1117,7 +1127,7 @@ export const toggleSuggestionUpvote = async (id: string, userId: string, current
     if (error) throw new Error(error.message);
 };
 
-export const updateSuggestionStatus = async (id: string, status: SuggestionStatus): Promise<void> => {
+export const updateSuggestionStatus = async (id: string, status: SuggestionStatus, updaterId: string): Promise<void> => {
     if (id.startsWith('local-')) {
         const current = getLocalSuggestions();
         const index = current.findIndex(s => s.id === id);
@@ -1127,8 +1137,25 @@ export const updateSuggestionStatus = async (id: string, status: SuggestionStatu
         }
         return;
     }
-    const { error } = await supabase.from('suggestions').update({ status }).eq('id', id);
+    // Use select().single() to return the updated record
+    const { data, error } = await supabase.from('suggestions').update({ status }).eq('id', id).select().single();
     if (error) throw new Error(error.message);
+
+    if (data) {
+        const typeText = data.type === 'BUG' ? 'Bug' : 'Feature';
+        let message = '';
+        if (status === 'COMPLETED') {
+            message = `Resolved: ${typeText} "${data.title}"`;
+        } else if (status === 'IN_PROGRESS') {
+            message = `Started working on: ${typeText} "${data.title}"`;
+        } else if (status === 'REJECTED') {
+             message = `Closed: ${typeText} "${data.title}"`;
+        }
+
+        if (message) {
+            await notifyAllUsers(message, 'suggestions', updaterId);
+        }
+    }
 };
 
 // --- PLAYGROUND CLOUD WITH FALLBACK ---

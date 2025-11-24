@@ -93,8 +93,8 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
         // Edit existing
         await api.updateProjectTask(editingTask.id, taskData);
     } else {
-        // Create new
-        await api.addProjectTask(taskData);
+        // Create new - Pass currentUser.uid for notifications
+        await api.addProjectTask(taskData, currentUser.uid);
     }
     await fetchProjectData();
   };
@@ -150,7 +150,7 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
         }
     }
     try {
-        await api.toggleProjectTaskCompletion(taskId, !currentStatus);
+        await api.toggleProjectTaskCompletion(taskId, !currentStatus, currentUser.uid);
     } catch (error: any) {
         console.error("Failed to toggle task:", error);
         await fetchProjectData();

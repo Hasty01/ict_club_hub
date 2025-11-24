@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useCallback } from 'react';
 import { User, Suggestion, SuggestionType, SuggestionStatus } from '../types';
 import { useData } from '../DataContext';
@@ -237,7 +238,7 @@ const Suggestions: React.FC<SuggestionsProps> = ({ currentUser }) => {
 
     const handleStatusChange = async (id: string, status: SuggestionStatus) => {
         try {
-            await api.updateSuggestionStatus(id, status);
+            await api.updateSuggestionStatus(id, status, currentUser.uid);
             await fetchSuggestions();
         } catch (error) {
             console.error("Status update failed", error);
