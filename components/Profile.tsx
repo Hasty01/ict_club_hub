@@ -162,6 +162,17 @@ const AppearanceSettings: React.FC = () => {
     };
 
     const cursors: { id: CursorVariant, name: string, preview: React.ReactNode }[] = [
+        {
+            id: 'normal',
+            name: 'System Default',
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center text-gray-900 dark:text-white">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="white" strokeWidth="1.5" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
+                        <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+                    </svg>
+                </div>
+            )
+        },
         { 
             id: 'default', 
             name: 'Modern Gradient', 

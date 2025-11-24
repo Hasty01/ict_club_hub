@@ -1,5 +1,4 @@
 
-
 import { supabase } from './supabaseClient';
 import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, FeedItemType, ProjectColumn, Resource, Notification, Tab, Room, Message, ActivityCategory, TaskPriority, FeedComment, ShowcaseItem } from '../types';
 import { predefinedAvatars } from '../constants';
@@ -32,6 +31,20 @@ const notifyPatronsOfNewUser = async (name: string, username: string, role: 'MEM
     } catch (err) {
         console.error("Error in notifyPatronsOfNewUser:", err);
         // We do not throw here to ensure the signup process completes even if notification fails
+    }
+};
+
+const notifyUser = async (userId: string, message: string, linkTo: Tab) => {
+    try {
+        const { error } = await supabase.from('notifications').insert({
+            user_uid: userId,
+            message: message,
+            is_read: false,
+            link_to: linkTo
+        });
+        if (error) console.error("Failed to send notification to user:", error);
+    } catch (err) {
+        console.error("Error in notifyUser:", err);
     }
 };
 
@@ -665,11 +678,18 @@ export const deleteProjectTask = async (taskId: string, columnId: string): Promi
 };
 
 export const assignProjectTask = async (taskId: string, assigneeId: string | undefined): Promise<void> => {
-    const { error } = await supabase
+    const { data, error } = await supabase
         .from('project_tasks')
         .update({ assignee_uid: assigneeId })
-        .eq('id', taskId);
+        .eq('id', taskId)
+        .select('content')
+        .single();
+    
     if (error) throw new Error(error.message);
+
+    if (assigneeId && data) {
+        await notifyUser(assigneeId, `You have been assigned to task: "${data.content}"`, 'projects');
+    }
 };
 
 export const toggleProjectTaskCompletion = async (taskId: string, isCompleted: boolean): Promise<void> => {
@@ -1079,8 +1099,8 @@ export const getShowcaseItems = async (): Promise<ShowcaseItem[]> => {
             id: item.id.toString(),
             createdAt: new Date(item.created_at).toLocaleString('en-US', { timeZone: 'Africa/Kampala' }),
             userUid: item.user_uid,
-            userName: user?.name || 'Unknown Coder',
-            userAvatarUrl: user?.avatar_url,
+            userName: user?.name || 'Unknown User',
+            userAvatarUrl: user?.avatar_url || `https://i.pravatar.cc/40?u=${item.user_uid}`,
             title: item.title,
             description: item.description,
             codeContent: item.code_content,
@@ -1089,33 +1109,27 @@ export const getShowcaseItems = async (): Promise<ShowcaseItem[]> => {
     });
 };
 
-export const addShowcaseItem = async (userUid: string, title: string, description: string, codeContent: string): Promise<void> => {
+export const addShowcaseItem = async (userId: string, title: string, description: string, code: string): Promise<void> => {
     const { error } = await supabase.from('showcase_items').insert({
-        user_uid: userUid,
+        user_uid: userId,
         title,
         description,
-        code_content: codeContent,
+        code_content: code,
         likes: []
     });
-    
     if (error) throw new Error(error.message);
-    await notifyAllUsers(`New code showcase: ${title}`, 'showcase', userUid);
 };
 
-export const toggleShowcaseLike = async (itemId: string, userUid: string, currentLikes: string[]): Promise<void> => {
-    const likesSet = new Set(currentLikes);
-    if (likesSet.has(userUid)) {
-        likesSet.delete(userUid);
-    } else {
-        likesSet.add(userUid);
-    }
-    
-    const newLikes = Array.from(likesSet);
-    
+export const toggleShowcaseLike = async (itemId: string, userId: string, currentLikes: string[]): Promise<void> => {
+    const hasLiked = currentLikes.includes(userId);
+    const newLikes = hasLiked 
+        ? currentLikes.filter(id => id !== userId) 
+        : [...currentLikes, userId];
+
     const { error } = await supabase
         .from('showcase_items')
         .update({ likes: newLikes })
         .eq('id', itemId);
-
+    
     if (error) throw new Error(error.message);
 };

@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 export type CursorVariant = 
+  | 'normal'
   | 'default' 
   | 'minimal' 
   | 'retro' 
@@ -95,7 +96,7 @@ const CustomCursor: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!isSupported) return;
+    if (!isSupported || variant === 'normal') return;
 
     const onMouseMove = (e: MouseEvent) => {
       if (!isVisible) setIsVisible(true);
@@ -158,7 +159,7 @@ const CustomCursor: React.FC = () => {
     };
   }, [isSupported, isVisible, variant]);
 
-  if (!isSupported) return null;
+  if (!isSupported || variant === 'normal') return null;
 
   // --- Styles based on variant ---
 
