@@ -24,6 +24,24 @@ const chartColors = {
     'Excused': '#F59E0B', // Amber-500
 };
 
+const formatDate = (dateString: string) => {
+  try {
+    if (!dateString || dateString === 'N/A') return dateString;
+    const date = new Date(dateString);
+    // check if valid date
+    if (isNaN(date.getTime())) return dateString;
+    
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }).format(date);
+  } catch (error) {
+    return dateString;
+  }
+};
+
 const Attendance: React.FC<AttendanceProps> = ({ currentUser, visible = true }) => {
   const { 
     attendance: attendanceRecords, 
@@ -100,7 +118,7 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, visible = true }) 
           return (
               <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg">
                   <p className="font-bold text-gray-800 dark:text-gray-200">{data.name}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{`Date: ${data.date}`}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{`Date: ${formatDate(data.date)}`}</p>
                   <p className="text-sm font-semibold" style={{ color: chartColors[data.status as AttendanceStatus] }}>{`Status: ${data.status}`}</p>
               </div>
           );
@@ -224,7 +242,7 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, visible = true }) 
                     >
                       <option value="" disabled>Select an activity...</option>
                       {unrecordedActivities.map(act => (
-                        <option key={act.id} value={act.id}>{act.title} ({act.date})</option>
+                        <option key={act.id} value={act.id}>{act.title} ({formatDate(act.date)})</option>
                       ))}
                     </select>
                   </div>
@@ -277,7 +295,7 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, visible = true }) 
                     {attendanceRecords.map((record) => (
                     <tr key={record.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td className="py-3 px-4 text-gray-700 dark:text-gray-300">{record.activityTitle}</td>
-                        <td className="py-3 px-4 text-gray-500 dark:text-gray-400">{record.date}</td>
+                        <td className="py-3 px-4 text-gray-500 dark:text-gray-400">{formatDate(record.date)}</td>
                         <td className="py-3 px-4">
                         <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusColors[record.status]}`}>
                             {record.status}
