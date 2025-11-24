@@ -35,15 +35,19 @@ interface ActivityCardProps {
     activity: Activity;
     currentUser?: User; // Optional only to support legacy usages if any, but logically required for RSVP
     onToggleRSVP?: (id: string, isJoining: boolean) => void;
+    onContextMenu?: (e: React.MouseEvent) => void;
 }
 
-const ActivityCard: React.FC<ActivityCardProps> = ({ activity, currentUser, onToggleRSVP }) => {
+const ActivityCard: React.FC<ActivityCardProps> = ({ activity, currentUser, onToggleRSVP, onContextMenu }) => {
   const categoryStyle = categoryStyles[activity.category] || categoryStyles['OTHER'];
   const rsvpCount = activity.rsvpUserIds ? activity.rsvpUserIds.length : 0;
   const isAttending = currentUser && activity.rsvpUserIds && activity.rsvpUserIds.includes(currentUser.uid);
 
   return (
-    <div className="group bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm hover:shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 transform hover:-translate-y-1 hover:border-pink-200 dark:hover:border-pink-900/50 relative overflow-hidden flex flex-col h-full">
+    <div 
+      onContextMenu={onContextMenu}
+      className="group bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm hover:shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 transform hover:-translate-y-1 hover:border-pink-200 dark:hover:border-pink-900/50 relative overflow-hidden flex flex-col h-full"
+    >
       
       {/* Category Badge */}
       <div className="absolute top-4 right-4 z-10">

@@ -438,9 +438,11 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
     
     // State for Custom Context Menu
     const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
+    const [roomContextMenu, setRoomContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
 
     // State for delete confirmation modal
     const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+    const [roomToDelete, setRoomToDelete] = useState<string | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -472,16 +474,21 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                 setShowEmojiPicker(false);
             }
             setContextMenu(null);
+            setRoomContextMenu(null);
         };
         document.addEventListener('click', handleClickOutside);
         document.addEventListener('contextmenu', (e) => {
-            if (contextMenu) setContextMenu(null);
+            // Only close if context menu is open and we aren't clicking inside it (which is prevented in the menu itself)
+            // Actually, standard behavior is right click elsewhere closes current.
+            if (contextMenu || roomContextMenu) {
+                 // Handled by the components stopPropagation, but a global right click should reset if not captured
+            }
         });
         return () => {
             document.removeEventListener('click', handleClickOutside);
             document.removeEventListener('contextmenu', () => {});
         };
-    }, [contextMenu]);
+    }, [contextMenu, roomContextMenu]);
     
     useEffect(() => {
         if (activeRoomId && unreadMessageCounts[activeRoomId] > 0) {
@@ -529,6 +536,22 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
             alert("Failed to delete message.");
         } finally {
             setMessageToDelete(null);
+        }
+    };
+
+    const handleDeleteRoom = async () => {
+        if (!roomToDelete) return;
+        try {
+            await api.deleteRoom(roomToDelete);
+            if (activeRoomId === roomToDelete) {
+                setActiveRoomId(null);
+            }
+            await fetchRooms();
+        } catch (error: any) {
+            console.error("Failed to delete room:", error);
+            alert("Failed to delete room: " + error.message);
+        } finally {
+            setRoomToDelete(null);
         }
     };
 
@@ -584,6 +607,28 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
              }
 
              setContextMenu({ id: msg.id, x, y });
+        }
+    };
+
+    const handleRoomContextMenu = (e: React.MouseEvent, roomId: string) => {
+        if (currentUser.role === 'PATRON') {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const menuWidth = 160;
+            const menuHeight = 50;
+            let x = e.clientX;
+            let y = e.clientY;
+
+            if (x + menuWidth > window.innerWidth) {
+                x = x - menuWidth;
+            }
+            
+            if (y + menuHeight > window.innerHeight) {
+                y = y - menuHeight;
+            }
+
+            setRoomContextMenu({ id: roomId, x, y });
         }
     };
 
@@ -906,6 +951,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                                 <div 
                                     key={room.id} 
                                     onClick={() => switchToRoom(room.id)}
+                                    onContextMenu={(e) => handleRoomContextMenu(e, room.id)}
                                     className={`p-4 flex items-center cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-800/50 ${isActive ? 'bg-white dark:bg-gray-700 shadow-sm border-l-4 border-l-pink-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 border-l-4 border-l-transparent'}`}
                                 >
                                     <div className="relative flex-shrink-0 mr-3">
@@ -1149,6 +1195,25 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                 </div>
             )}
 
+            {roomContextMenu && (
+                <div 
+                    className="fixed z-50 bg-white dark:bg-gray-800 shadow-xl rounded-lg py-1 border border-gray-200 dark:border-gray-700 min-w-[160px] animate-fade-in-up"
+                    style={{ top: roomContextMenu.y, left: roomContextMenu.x }}
+                    onClick={(e) => e.stopPropagation()} 
+                >
+                    <button 
+                        onClick={() => {
+                            setRoomToDelete(roomContextMenu.id);
+                            setRoomContextMenu(null);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2 transition-colors"
+                    >
+                        <TrashIcon /> 
+                        <span className="font-medium">Delete Group</span>
+                    </button>
+                </div>
+            )}
+
             <ConfirmationModal
                 isOpen={!!messageToDelete}
                 onClose={() => setMessageToDelete(null)}
@@ -1156,6 +1221,16 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                 title="Delete Message"
                 message="Are you sure you want to delete this message? This action cannot be undone."
                 confirmText="Delete"
+                isDangerous
+            />
+
+            <ConfirmationModal
+                isOpen={!!roomToDelete}
+                onClose={() => setRoomToDelete(null)}
+                onConfirm={handleDeleteRoom}
+                title="Delete Group Chat"
+                message="Are you sure you want to delete this group chat? All messages and data will be permanently removed."
+                confirmText="Delete Group"
                 isDangerous
             />
 

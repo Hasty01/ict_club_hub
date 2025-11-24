@@ -1,5 +1,5 @@
 
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import { Activity, User } from '../types';
 import * as api from '../services/apiService';
 import AddActivityForm from './AddActivityForm';
@@ -8,6 +8,8 @@ import CalendarView from './CalendarView';
 import { useData } from '../DataContext';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { ViewListIcon } from './icons/ViewListIcon';
+import { UsersIcon } from './icons/UsersIcon';
+import { XIcon } from './icons/XIcon';
 import ConfirmationModal from './ConfirmationModal';
 
 interface ActivitiesProps {
@@ -23,8 +25,72 @@ interface RSVPActionState {
     isJoining: boolean;
 }
 
+interface AttendeesModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    activityId: string;
+    activities: Activity[];
+    allUsers: User[];
+}
+
+const AttendeesModal: React.FC<AttendeesModalProps> = ({ isOpen, onClose, activityId, activities, allUsers }) => {
+    if (!isOpen) return null;
+
+    const activity = activities.find(a => a.id === activityId);
+    if (!activity) return null;
+
+    const attendees = allUsers.filter(u => activity.rsvpUserIds.includes(u.uid));
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[80vh]">
+                <button 
+                    onClick={onClose} 
+                    className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full p-1 transition-colors"
+                >
+                    <XIcon />
+                </button>
+                
+                <div className="mb-4 pb-2 border-b border-gray-100 dark:border-gray-700">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white pr-8">{activity.title}</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-1">
+                        <span className="bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 px-2 py-0.5 rounded-full text-xs font-bold">
+                            {attendees.length} Attendees
+                        </span>
+                    </p>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+                    {attendees.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                            <p>No one has RSVP'd yet.</p>
+                        </div>
+                    ) : (
+                        attendees.map(user => (
+                            <div key={user.uid} className="flex items-center p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors border border-transparent hover:border-gray-100 dark:hover:border-gray-700">
+                                <img 
+                                    src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`} 
+                                    alt={user.name} 
+                                    className="w-10 h-10 rounded-full mr-3 border border-gray-200 dark:border-gray-600 object-cover" 
+                                />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">{user.name}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{user.username}</p>
+                                </div>
+                                <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${user.role === 'PATRON' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'}`}>
+                                    {user.role}
+                                </span>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
-  const { activities, isLoadingActivities, activitiesError, fetchActivities } = useData();
+  const { activities, isLoadingActivities, activitiesError, fetchActivities, allUsers } = useData();
   const [filter, setFilter] = useState<FilterType>('UPCOMING');
   const [viewMode, setViewMode] = useState<'LIST' | 'CALENDAR'>('LIST');
   
@@ -35,6 +101,38 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
       activityTitle: '',
       isJoining: false
   });
+
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, activityId: string } | null>(null);
+  
+  // View Attendees Modal State
+  const [viewAttendeesState, setViewAttendeesState] = useState<{ isOpen: boolean, activityId: string | null }>({
+      isOpen: false,
+      activityId: null
+  });
+
+  useEffect(() => {
+      const handleClickOutside = () => {
+          setContextMenu(null);
+      };
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleContextMenu = (e: React.MouseEvent, activityId: string) => {
+      if (currentUser.role === 'PATRON') {
+          e.preventDefault();
+          e.stopPropagation();
+          setContextMenu({ x: e.clientX, y: e.clientY, activityId });
+      }
+  };
+
+  const handleOpenAttendees = () => {
+      if (contextMenu) {
+          setViewAttendeesState({ isOpen: true, activityId: contextMenu.activityId });
+          setContextMenu(null);
+      }
+  };
 
   const handleAddActivity = useCallback(async (newActivity: Omit<Activity, 'id' | 'rsvpUserIds'>) => {
     await api.addActivity(newActivity);
@@ -113,6 +211,7 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
                         activity={activity} 
                         currentUser={currentUser}
                         onToggleRSVP={initiateRSVP}
+                        onContextMenu={(e) => handleContextMenu(e, activity.id)}
                     />
                 ))}
             </div>
@@ -208,6 +307,34 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
             confirmText={rsvpState.isJoining ? "Confirm Join" : "Confirm Leave"}
             isDangerous={!rsvpState.isJoining}
         />
+
+        {/* Context Menu */}
+        {contextMenu && (
+            <div 
+                className="fixed z-50 bg-white dark:bg-gray-800 shadow-xl rounded-lg py-1 border border-gray-200 dark:border-gray-700 min-w-[160px] animate-fade-in-up"
+                style={{ top: contextMenu.y, left: contextMenu.x }}
+                onClick={(e) => e.stopPropagation()} 
+            >
+                <button 
+                    onClick={handleOpenAttendees}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
+                >
+                    <UsersIcon className="w-4 h-4 text-purple-500" />
+                    <span className="font-medium">View Attendees</span>
+                </button>
+            </div>
+        )}
+
+        {/* View Attendees Modal */}
+        {viewAttendeesState.activityId && (
+            <AttendeesModal 
+                isOpen={viewAttendeesState.isOpen}
+                onClose={() => setViewAttendeesState({ isOpen: false, activityId: null })}
+                activityId={viewAttendeesState.activityId}
+                activities={activities}
+                allUsers={allUsers}
+            />
+        )}
     </div>
   );
 };

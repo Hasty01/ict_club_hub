@@ -536,6 +536,34 @@ export const addFeedComment = async (feedItemId: string, userId: string, content
     // Manually fetch user profile for the return object
     const user = await getUserProfile(userId);
 
+    // Notify Patrons about the new comment
+    try {
+        const commenterName = user?.name || 'A member';
+        // Fetch all approved patrons, excluding the commenter themselves (if they are a patron)
+        const { data: patrons } = await supabase
+            .from('users')
+            .select('uid')
+            .eq('role', 'PATRON')
+            .eq('status', 'APPROVED')
+            .neq('uid', userId);
+
+        if (patrons && patrons.length > 0) {
+            const snippet = content.length > 30 ? content.substring(0, 30) + '...' : content;
+            const message = `${commenterName} commented on the feed: "${snippet}"`;
+
+            const notifications = patrons.map(patron => ({
+                user_uid: patron.uid,
+                message: message,
+                is_read: false,
+                link_to: 'feed',
+            }));
+
+            await supabase.from('notifications').insert(notifications);
+        }
+    } catch (err) {
+        console.error("Error notifying patrons of comment:", err);
+    }
+
     return {
         id: data.id.toString(),
         feedItemId: data.feed_item_id.toString(),
@@ -974,6 +1002,11 @@ export const updateRoomTitle = async (roomId: string, title: string): Promise<vo
     const { error } = await supabase.from('rooms').update({ title, updated_at: new Date().toISOString() }).eq('id', roomId);
     if (error) throw new Error(error.message);
 }
+
+export const deleteRoom = async (roomId: string): Promise<void> => {
+    const { error } = await supabase.from('rooms').delete().eq('id', roomId);
+    if (error) throw new Error(error.message);
+};
 
 export const uploadChatFile = async (file: File, roomId: string, userId: string): Promise<string> => {
     // Check file size (2MB limit)
