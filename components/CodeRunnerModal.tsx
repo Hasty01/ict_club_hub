@@ -16,11 +16,30 @@ interface OutputLine {
     content: string;
 }
 
+const SYNTAX_REGEX = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\b\d+(?:\.\d+)?\b|\b(?:True|False|None|and|or|not|def|class|return|import|from|if|else|elif|for|while|print)\b|[\[\]\{\}\(\),:])/g;
+
+const SyntaxHighlightedText: React.FC<{ text: string }> = ({ text }) => {
+    const parts = text.split(SYNTAX_REGEX);
+    return (
+        <>
+            {parts.map((part, i) => {
+                if (!part) return null;
+                if (/^".*"$/.test(part) || /^'.*'$/.test(part)) return <span key={i} className="text-green-600 dark:text-green-400">{part}</span>;
+                if (/^\d+(\.\d+)?$/.test(part)) return <span key={i} className="text-blue-600 dark:text-blue-400 font-semibold">{part}</span>;
+                if (/^(True|False|None|and|or|not|def|class|return|import|from|if|else|elif|for|while|print)$/.test(part)) return <span key={i} className="text-purple-600 dark:text-purple-400 font-bold">{part}</span>;
+                if (/^[\[\]\{\}\(\),:]$/.test(part)) return <span key={i} className="text-gray-500 dark:text-gray-500 font-bold">{part}</span>;
+                return <span key={i}>{part}</span>;
+            })}
+        </>
+    );
+};
+
 const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code, title }) => {
   const [output, setOutput] = useState<OutputLine[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [pyodide, setPyodide] = useState<any | null>(null);
   const [isLoadingPyodide, setIsLoadingPyodide] = useState(false);
+  const outputContainerRef = useRef<HTMLDivElement>(null);
   
   // Input Modal State
   const [inputModalOpen, setInputModalOpen] = useState(false);
@@ -52,6 +71,12 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
     }
   }, [isOpen]);
 
+  useEffect(() => {
+      if (outputContainerRef.current) {
+          outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
+      }
+  }, [output]);
+
   const handleInputSubmit = (value: string) => {
       setInputModalOpen(false);
       if (inputResolverRef.current) {
@@ -76,7 +101,17 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
 
       // Setup global function for Python to print to our state
       (window as any).showcasePrint = (text: string, type: 'log' | 'error') => {
-          setOutput(prev => [...prev, { type, content: text }]);
+          setOutput(prev => {
+              const lastOutput = prev[prev.length - 1];
+              // Append to last line if types match, otherwise new line
+              if (lastOutput && lastOutput.type === type) {
+                  const newOutput = [...prev];
+                  newOutput[newOutput.length - 1] = { ...lastOutput, content: lastOutput.content + text };
+                  return newOutput;
+              } else {
+                  return [...prev, { type, content: text }];
+              }
+          });
       };
 
       const setupCode = `
@@ -109,15 +144,7 @@ builtins.input = custom_input
           await pyodide.loadPackagesFromImports(code);
           await pyodide.runPythonAsync(setupCode);
           
-          // Transform code to allow top-level await for input if necessary, 
-          // although simply overriding input with an async function works if 
-          // we use runPythonAsync and the user code awaits input (which it doesn't usually).
-          // BUT, Pyodide's runPythonAsync handles top-level await implicitly. 
-          // Standard "input()" calls in user code are synchronous. 
-          // To make them async without rewriting user code, we need a transformer or 
-          // rely on the fact that simple scripts might not work perfectly if they expect blocking.
-          // HOWEVER, a common trick in web playgrounds is regex replacement:
-          
+          // Regex to replace standard input() calls with await input() to handle async JS interaction
           const asyncCode = code.replace(/\binput\s*\(/g, 'await input(');
           
           await pyodide.runPythonAsync(asyncCode);
@@ -154,17 +181,24 @@ builtins.input = custom_input
                 </div>
 
                 {/* Output Terminal */}
-                <div className="flex-1 bg-black text-green-400 font-mono text-xs md:text-sm p-4 overflow-y-auto flex flex-col">
+                <div 
+                    ref={outputContainerRef}
+                    className="flex-1 bg-gray-900 dark:bg-black text-gray-300 font-mono text-xs md:text-sm p-4 overflow-y-auto flex flex-col shadow-inner"
+                >
                     <div className="flex-1">
                         {output.length === 0 && !isExecuting && (
                             <div className="text-gray-500 italic">Click Run to execute...</div>
                         )}
                         {output.map((line, i) => (
-                            <div key={i} className={`${line.type === 'error' ? 'text-red-500' : 'text-green-400'} mb-1 whitespace-pre-wrap break-all`}>
-                                {line.content}
+                            <div key={i} className="mb-1 whitespace-pre-wrap break-all leading-relaxed">
+                                {line.type === 'log' ? (
+                                    <SyntaxHighlightedText text={line.content} />
+                                ) : (
+                                    <span className="text-red-400 font-medium">{line.content}</span>
+                                )}
                             </div>
                         ))}
-                        {isExecuting && <div className="animate-pulse mt-2">_</div>}
+                        {isExecuting && <div className="animate-pulse mt-2 text-green-500">_</div>}
                     </div>
                 </div>
             </div>
