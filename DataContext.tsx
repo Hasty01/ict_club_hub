@@ -1,7 +1,5 @@
 
-
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
-// FIX: Imported the new Notification type.
 import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, Notification, Room, ShowcaseItem } from './types';
 import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
@@ -15,8 +13,8 @@ interface IDataContext {
   projectData: ProjectData | null;
   setProjectData: React.Dispatch<React.SetStateAction<ProjectData | null>>;
   allUsers: User[];
+  onlineUsers: string[]; // List of UIDs of currently online users
   resources: Resource[];
-  // FIX: Added notifications to the context interface.
   notifications: Notification[];
   rooms: Room[];
   showcaseItems: ShowcaseItem[];
@@ -32,7 +30,6 @@ interface IDataContext {
   isLoadingProjects: boolean;
   isLoadingUsers: boolean;
   isLoadingResources: boolean;
-  // FIX: Added notification loading state.
   isLoadingNotifications: boolean;
   isLoadingRooms: boolean;
   isLoadingShowcase: boolean;
@@ -45,7 +42,6 @@ interface IDataContext {
   projectDataError: string | null;
   allUsersError: string | null;
   resourcesError: string | null;
-  // FIX: Added notification error state.
   notificationsError: string | null;
   roomsError: string | null;
   showcaseError: string | null;
@@ -57,7 +53,6 @@ interface IDataContext {
   fetchProjectData: () => Promise<void>;
   fetchUsers: () => Promise<void>;
   fetchResources: () => Promise<void>;
-  // FIX: Added notification fetch function.
   fetchNotifications: () => Promise<void>;
   fetchRooms: () => Promise<void>;
   fetchShowcaseItems: () => Promise<void>;
@@ -73,9 +68,9 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [rawResources, setRawResources] = useState<Omit<Resource, 'uploaderName' | 'uploaderAvatarUrl'>[]>([]);
-  // FIX: Added state for notifications.
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [showcaseItems, setShowcaseItems] = useState<ShowcaseItem[]>([]);
@@ -87,7 +82,6 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [isLoadingResources, setIsLoadingResources] = useState(true);
-  // FIX: Added loading state for notifications.
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
   const [isLoadingRooms, setIsLoadingRooms] = useState(true);
   const [isLoadingShowcase, setIsLoadingShowcase] = useState(true);
@@ -98,11 +92,11 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [projectDataError, setProjectDataError] = useState<string | null>(null);
   const [allUsersError, setAllUsersError] = useState<string | null>(null);
   const [resourcesError, setResourcesError] = useState<string | null>(null);
-  // FIX: Added error state for notifications.
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
   const [roomsError, setRoomsError] = useState<string | null>(null);
   const [showcaseError, setShowcaseError] = useState<string | null>(null);
 
+  // ... (keep existing fetch functions: fetchActivities, fetchAttendance, fetchFeedItems, etc.)
   const fetchActivities = useCallback(async () => {
     setIsLoadingActivities(true);
     setActivitiesError(null);
@@ -182,11 +176,10 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     } catch (e: any) {
       console.error("Failed to fetch resources", e);
       setResourcesError(e.message || 'An unknown error occurred.');
-      setIsLoadingResources(false); // Ensure loading stops on error
+      setIsLoadingResources(false); 
     }
   }, []);
 
-  // FIX: Added fetchNotifications function.
   const fetchNotifications = useCallback(async () => {
     setIsLoadingNotifications(true);
     setNotificationsError(null);
@@ -240,7 +233,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
 
   // Effect to perform the client-side join for resources
   useEffect(() => {
-    if (isLoadingUsers || resourcesError) { // Don't process if users are loading or there was an error fetching resources
+    if (isLoadingUsers || resourcesError) { 
       return; 
     }
 
@@ -256,14 +249,45 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     });
     
     setResources(enrichedResources);
-    setIsLoadingResources(false); // Mark final resources as loaded
+    setIsLoadingResources(false); 
   }, [rawResources, allUsers, isLoadingUsers, resourcesError]);
   
-  // Realtime subscription for global messages (unread counts)
+  // Realtime Presence for Online Users
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const channel = supabase.channel('online-users', {
+      config: {
+        presence: {
+          key: currentUser.uid,
+        },
+      },
+    });
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const newState = channel.presenceState();
+        // The keys of the presence state object are the presence keys we set (user UIDs)
+        const onlineUserIds = Object.keys(newState);
+        setOnlineUsers(onlineUserIds);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser]);
+
+  // Realtime subscription for global messages (unread counts) and notifications
   useEffect(() => {
     if (!currentUser) return;
     
-    // Subscribe to INSERT events on the messages table
     const messageChannel = supabase.channel('global_messages_listener')
         .on(
             'postgres_changes',
@@ -274,13 +298,8 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
             },
             (payload) => {
                 const newMsg = payload.new as any;
-                
-                // Don't count own messages
                 if (newMsg.sender_id === currentUser.uid) return;
-
-                // Check if the user is a member of the room where the message was sent
                 const isRelevantRoom = rooms.some(r => r.id === newMsg.room_id);
-
                 if (isRelevantRoom) {
                     setUnreadMessageCounts(prev => ({
                         ...prev,
@@ -291,7 +310,6 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         )
         .subscribe();
 
-    // Subscribe to notifications table for real-time alerts
     const notificationChannel = supabase.channel(`notifications:${currentUser.uid}`)
         .on(
             'postgres_changes',
@@ -323,7 +341,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   }, [currentUser, rooms]); 
 
 
-  // Fetch all data when the provider mounts (i.e., when the user logs in)
+  // Fetch all data when the provider mounts
   useEffect(() => {
     if (currentUser) {
       Promise.all([
@@ -332,16 +350,13 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         fetchFeedItems(),
         fetchProjectData(),
         fetchUsers(),
-        // FIX: Fetch notifications on initial load.
         fetchNotifications(),
         fetchRooms(),
         fetchShowcaseItems(),
       ]).then(() => {
-        // After users are fetched, resources can be fetched and joined
         fetchResources();
       });
     }
-  // FIX: Added fetchNotifications to the dependency array.
   }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources, fetchNotifications, fetchRooms, fetchShowcaseItems]);
 
   const value = {
@@ -351,8 +366,8 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     projectData,
     setProjectData,
     allUsers,
+    onlineUsers,
     resources,
-    // FIX: Provide notification state through context.
     notifications,
     rooms,
     showcaseItems,
@@ -364,7 +379,6 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     isLoadingProjects,
     isLoadingUsers,
     isLoadingResources,
-    // FIX: Provide notification loading state.
     isLoadingNotifications,
     isLoadingRooms,
     isLoadingShowcase,
@@ -374,11 +388,9 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     projectDataError,
     allUsersError,
     resourcesError,
-    // FIX: Provide notification error state.
     notificationsError,
     roomsError,
     showcaseError,
-    // FIX: Include notification loading state in the overall initial loading flag.
     isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources || isLoadingNotifications || isLoadingRooms || isLoadingShowcase,
     fetchActivities,
     fetchAttendance,
@@ -386,7 +398,6 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     fetchProjectData,
     fetchUsers,
     fetchResources,
-    // FIX: Provide notification fetch function.
     fetchNotifications,
     fetchRooms,
     fetchShowcaseItems,
@@ -395,7 +406,6 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 };
 
-// Create a custom hook for easy access to the context
 export const useData = () => {
   const context = useContext(DataContext);
   if (context === undefined) {

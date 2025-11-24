@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { User } from '../types';
 import * as api from '../services/apiService';
@@ -12,7 +13,7 @@ interface MembersProps {
 }
 
 const Members: React.FC<MembersProps> = ({ currentUser }) => {
-    const { allUsers, isLoadingUsers, allUsersError, fetchUsers } = useData();
+    const { allUsers, isLoadingUsers, allUsersError, fetchUsers, onlineUsers } = useData();
 
     const handleAction = async (action: () => Promise<any>) => {
         try {
@@ -54,8 +55,22 @@ const Members: React.FC<MembersProps> = ({ currentUser }) => {
                         {allUsers.map((user) => (
                             <tr key={user.uid} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                 <td className="py-4 px-4">
-                                    <div className="font-medium text-gray-800 dark:text-gray-200">{user.name}</div>
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">@{user.username}</div>
+                                    <div className="flex items-center">
+                                        <div className="relative mr-3">
+                                            <img 
+                                                src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`} 
+                                                alt={user.name} 
+                                                className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600" 
+                                            />
+                                            {onlineUsers.includes(user.uid) && (
+                                                <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-gray-800 bg-green-400"></span>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <div className="font-medium text-gray-800 dark:text-gray-200">{user.name}</div>
+                                            <div className="text-sm text-gray-500 dark:text-gray-400">@{user.username}</div>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td className="py-4 px-4 text-sm text-gray-500 dark:text-gray-400">
                                     {user.phoneNumber || 'N/A'}

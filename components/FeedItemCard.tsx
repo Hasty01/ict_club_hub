@@ -1,9 +1,9 @@
 
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FeedItem, FeedItemType, User, FeedComment } from '../types';
 import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
 import { SendIcon } from './icons/SendIcon';
+import { TrashIcon } from './icons/TrashIcon';
 import * as api from '../services/apiService';
 import LinkPreview from './LinkPreview';
 
@@ -32,9 +32,10 @@ const badgeConfig: { [key in FeedItemType]: {
 interface FeedItemCardProps {
   item: FeedItem;
   currentUser: User;
+  onDelete?: (id: string) => void;
 }
 
-const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser }) => {
+const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete }) => {
   const config = badgeConfig[item.type];
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<FeedComment[]>([]);
@@ -43,6 +44,22 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser }) => {
   const [isPosting, setIsPosting] = useState(false);
   // Optimistic comment count: starts with DB value, increments locally on post
   const [commentCount, setCommentCount] = useState(item.commentCount || 0);
+  
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+      const handleClickOutside = () => setContextMenu(null);
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+      if (currentUser.role === 'PATRON' && onDelete) {
+          e.preventDefault();
+          setContextMenu({ x: e.clientX, y: e.clientY });
+      }
+  };
 
   const handleToggleComments = async () => {
       if (!showComments) {
@@ -98,7 +115,10 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser }) => {
   };
   
   return (
-    <div className="group bg-white dark:bg-gray-800 rounded-3xl p-1 shadow-sm hover:shadow-xl border border-gray-100 dark:border-gray-700 transition-all duration-300">
+    <div 
+        onContextMenu={handleContextMenu}
+        className="group bg-white dark:bg-gray-800 rounded-3xl p-1 shadow-sm hover:shadow-xl border border-gray-100 dark:border-gray-700 transition-all duration-300"
+    >
         <div className="bg-white dark:bg-gray-800 rounded-[1.4rem] p-5 sm:p-6 h-full relative overflow-hidden">
              {/* Decorative gradient blur top right */}
              <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-full opacity-50 blur-2xl group-hover:from-pink-100 group-hover:to-purple-100 dark:group-hover:from-pink-900/30 dark:group-hover:to-purple-900/30 transition-colors duration-500 pointer-events-none"></div>
@@ -202,6 +222,23 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser }) => {
                 </div>
             )}
         </div>
+
+        {/* Context Menu for Patrons */}
+        {contextMenu && onDelete && (
+            <div 
+                className="fixed z-50 bg-white dark:bg-gray-800 shadow-xl rounded-lg py-1 border border-gray-200 dark:border-gray-700 min-w-[160px] animate-fade-in-up"
+                style={{ top: contextMenu.y, left: contextMenu.x }}
+                onClick={(e) => e.stopPropagation()} 
+            >
+                <button 
+                    onClick={() => onDelete(item.id)}
+                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2 transition-colors"
+                >
+                    <TrashIcon /> 
+                    <span className="font-medium">Delete Post</span>
+                </button>
+            </div>
+        )}
     </div>
   );
 };

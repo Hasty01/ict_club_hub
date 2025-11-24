@@ -19,7 +19,7 @@ import { PencilIcon } from './icons/PencilIcon';
 import { UserAddIcon } from './icons/UserAddIcon';
 import { CheckIcon } from './icons/CheckIcon';
 import { CodeIcon } from './icons/CodeIcon';
-import { LinkIcon } from './icons/LinkIcon';
+import { CopyIcon } from './icons/CopyIcon';
 import LinkPreview from './LinkPreview';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import ConfirmationModal from './ConfirmationModal';
@@ -29,11 +29,76 @@ interface ChatProps {
     setActiveTab: (tab: Tab) => void;
 }
 
-// Helper to get a room name. If title exists, use it. Else, list other participants.
+// --- Syntax Highlighting Components ---
+
+const SYNTAX_REGEX = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\b\d+(?:\.\d+)?\b|\b(?:True|False|None|and|or|not|def|class|return|import|from|if|else|elif|for|while|print)\b|[\[\]\{\}\(\),:])/g;
+
+const SyntaxHighlightedText: React.FC<{ text: string }> = ({ text }) => {
+    const parts = text.split(SYNTAX_REGEX);
+    return (
+        <>
+            {parts.map((part, i) => {
+                if (!part) return null;
+                if (/^".*"$/.test(part) || /^'.*'$/.test(part)) return <span key={i} className="text-green-400">{part}</span>;
+                if (/^\d+(\.\d+)?$/.test(part)) return <span key={i} className="text-blue-400 font-semibold">{part}</span>;
+                if (/^(True|False|None|and|or|not|def|class|return|import|from|if|else|elif|for|while|print)$/.test(part)) return <span key={i} className="text-purple-400 font-bold">{part}</span>;
+                if (/^[\[\]\{\}\(\),:]$/.test(part)) return <span key={i} className="text-gray-500 font-bold">{part}</span>;
+                return <span key={i}>{part}</span>;
+            })}
+        </>
+    );
+};
+
+const CodeBlock: React.FC<{ code: string, language?: string }> = ({ code, language }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <div className="my-3 rounded-lg overflow-hidden bg-gray-900 border border-gray-700 shadow-sm w-full max-w-full text-left">
+            <div className="flex justify-between items-center px-3 py-1.5 bg-gray-800/80 border-b border-gray-700">
+                <div className="flex items-center gap-2">
+                    <CodeIcon className="h-4 w-4 text-gray-400" />
+                    <span className="text-[10px] font-mono uppercase text-gray-400 font-semibold tracking-wider">
+                        {language || 'CODE'}
+                    </span>
+                </div>
+                <button 
+                    onClick={handleCopy}
+                    className="text-xs text-gray-400 hover:text-white flex items-center gap-1.5 transition-colors px-2 py-0.5 rounded hover:bg-gray-700"
+                    title="Copy Code"
+                >
+                    {copied ? (
+                        <>
+                            <CheckIcon className="h-3 w-3 text-green-400" />
+                            <span className="text-green-400 font-medium">Copied</span>
+                        </>
+                    ) : (
+                        <>
+                            <CopyIcon className="h-3 w-3" />
+                            <span>Copy</span>
+                        </>
+                    )}
+                </button>
+            </div>
+            <div className="p-3 overflow-x-auto custom-scrollbar">
+                <pre className="text-xs md:text-sm font-mono text-gray-300 whitespace-pre leading-relaxed">
+                    <SyntaxHighlightedText text={code.trim()} />
+                </pre>
+            </div>
+        </div>
+    );
+};
+
+// --- Helper Functions ---
+
 const getRoomName = (room: Room, allUsers: User[], currentUserId: string) => {
     if (room.title) return room.title;
     
-    // Filter out current user
     const others = room.participantIds
         .filter(uid => uid !== currentUserId)
         .map(uid => allUsers.find(u => u.uid === uid)?.name || 'Unknown');
@@ -42,7 +107,6 @@ const getRoomName = (room: Room, allUsers: User[], currentUserId: string) => {
     return others.join(', ');
 };
 
-// Helper to get room avatar (first other person or group icon)
 const getRoomAvatar = (room: Room, allUsers: User[], currentUserId: string) => {
      const others = room.participantIds
         .filter(uid => uid !== currentUserId)
@@ -50,7 +114,6 @@ const getRoomAvatar = (room: Room, allUsers: User[], currentUserId: string) => {
     
     if (others.length === 0) return null;
     if (others.length === 1) return others[0]?.avatarUrl;
-    // Return undefined to signal generic group icon
     return undefined; 
 };
 
@@ -78,7 +141,6 @@ const NewChatModal: React.FC<{
 
     const handleSubmit = () => {
         if (selectedUserIds.length === 0) return;
-        // For 1-on-1, we ignore the title. For groups, title is optional.
         onCreate(selectedUserIds, selectedUserIds.length > 1 ? groupTitle : undefined);
         onClose();
         setSelectedUserIds([]);
@@ -169,7 +231,6 @@ const RoomDetailsModal: React.FC<{
     const participants = room.participantIds.map(uid => allUsers.find(u => u.uid === uid)).filter(Boolean) as User[];
     const isCreator = room.createdBy === currentUser.uid;
 
-    // Potential members to add (approved users not already in room)
     const availableUsers = allUsers.filter(u => 
         !room.participantIds.includes(u.uid) && 
         u.status === 'APPROVED' &&
@@ -219,7 +280,6 @@ const RoomDetailsModal: React.FC<{
                 
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Group Info</h3>
                 
-                {/* Title Section */}
                 <div className="mb-4">
                     {isEditingTitle ? (
                         <div className="flex items-center gap-2">
@@ -336,7 +396,6 @@ const RoomDetailsModal: React.FC<{
                      </div>
                 )}
 
-                {/* Remove Confirmation Overlay */}
                 {memberToRemove && (
                     <div className="absolute inset-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-6 rounded-2xl animate-fade-in text-center">
                         <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full mb-3">
@@ -368,7 +427,7 @@ const RoomDetailsModal: React.FC<{
 };
 
 const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
-    const { rooms, allUsers, isLoadingRooms, fetchRooms, unreadMessageCounts, clearUnreadCount } = useData();
+    const { rooms, allUsers, isLoadingRooms, fetchRooms, unreadMessageCounts, clearUnreadCount, onlineUsers } = useData();
     const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     
@@ -382,11 +441,9 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [viewingImage, setViewingImage] = useState<string | null>(null);
     
-    // State for Custom Context Menu
     const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
     const [roomContextMenu, setRoomContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
 
-    // State for delete confirmation modal
     const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
     const [roomToDelete, setRoomToDelete] = useState<string | null>(null);
 
@@ -396,6 +453,8 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const activeRoom = useMemo(() => rooms.find(r => r.id === activeRoomId), [rooms, activeRoomId]);
+
+    const isUserOnline = (uid: string) => onlineUsers.includes(uid);
 
     const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
         setTimeout(() => {
@@ -424,10 +483,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
         };
         document.addEventListener('click', handleClickOutside);
         document.addEventListener('contextmenu', (e) => {
-            // Only close if context menu is open and we aren't clicking inside it (which is prevented in the menu itself)
-            // Actually, standard behavior is right click elsewhere closes current.
             if (contextMenu || roomContextMenu) {
-                 // Handled by the components stopPropagation, but a global right click should reset if not captured
             }
         });
         return () => {
@@ -473,7 +529,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
     
     const handleDeleteMessage = async () => {
         if (!messageToDelete) return;
-        
         try {
             await api.deleteMessage(messageToDelete);
             setMessages(prev => prev.filter(m => m.id !== messageToDelete));
@@ -544,13 +599,8 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
              let x = e.clientX;
              let y = e.clientY;
 
-             if (x + menuWidth > window.innerWidth) {
-                 x = x - menuWidth;
-             }
-             
-             if (y + menuHeight > window.innerHeight) {
-                 y = y - menuHeight;
-             }
+             if (x + menuWidth > window.innerWidth) x -= menuWidth;
+             if (y + menuHeight > window.innerHeight) y -= menuHeight;
 
              setContextMenu({ id: msg.id, x, y });
         }
@@ -566,13 +616,8 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
             let x = e.clientX;
             let y = e.clientY;
 
-            if (x + menuWidth > window.innerWidth) {
-                x = x - menuWidth;
-            }
-            
-            if (y + menuHeight > window.innerHeight) {
-                y = y - menuHeight;
-            }
+            if (x + menuWidth > window.innerWidth) x -= menuWidth;
+            if (y + menuHeight > window.innerHeight) y -= menuHeight;
 
             setRoomContextMenu({ id: roomId, x, y });
         }
@@ -622,7 +667,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                 }
             )
             .subscribe((status) => {
-                console.log(`Subscription status for room ${activeRoomId}:`, status);
                 setRealtimeStatus(status);
             });
 
@@ -634,11 +678,9 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
 
     useEffect(() => {
         if (!activeRoomId) return;
-
         const intervalId = setInterval(() => {
             loadMessages(activeRoomId, false);
         }, 5000); 
-
         return () => clearInterval(intervalId);
     }, [activeRoomId, loadMessages]);
 
@@ -778,7 +820,6 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
             if (!response.ok) throw new Error("Failed to load file content");
             const text = await response.text();
 
-            // SAVE TO PENDING STORAGE to ensure availability if Playground is lazy loaded
             localStorage.setItem('playground_pending_code', text);
 
             const event = new CustomEvent('open-in-playground', { detail: text });
@@ -789,6 +830,23 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
             console.error("Error opening file:", error);
             alert("Could not open file in playground.");
         }
+    };
+
+    const renderTextWithLinks = (text: string) => {
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        if (!urlRegex.test(text)) return <p className="whitespace-pre-wrap break-words text-sm md:text-base leading-relaxed">{text}</p>;
+
+        const parts = text.split(urlRegex);
+        return (
+            <div className="whitespace-pre-wrap break-words text-sm md:text-base w-full min-w-0 inline leading-relaxed">
+                {parts.map((part, i) => {
+                    if (part.match(urlRegex)) {
+                        return <LinkPreview key={i} url={part} onImageClick={setViewingImage} />;
+                    }
+                    return <span key={i}>{part}</span>;
+                })}
+            </div>
+        );
     };
 
     const renderMessageContent = (msg: Message, isMe: boolean) => {
@@ -850,26 +908,53 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
             );
         }
 
-        const urlRegex = /(https?:\/\/[^\s]+)/g;
-        if (urlRegex.test(msg.content)) {
-            const parts = msg.content.split(urlRegex);
-            return (
-                <div className="whitespace-pre-wrap break-words text-sm md:text-base w-full min-w-0">
-                    {parts.map((part, i) => {
-                        if (part.match(urlRegex)) {
-                            return <LinkPreview key={i} url={part} onImageClick={setViewingImage} />;
-                        }
-                        return <span key={i}>{part}</span>;
-                    })}
-                </div>
-            );
+        // Code block handling
+        // Check for ```lang ... ``` pattern
+        const codeBlockRegex = /```(\w+)?\s*([\s\S]*?)```/g;
+        
+        if (codeBlockRegex.test(msg.content)) {
+            const parts = [];
+            let lastIndex = 0;
+            let match;
+            
+            // Reset lastIndex for execution loop
+            codeBlockRegex.lastIndex = 0;
+
+            while ((match = codeBlockRegex.exec(msg.content)) !== null) {
+                // Text before code block
+                if (match.index > lastIndex) {
+                    const textPart = msg.content.slice(lastIndex, match.index);
+                    if (textPart.trim()) {
+                        parts.push(renderTextWithLinks(textPart));
+                    }
+                }
+                
+                // Code block
+                const language = match[1];
+                const code = match[2];
+                parts.push(<CodeBlock key={match.index} code={code} language={language} />);
+                
+                lastIndex = match.index + match[0].length;
+            }
+
+            // Remaining text
+            if (lastIndex < msg.content.length) {
+                const remainingText = msg.content.slice(lastIndex);
+                if (remainingText.trim()) {
+                    parts.push(renderTextWithLinks(remainingText));
+                }
+            }
+
+            return <div className="w-full min-w-0 flex flex-col">{parts}</div>;
         }
 
-        return <p className="whitespace-pre-wrap break-words text-sm md:text-base">{msg.content}</p>;
+        // Regular text message
+        return renderTextWithLinks(msg.content);
     };
 
     return (
         <div className="flex h-full bg-white dark:bg-gray-900 shadow-xl rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+            {/* Sidebar */}
             <div className={`${isSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-1/3 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800`}>
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800/50">
                     <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">Messages</h2>
@@ -893,6 +978,12 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                             const avatar = getRoomAvatar(room, allUsers, currentUser.uid);
                             const unreadCount = unreadMessageCounts[room.id] || 0;
                             
+                            let isOnline = false;
+                            if (!room.title && room.participantIds.length === 2) {
+                                const otherId = room.participantIds.find(id => id !== currentUser.uid);
+                                if (otherId) isOnline = isUserOnline(otherId);
+                            }
+
                             return (
                                 <div 
                                     key={room.id} 
@@ -907,6 +998,9 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                                             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
                                                 {roomName.charAt(0)}
                                             </div>
+                                        )}
+                                        {isOnline && (
+                                            <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full ring-2 ring-white dark:ring-gray-900 bg-green-400"></span>
                                         )}
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -932,6 +1026,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                 </div>
             </div>
 
+            {/* Chat Area */}
             <div className={`${!isSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col flex-1 bg-white dark:bg-gray-900 relative min-w-0`}>
                 {activeRoom ? (
                     <>
@@ -972,7 +1067,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-gray-50 dark:bg-gray-900">
                             {isLoadingMessages ? (
                                 <div className="text-center py-10 text-gray-500">Loading messages...</div>
                             ) : messages.length === 0 ? (
@@ -987,15 +1082,20 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                                     return (
                                         <div key={msg.id} className={`flex group ${isMe ? 'justify-end' : 'justify-start'} relative`}>
                                             {!isMe && (
-                                                <img 
-                                                    src={sender?.avatarUrl || `https://i.pravatar.cc/24?u=${msg.senderId}`} 
-                                                    alt={sender?.name} 
-                                                    className="w-8 h-8 rounded-full mr-2 self-end mb-1 border border-gray-200 dark:border-gray-700"
-                                                    title={sender?.name}
-                                                />
+                                                <div className="relative mr-2 self-end mb-1">
+                                                    <img 
+                                                        src={sender?.avatarUrl || `https://i.pravatar.cc/24?u=${msg.senderId}`} 
+                                                        alt={sender?.name} 
+                                                        className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700"
+                                                        title={sender?.name}
+                                                    />
+                                                    {sender && isUserOnline(sender.uid) && (
+                                                        <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-1 ring-white dark:ring-gray-900 bg-green-400"></span>
+                                                    )}
+                                                </div>
                                             )}
 
-                                            <div className="flex flex-col max-w-[75%] sm:max-w-[70%] min-w-0">
+                                            <div className="flex flex-col max-w-[85%] sm:max-w-[75%] min-w-0">
                                                 <div 
                                                     onContextMenu={(e) => handleContextMenu(e, msg)}
                                                     className={`relative px-4 py-2 shadow-sm rounded-2xl ${

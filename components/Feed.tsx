@@ -1,11 +1,11 @@
 
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { FeedItem, User, FeedItemType } from '../types';
 import * as api from '../services/apiService';
 import AddAnnouncement from './AddAnnouncement';
 import FeedItemCard from './FeedItemCard';
 import { useData } from '../DataContext';
+import ConfirmationModal from './ConfirmationModal';
 
 interface FeedProps {
   currentUser: User;
@@ -14,6 +14,7 @@ interface FeedProps {
 const Feed: React.FC<FeedProps> = ({ currentUser }) => {
   const { feedItems: items, isLoadingFeed, feedItemsError, fetchFeedItems } = useData();
   const [isMounted, setIsMounted] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   
   useEffect(() => {
     if(!isLoadingFeed) {
@@ -26,6 +27,19 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
     await api.addFeedItem({ ...data }, currentUser.uid);
     await fetchFeedItems();
   }, [fetchFeedItems, currentUser.uid]);
+
+  const handleDeletePost = async () => {
+      if (!itemToDelete) return;
+      try {
+          await api.deleteFeedItem(itemToDelete);
+          await fetchFeedItems();
+      } catch (error) {
+          console.error("Failed to delete item:", error);
+          alert("Failed to delete post.");
+      } finally {
+          setItemToDelete(null);
+      }
+  };
 
   if (isLoadingFeed) {
     return (
@@ -126,11 +140,25 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
                     {/* Timeline Dot (Desktop only) */}
                     <div className="hidden md:flex absolute left-6 top-8 w-4 h-4 rounded-full border-4 border-white dark:border-gray-900 bg-gradient-to-r from-pink-500 to-purple-600 shadow-md z-10"></div>
                     
-                    <FeedItemCard item={item} currentUser={currentUser} />
+                    <FeedItemCard 
+                        item={item} 
+                        currentUser={currentUser} 
+                        onDelete={setItemToDelete}
+                    />
                 </div>
                 ))
             )}
         </div>
+        
+        <ConfirmationModal
+            isOpen={!!itemToDelete}
+            onClose={() => setItemToDelete(null)}
+            onConfirm={handleDeletePost}
+            title="Delete Post"
+            message="Are you sure you want to delete this post? This action cannot be undone."
+            confirmText="Delete"
+            isDangerous
+        />
       </div>
     </div>
   );
