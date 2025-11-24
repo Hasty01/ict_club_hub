@@ -280,7 +280,10 @@ export const markAttendanceOnLogin = async (uid: string): Promise<void> => {
 export const getActivities = async (): Promise<Activity[]> => {
     let dbActivities: any[] = [];
     try {
-        const { data, error } = await supabase.from('activities').select('*');
+        const { data, error } = await supabase
+            .from('activities')
+            .select('*, activity_rsvps(user_uid)');
+            
         if (error) {
             console.warn("Error fetching activities:", error.message);
         }
@@ -292,7 +295,7 @@ export const getActivities = async (): Promise<Activity[]> => {
     const localRSVPs = getLocalRSVPs();
 
     return dbActivities.map((a: any) => {
-        const dbRsvps = a.rsvp_users || [];
+        const dbRsvps = a.activity_rsvps ? a.activity_rsvps.map((r: any) => r.user_uid) : [];
         const localActivityRsvps = localRSVPs[a.id.toString()] || [];
         // Merge local and remote RSVPs
         const combinedRsvps = Array.from(new Set([...dbRsvps, ...localActivityRsvps]));
@@ -315,8 +318,7 @@ export const addActivity = async (activity: Omit<Activity, 'id' | 'rsvpUserIds'>
         date: activity.date,
         description: activity.description,
         location: activity.location,
-        category: activity.category,
-        rsvp_users: []
+        category: activity.category
     });
     if (error) throw new Error(error.message);
     
@@ -328,23 +330,23 @@ export const toggleRSVP = async (activityId: string, userId: string, isJoining: 
     saveLocalRSVP(activityId, userId, isJoining);
 
     try {
-        const { data: activity, error: fetchError } = await supabase.from('activities').select('rsvp_users').eq('id', activityId).single();
-        
-        if (fetchError) {
-            console.warn("Could not fetch remote RSVP list:", fetchError.message);
-            return;
-        }
-        
-        let rsvpUsers: string[] = activity.rsvp_users || [];
         if (isJoining) {
-            if (!rsvpUsers.includes(userId)) rsvpUsers.push(userId);
+            const { error } = await supabase.from('activity_rsvps').insert({ 
+                activity_id: activityId, 
+                user_uid: userId 
+            });
+            
+            if (error && error.code !== '23505') { // Ignore unique violation
+                console.warn("Failed to join activity:", error.message);
+            }
         } else {
-            rsvpUsers = rsvpUsers.filter((id: any) => id !== userId);
-        }
-        
-        const { error } = await supabase.from('activities').update({ rsvp_users: rsvpUsers }).eq('id', activityId);
-        if (error) {
-            console.warn("Failed to update remote RSVP:", error.message);
+            const { error } = await supabase.from('activity_rsvps').delete()
+                .eq('activity_id', activityId)
+                .eq('user_uid', userId);
+                
+            if (error) {
+                console.warn("Failed to leave activity:", error.message);
+            }
         }
     } catch (e) {
         console.warn("Network error updating RSVP:", e);
@@ -491,7 +493,7 @@ export const deleteFeedItem = async (id: string): Promise<void> => {
 export const getFeedComments = async (feedItemId: string): Promise<FeedComment[]> => {
     const { data, error } = await supabase
         .from('feed_comments')
-        .select(`*, user:user_uid ( uid, name, avatar_url )`)
+        .select(`*, user:users ( uid, name, avatar_url )`)
         .eq('feed_item_id', feedItemId)
         .order('created_at', { ascending: true });
 
@@ -513,7 +515,7 @@ export const addFeedComment = async (feedItemId: string, userId: string, content
         feed_item_id: feedItemId,
         user_uid: userId,
         content: content
-    }).select(`*, user:user_uid ( uid, name, avatar_url )`).single();
+    }).select(`*, user:users ( uid, name, avatar_url )`).single();
 
     if (error) throw new Error(error.message);
     
