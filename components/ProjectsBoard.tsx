@@ -116,13 +116,28 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     }
   };
 
-  const handleAssignTask = async (taskId: string, assigneeId: string | undefined) => {
+  const handleToggleTaskAssignee = async (taskId: string, userId: string) => {
+    if (!data) return;
+    
+    // Optimistic update
+    const task = data.tasks[taskId];
+    if (!task) return;
+
+    const currentAssignees = task.assigneeIds || [];
+    const newAssignees = currentAssignees.includes(userId)
+        ? currentAssignees.filter(id => id !== userId)
+        : [...currentAssignees, userId];
+
+    const newData = JSON.parse(JSON.stringify(data));
+    newData.tasks[taskId].assigneeIds = newAssignees;
+    setProjectData(newData);
+
     try {
-        await api.assignProjectTask(taskId, assigneeId);
-        await fetchProjectData();
+        await api.updateTaskAssignees(taskId, newAssignees);
     } catch (error: any) {
         console.error("Failed to assign task:", error);
-        alert(`Could not assign the task: ${error.message}`);
+        alert(`Could not update assignees: ${error.message}`);
+        await fetchProjectData(); // Revert
     }
   };
 
@@ -187,7 +202,7 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
               onDragStart={handleDragStart}
               onDrop={handleDrop}
               onDeleteTask={handleDeleteTaskClick}
-              onAssignTask={handleAssignTask}
+              onToggleTaskAssignee={handleToggleTaskAssignee}
               onToggleTaskCompletion={handleToggleTaskCompletion}
               // Pass the edit handler down
               onEditTask={handleOpenEditTaskModal}

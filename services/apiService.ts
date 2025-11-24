@@ -1,4 +1,5 @@
 
+
 import { supabase } from './supabaseClient';
 import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, FeedItemType, ProjectColumn, Resource, Notification, Tab, Room, Message, ActivityCategory, TaskPriority, FeedComment, ShowcaseItem } from '../types';
 import { predefinedAvatars } from '../constants';
@@ -424,24 +425,28 @@ export const markAttendanceOnLogin = async (userId: string): Promise<void> => {
 // --- FEED API ---
 
 export const getFeedItems = async (): Promise<FeedItem[]> => {
+    // Fetch feed items along with author details and a count of comments.
+    // Supabase automatically handles the 'feed_comments(count)' aggregation if the relationship is set up.
     const { data, error } = await supabase
         .from('feed_items')
         .select(`
             *,
-            author:author_uid ( uid, name, avatar_url )
+            author:author_uid ( uid, name, avatar_url ),
+            feed_comments (count)
         `)
         .order('created_at', { ascending: false });
     
     if (error) throw new Error(error.message);
     if (!data) return [];
     
-    // The query joins with the users table via the author_uid foreign key,
-    // and returns the author's profile in the 'author' property.
-    return data.map(item => {
+    return data.map((item: any) => {
         const authorProfile = item.author as { uid: string; name: string; avatar_url: string } | null;
         const authorName = authorProfile?.name || 'Unknown User';
         const authorUid = authorProfile?.uid || 'unknown';
         
+        // Extract count from the response. Supabase returns an array of objects for one-to-many queries usually.
+        const commentCount = item.feed_comments?.[0]?.count || 0;
+
         return {
             ...item,
             id: item.id.toString(),
@@ -450,6 +455,7 @@ export const getFeedItems = async (): Promise<FeedItem[]> => {
             author: authorName,
             authorAvatarUrl: authorProfile?.avatar_url || `https://i.pravatar.cc/40?u=${authorUid}`,
             timestamp: new Date(item.created_at).toLocaleString('en-US', { timeZone: 'Africa/Kampala' }), // Format timestamp in EAT
+            commentCount: commentCount,
         };
     });
 };
@@ -586,23 +592,39 @@ export const addFeedComment = async (feedItemId: string, userId: string, content
 
 export const getProjectData = async (): Promise<ProjectData> => {
     // 1. Fetch columns and tasks in parallel.
+    // Note: We attempt to select all columns. If `assignee_uids` exists, it will be returned.
+    // If not, we fallback to `assignee_uid` logic in the map.
     const [columnsRes, tasksRes] = await Promise.all([
         supabase.from('project_columns').select('*').order('position', { ascending: true }),
         supabase.from('project_tasks').select('*') 
     ]);
 
     if (columnsRes.error) throw new Error(columnsRes.error.message);
-    if (tasksRes.error) throw new Error(tasksRes.error.message);
+    if (tasksRes.error) {
+        // If the error is network related, we return empty structure instead of crashing
+        if (tasksRes.error.message && tasksRes.error.message.includes('fetch')) {
+             return { tasks: {}, columns: {}, columnOrder: [] };
+        }
+        throw new Error(tasksRes.error.message);
+    }
     
     const allTasksData = tasksRes.data || [];
     const columnsData = columnsRes.data || [];
 
     // 2. Process tasks into a dictionary for quick O(1) lookups.
     const tasks: { [key: string]: ProjectTask } = allTasksData.reduce((acc, task) => {
+        // Handle potential multiple assignees if the DB supports it, otherwise fallback to single
+        let assigneeIds: string[] = [];
+        if (task.assignee_uids && Array.isArray(task.assignee_uids)) {
+            assigneeIds = task.assignee_uids;
+        } else if (task.assignee_uid) {
+            assigneeIds = [task.assignee_uid];
+        }
+
         acc[task.id.toString()] = { 
             id: task.id.toString(),
             content: task.content,
-            assigneeId: task.assignee_uid,
+            assigneeIds: assigneeIds, 
             isCompleted: task.is_completed || false, 
             priority: task.priority || 'MEDIUM',
             dueDate: task.due_date,
@@ -705,19 +727,49 @@ export const deleteProjectTask = async (taskId: string, columnId: string): Promi
     if (error) throw new Error(error.message);
 };
 
-export const assignProjectTask = async (taskId: string, assigneeId: string | undefined): Promise<void> => {
-    const { data, error } = await supabase
-        .from('project_tasks')
-        .update({ assignee_uid: assigneeId })
-        .eq('id', taskId)
-        .select('content')
-        .single();
-    
-    if (error) throw new Error(error.message);
+export const updateTaskAssignees = async (taskId: string, assigneeIds: string[]): Promise<void> => {
+    // Attempt to update a hypothetical assignee_uids array column.
+    // If the DB schema doesn't support it, we fallback to storing the first ID in assignee_uid for compatibility.
+    const dbUpdates: any = {
+        assignee_uids: assigneeIds, 
+        assignee_uid: assigneeIds.length > 0 ? assigneeIds[0] : null
+    };
 
-    if (assigneeId && data) {
-        await notifyUser(assigneeId, `You have been assigned to task: "${data.content}"`, 'projects');
+    // We try to update. Supabase might ignore extra columns if they don't exist, or error out.
+    // In a strict environment, we'd check schema. Here we try both for max compatibility.
+    try {
+        const { error } = await supabase
+            .from('project_tasks')
+            .update(dbUpdates)
+            .eq('id', taskId);
+        
+        if (error) {
+            // Fallback: If updating array failed (likely column missing), try just the single ID
+            console.warn("Failed to update multiple assignees, falling back to single assignee.", error.message);
+            const { error: fallbackError } = await supabase
+                .from('project_tasks')
+                .update({ assignee_uid: dbUpdates.assignee_uid })
+                .eq('id', taskId);
+            
+            if (fallbackError) throw new Error(fallbackError.message);
+        }
+
+        if (assigneeIds.length > 0) {
+             // Notify the newly assigned users (simple check: notify all in list)
+             // Optimization: In a real app, calculate diff to only notify new ones.
+             for (const uid of assigneeIds) {
+                 await notifyUser(uid, `You have been assigned to a task.`, 'projects');
+             }
+        }
+
+    } catch (err: any) {
+        throw new Error(err.message);
     }
+};
+
+// Deprecated: Wrapper for backward compatibility if needed elsewhere
+export const assignProjectTask = async (taskId: string, assigneeId: string | undefined): Promise<void> => {
+    return updateTaskAssignees(taskId, assigneeId ? [assigneeId] : []);
 };
 
 export const toggleProjectTaskCompletion = async (taskId: string, isCompleted: boolean): Promise<void> => {

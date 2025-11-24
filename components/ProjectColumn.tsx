@@ -16,7 +16,7 @@ interface ProjectColumnProps {
   onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string, sourceColumnId: string) => void;
   onDrop: (destinationColumnId: string) => void;
   onDeleteTask: (taskId: string, columnId: string) => void;
-  onAssignTask: (taskId: string, assigneeId: string | undefined) => void;
+  onToggleTaskAssignee: (taskId: string, userId: string) => void;
   onToggleTaskCompletion: (taskId: string, currentStatus: boolean) => void;
   onEditTask: (task: ProjectTask) => void;
 }
@@ -39,7 +39,7 @@ const getDragAfterElement = (container: HTMLElement, y: number) => {
 const ProjectColumn: React.FC<ProjectColumnProps> = (props) => {
   const { 
     column, tasks, allUsers, isPatron, currentUser, draggedItemId, dropIndicator, setDropIndicator,
-    onDragStart, onDrop, onDeleteTask, onAssignTask, onToggleTaskCompletion, onEditTask
+    onDragStart, onDrop, onDeleteTask, onToggleTaskAssignee, onToggleTaskCompletion, onEditTask
   } = props;
   
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -88,7 +88,7 @@ const ProjectColumn: React.FC<ProjectColumnProps> = (props) => {
                     allUsers={allUsers}
                     onDragStart={onDragStart}
                     onDeleteTask={onDeleteTask}
-                    onAssignTask={onAssignTask}
+                    onToggleTaskAssignee={onToggleTaskAssignee}
                     onToggleTaskCompletion={onToggleTaskCompletion}
                     onEditTask={onEditTask}
                 />

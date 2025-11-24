@@ -5,6 +5,7 @@ import { FeedItem, FeedItemType, User, FeedComment } from '../types';
 import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
 import { SendIcon } from './icons/SendIcon';
 import * as api from '../services/apiService';
+import LinkPreview from './LinkPreview';
 
 const badgeConfig: { [key in FeedItemType]: {
     text: string;
@@ -40,6 +41,8 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser }) => {
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  // Optimistic comment count: starts with DB value, increments locally on post
+  const [commentCount, setCommentCount] = useState(item.commentCount || 0);
 
   const handleToggleComments = async () => {
       if (!showComments) {
@@ -47,6 +50,8 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser }) => {
           try {
               const fetchedComments = await api.getFeedComments(item.id);
               setComments(fetchedComments);
+              // Update local count to match fetched data
+              setCommentCount(fetchedComments.length);
           } catch (error) {
               console.error("Failed to load comments", error);
           } finally {
@@ -64,6 +69,7 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser }) => {
       try {
           const comment = await api.addFeedComment(item.id, currentUser.uid, newComment);
           setComments([...comments, comment]);
+          setCommentCount(prev => prev + 1);
           setNewComment('');
       } catch (error) {
           console.error("Failed to post comment", error);
@@ -72,12 +78,30 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser }) => {
           setIsPosting(false);
       }
   };
+
+  const renderMessageContent = (content: string) => {
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      if (urlRegex.test(content)) {
+          const parts = content.split(urlRegex);
+          return (
+              <div className="whitespace-pre-wrap break-words w-full min-w-0 text-gray-600 dark:text-gray-300 leading-relaxed">
+                  {parts.map((part, i) => {
+                      if (part.match(urlRegex)) {
+                          return <LinkPreview key={i} url={part} />;
+                      }
+                      return <span key={i}>{part}</span>;
+                  })}
+              </div>
+          );
+      }
+      return <p className="text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{content}</p>;
+  };
   
   return (
     <div className="group bg-white dark:bg-gray-800 rounded-3xl p-1 shadow-sm hover:shadow-xl border border-gray-100 dark:border-gray-700 transition-all duration-300">
         <div className="bg-white dark:bg-gray-800 rounded-[1.4rem] p-5 sm:p-6 h-full relative overflow-hidden">
              {/* Decorative gradient blur top right */}
-             <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-full opacity-50 blur-2xl group-hover:from-pink-100 group-hover:to-purple-100 dark:group-hover:from-pink-900/30 dark:group-hover:to-purple-900/30 transition-colors duration-500"></div>
+             <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-full opacity-50 blur-2xl group-hover:from-pink-100 group-hover:to-purple-100 dark:group-hover:from-pink-900/30 dark:group-hover:to-purple-900/30 transition-colors duration-500 pointer-events-none"></div>
 
             {/* Header */}
             <div className="flex items-center justify-between mb-4 relative z-10">
@@ -107,7 +131,7 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser }) => {
                     </h3>
                 )}
                 <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <p className="text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{item.message}</p>
+                    {renderMessageContent(item.message)}
                 </div>
             </div>
 
@@ -119,7 +143,9 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser }) => {
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all group/btn ${showComments ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 dark:hover:text-purple-400'}`}
                     >
                          <ChatBubbleIcon />
-                         <span className="text-xs font-medium">Comments {comments.length > 0 && `(${comments.length})`}</span>
+                         <span className="text-xs font-medium">
+                             Comments {commentCount > 0 && `(${commentCount})`}
+                         </span>
                     </button>
                 </div>
                 

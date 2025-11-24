@@ -1,9 +1,10 @@
 
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect, useRef } from 'react';
 import { ProjectTask, User } from '../types';
 import { TrashIcon } from './icons/TrashIcon';
 import { CheckIcon } from './icons/CheckIcon';
 import { PencilIcon } from './icons/PencilIcon';
+import { UserAddIcon } from './icons/UserAddIcon';
 
 interface ProjectTaskCardProps {
   task: ProjectTask;
@@ -14,7 +15,7 @@ interface ProjectTaskCardProps {
   allUsers: User[];
   onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string, sourceColumnId: string) => void;
   onDeleteTask: (taskId: string, columnId: string) => void;
-  onAssignTask: (taskId: string, assigneeId: string | undefined) => void;
+  onToggleTaskAssignee: (taskId: string, userId: string) => void;
   onToggleTaskCompletion: (taskId: string, currentStatus: boolean) => void;
   onEditTask: (task: ProjectTask) => void;
 }
@@ -37,18 +38,37 @@ const PriorityBadge: React.FC<{ priority: string }> = ({ priority }) => {
 const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
     const { 
         task, columnId, isBeingDragged, isPatron, currentUser, allUsers, 
-        onDragStart, onDeleteTask, onAssignTask, onToggleTaskCompletion, onEditTask
+        onDragStart, onDeleteTask, onToggleTaskAssignee, onToggleTaskCompletion, onEditTask
     } = props;
 
-  const assignee = task.assigneeId ? allUsers.find(u => u.uid === task.assigneeId) : null;
+  const [isAssignDropdownOpen, setIsAssignDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Resolve assignee objects from IDs
+  const assignees = (task.assigneeIds || []).map(id => allUsers.find(u => u.uid === id)).filter(Boolean) as User[];
   const approvedMembers = allUsers.filter(u => u.status === 'APPROVED');
   const isCompleted = task.isCompleted;
 
   // Determine if due date is passed
   const isOverdue = task.dueDate ? new Date(task.dueDate) < new Date() && !isCompleted : false;
 
-  // Allow completion toggling if user is a Patron OR the assigned user
-  const canToggleCompletion = isPatron || (task.assigneeId === currentUser.uid);
+  // Allow completion toggling if user is a Patron OR one of the assigned users
+  const canToggleCompletion = isPatron || (task.assigneeIds && task.assigneeIds.includes(currentUser.uid));
+
+  useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+          if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+              setIsAssignDropdownOpen(false);
+          }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleAssignee = (e: React.MouseEvent, userId: string) => {
+      e.stopPropagation();
+      onToggleTaskAssignee(task.id, userId);
+  };
 
   return (
     <div
@@ -117,52 +137,85 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
           </div>
       )}
 
-      <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+      <div className="pt-3 mt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between relative">
         <div className="flex items-center min-w-0" onClick={e => e.stopPropagation()}>
-            {assignee ? (
-                <>
-                    <img
-                        src={assignee.avatarUrl || `https://i.pravatar.cc/24?u=${assignee.username}`}
-                        alt={assignee.name}
-                        className="w-6 h-6 rounded-full mr-2 flex-shrink-0"
-                        title={`Assigned to ${assignee.name}`}
-                    />
-                    <span className="text-xs text-gray-600 dark:text-gray-400 truncate hidden sm:inline">{assignee.name}</span>
-                </>
-            ) : (
-                <div className="flex items-center" title="Unassigned">
-                    <div className="w-6 h-6 rounded-full mr-2 bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
+            <div className="flex -space-x-2 overflow-hidden p-1">
+                {assignees.length > 0 ? (
+                    assignees.slice(0, 3).map(user => (
+                        <img
+                            key={user.uid}
+                            src={user.avatarUrl || `https://i.pravatar.cc/24?u=${user.username}`}
+                            alt={user.name}
+                            className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-800 object-cover"
+                            title={user.name}
+                        />
+                    ))
+                ) : (
+                    <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center bg-gray-50 dark:bg-gray-800/50" title="Unassigned">
+                       <span className="text-[10px] text-gray-400">?</span>
                     </div>
+                )}
+                {assignees.length > 3 && (
+                    <div className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-800 bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[9px] font-bold text-gray-600 dark:text-gray-300">
+                        +{assignees.length - 3}
+                    </div>
+                )}
+            </div>
+        </div>
+        
+        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+            {isPatron && (
+                <div className="relative" ref={dropdownRef}>
+                    <button 
+                        onClick={() => setIsAssignDropdownOpen(!isAssignDropdownOpen)}
+                        className={`p-1.5 rounded-full transition-colors ${isAssignDropdownOpen ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/50 dark:text-purple-300' : 'text-gray-400 hover:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20'}`}
+                        aria-label="Manage assignees"
+                        title="Manage Assignees"
+                    >
+                        <UserAddIcon className="h-4 w-4" />
+                    </button>
+
+                    {isAssignDropdownOpen && (
+                        <div className="absolute bottom-full right-0 mb-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-60 overflow-y-auto custom-scrollbar">
+                            <div className="p-2 border-b border-gray-100 dark:border-gray-700 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                                Assign to...
+                            </div>
+                            {approvedMembers.map(user => {
+                                const isAssigned = task.assigneeIds?.includes(user.uid);
+                                return (
+                                    <div 
+                                        key={user.uid}
+                                        onClick={(e) => toggleAssignee(e, user.uid)}
+                                        className={`px-3 py-2 flex items-center gap-2 text-sm cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${isAssigned ? 'bg-pink-50 dark:bg-pink-900/10' : ''}`}
+                                    >
+                                        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isAssigned ? 'bg-pink-500 border-pink-500' : 'border-gray-300 dark:border-gray-500'}`}>
+                                            {isAssigned && <CheckIcon className="w-3 h-3 text-white" />}
+                                        </div>
+                                        <img src={user.avatarUrl || `https://i.pravatar.cc/20?u=${user.username}`} className="w-5 h-5 rounded-full object-cover" alt="" />
+                                        <span className={`truncate ${isAssigned ? 'text-pink-700 dark:text-pink-300 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
+                                            {user.name}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             )}
-        </div>
-        {isPatron && (
-            <div className="flex items-center space-x-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                 <select
-                    value={task.assigneeId || ''}
-                    onChange={(e) => onAssignTask(task.id, e.target.value ? e.target.value : undefined)}
-                    className="text-xs border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md shadow-sm focus:border-purple-300 focus:ring focus:ring-purple-200 focus:ring-opacity-50 h-6"
-                 >
-                    <option value="">Assign</option>
-                    {approvedMembers.map(user => (
-                        <option key={user.uid} value={user.uid}>{user.name}</option>
-                    ))}
-                 </select>
+            
+            {isPatron && (
                 <button 
                     onClick={(e) => {
                         e.stopPropagation();
                         onDeleteTask(task.id, columnId);
                     }}
-                    className="p-1 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors" 
+                    className="p-1.5 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" 
                     aria-label="Delete task"
                 >
-                    <TrashIcon />
+                    <TrashIcon className="h-4 w-4" />
                 </button>
-            </div>
-        )}
+            )}
+        </div>
       </div>
     </div>
   );

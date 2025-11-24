@@ -1,9 +1,11 @@
 
+
 import React, { useEffect, useRef, useState } from 'react';
 
 export type CursorVariant = 
   | 'normal'
   | 'default' 
+  | 'figma'
   | 'minimal' 
   | 'retro' 
   | 'glow' 
@@ -63,7 +65,7 @@ const CustomCursor: React.FC = () => {
   const [hovering, setHovering] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
-  const [variant, setVariant] = useState<CursorVariant>('default');
+  const [variant, setVariant] = useState<CursorVariant>('figma');
   
   // Initialize off-screen
   const position = useRef({ x: -100, y: -100 });
@@ -102,6 +104,11 @@ const CustomCursor: React.FC = () => {
       if (!isVisible) setIsVisible(true);
       position.current = { x: e.clientX, y: e.clientY };
       
+      // Update the main cursor position immediately for zero-latency feel
+      if (cursorRef.current) {
+        cursorRef.current.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+      }
+
       const target = e.target as HTMLElement;
       const isInteractive = 
         window.getComputedStyle(target).cursor === 'pointer' ||
@@ -127,16 +134,11 @@ const CustomCursor: React.FC = () => {
     let animationFrameId: number;
 
     const animate = () => {
-      if (cursorRef.current) {
-        // Main dot follows instantly
-        cursorRef.current.style.transform = `translate3d(${position.current.x}px, ${position.current.y}px, 0)`;
-      }
-
+      // Follower movement with smooth lerp
       if (followerRef.current) {
-        // Follower smooth lerp
         // Adjust speed based on variant
         let speed = 0.2;
-        if (['retro', 'pixel', 'target', 'ring', 'gear'].includes(variant)) speed = 0.4;
+        if (['retro', 'pixel', 'target', 'ring', 'gear', 'figma'].includes(variant)) speed = 0.4;
         if (['bubble', 'ghost', 'ufo', 'potion'].includes(variant)) speed = 0.12;
         if (['crosshair', 'pencil', 'wand', 'sword'].includes(variant)) speed = 0.3;
         
@@ -165,6 +167,20 @@ const CustomCursor: React.FC = () => {
 
   const renderCursor = () => {
       switch (variant) {
+          case 'figma':
+              return (
+                  <>
+                    <div 
+                        ref={cursorRef}
+                        className="fixed top-0 left-0 pointer-events-none z-[9999] -ml-0 -mt-0"
+                    >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}>
+                            <path d="M5.65376 12.3673H5.46026L5.31717 12.4976L0.500002 16.8829L0.500002 1.1943L11.7841 12.3673H5.65376Z" fill="black" stroke="white" strokeWidth="1"/>
+                        </svg>
+                    </div>
+                    {/* No follower for Figma style to keep it clean and authentic */}
+                  </>
+              );
           case 'minimal':
               return (
                   <div 
@@ -849,7 +865,7 @@ const CustomCursor: React.FC = () => {
               return (
                   <>
                     <div ref={cursorRef} className="fixed top-0 left-0 pointer-events-none z-[9999] -ml-3 -mt-3 text-purple-500">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 16v-2h-2v-1h2v-2h-2V9h2V7h-2V5h2V3H7v2h2v2H7v2h2v2H7v1h2v2H7v3c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2v-3h2zM12 6c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-1 3c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 3c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z"/></svg>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 16v-2h-2v-1h2v-2h-2V9h2V7h-2V5h2V3H7v2h2v2H7v2h2v2H7v1h2v2H7v3c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2v-3h2zM12 6c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-1 3c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 3c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 3c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z"/></svg>
                     </div>
                     <div 
                         ref={followerRef}

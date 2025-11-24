@@ -147,7 +147,7 @@ const ChangePasswordForm: React.FC<{ currentUser: User }> = ({ currentUser }) =>
 };
 
 const AppearanceSettings: React.FC = () => {
-    const [selectedCursor, setSelectedCursor] = useState<CursorVariant>('default');
+    const [selectedCursor, setSelectedCursor] = useState<CursorVariant>('figma');
 
     useEffect(() => {
         const saved = localStorage.getItem('app_cursor') as CursorVariant;
@@ -162,6 +162,17 @@ const AppearanceSettings: React.FC = () => {
     };
 
     const cursors: { id: CursorVariant, name: string, preview: React.ReactNode }[] = [
+        { 
+            id: 'figma', 
+            name: 'Figma Style', 
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
+                        <path d="M5.65376 12.3673H5.46026L5.31717 12.4976L0.500002 16.8829L0.500002 1.1943L11.7841 12.3673H5.65376Z" fill="black" stroke="white" strokeWidth="1"/>
+                    </svg>
+                </div>
+            )
+        },
         {
             id: 'normal',
             name: 'System Default',

@@ -46,6 +46,7 @@ export interface FeedItem {
   timestamp: string; // This will be handled by Supabase server timestamps
   title?: string;
   message: string;
+  commentCount?: number;
 }
 
 export interface FeedComment {
@@ -64,7 +65,7 @@ export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 export interface ProjectTask {
   id: string;
   content: string;
-  assigneeId?: string; // Changed to string to store user UID
+  assigneeIds: string[]; // Changed to array of strings for multiple assignees
   isCompleted?: boolean;
   priority: TaskPriority;
   dueDate?: string;
