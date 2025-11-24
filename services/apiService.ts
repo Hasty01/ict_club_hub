@@ -279,15 +279,28 @@ export const markAttendanceOnLogin = async (uid: string): Promise<void> => {
 
 export const getActivities = async (): Promise<Activity[]> => {
     let dbActivities: any[] = [];
+    let dbRsvps: any[] = [];
+
     try {
-        const { data, error } = await supabase
+        // Fetch activities
+        const { data: activitiesData, error: activitiesError } = await supabase
             .from('activities')
-            .select('*, activity_rsvps(user_uid)');
+            .select('*');
             
-        if (error) {
-            console.warn("Error fetching activities:", error.message);
+        if (activitiesError) throw activitiesError;
+        if (activitiesData) dbActivities = activitiesData;
+
+        // Fetch ALL RSVPs explicitly to avoid join issues
+        const { data: rsvpsData, error: rsvpsError } = await supabase
+            .from('activity_rsvps')
+            .select('activity_id, user_uid');
+            
+        if (rsvpsError) {
+             console.warn("Error fetching RSVPs:", rsvpsError.message);
+        } else if (rsvpsData) {
+            dbRsvps = rsvpsData;
         }
-        if (data) dbActivities = data;
+
     } catch (e) {
         console.warn("Network error fetching activities:", e);
     }
@@ -295,13 +308,20 @@ export const getActivities = async (): Promise<Activity[]> => {
     const localRSVPs = getLocalRSVPs();
 
     return dbActivities.map((a: any) => {
-        const dbRsvps = a.activity_rsvps ? a.activity_rsvps.map((r: any) => r.user_uid) : [];
-        const localActivityRsvps = localRSVPs[a.id.toString()] || [];
+        const activityIdStr = a.id.toString();
+        
+        // Filter RSVPs for this activity from the separate fetch
+        const remoteRsvpsForActivity = dbRsvps
+            .filter((r: any) => r.activity_id.toString() === activityIdStr)
+            .map((r: any) => r.user_uid);
+
+        const localActivityRsvps = localRSVPs[activityIdStr] || [];
+        
         // Merge local and remote RSVPs
-        const combinedRsvps = Array.from(new Set([...dbRsvps, ...localActivityRsvps]));
+        const combinedRsvps = Array.from(new Set([...remoteRsvpsForActivity, ...localActivityRsvps]));
 
         return {
-            id: a.id.toString(),
+            id: activityIdStr,
             title: a.title,
             date: a.date,
             description: a.description,
@@ -441,6 +461,8 @@ export const addAttendance = async (userId: string, record: Omit<AttendanceRecor
 
 export const getFeedItems = async (): Promise<FeedItem[]> => {
     try {
+        // Some deployments might also have issues with author join, but let's keep it unless it breaks
+        // If it breaks, we can use the same strategy as getFeedComments
         const { data, error } = await supabase
             .from('feed_items')
             .select(`
@@ -491,42 +513,72 @@ export const deleteFeedItem = async (id: string): Promise<void> => {
 };
 
 export const getFeedComments = async (feedItemId: string): Promise<FeedComment[]> => {
-    const { data, error } = await supabase
+    // 1. Fetch comments without relying on the join
+    const { data: comments, error } = await supabase
         .from('feed_comments')
-        .select(`*, user:users ( uid, name, avatar_url )`)
+        .select('*')
         .eq('feed_item_id', feedItemId)
         .order('created_at', { ascending: true });
 
     if (error) throw new Error(error.message);
+    if (!comments || comments.length === 0) return [];
+
+    // 2. Get unique user IDs to fetch profiles
+    const userIds = Array.from(new Set(comments.map((c: any) => c.user_uid))).filter(Boolean);
+
+    // 3. Fetch users manually
+    let userMap = new Map();
+    if (userIds.length > 0) {
+        const { data: users, error: usersError } = await supabase
+            .from('users')
+            .select('uid, name, avatar_url')
+            .in('uid', userIds);
+        
+        if (!usersError && users) {
+            users.forEach((u: any) => userMap.set(u.uid, u));
+        }
+    }
     
-    return data.map((c: any) => ({
-        id: c.id.toString(),
-        feedItemId: c.feed_item_id.toString(),
-        userId: c.user_uid,
-        userName: c.user?.name || 'Unknown',
-        userAvatarUrl: c.user?.avatar_url || `https://i.pravatar.cc/40?u=${c.user_uid}`,
-        content: c.content,
-        createdAt: new Date(c.created_at).toLocaleString()
-    }));
+    // 4. Map and return
+    return comments.map((c: any) => {
+        const user = userMap.get(c.user_uid);
+        return {
+            id: c.id.toString(),
+            feedItemId: c.feed_item_id.toString(),
+            userId: c.user_uid,
+            userName: user?.name || 'Unknown Member',
+            userAvatarUrl: user?.avatar_url || `https://i.pravatar.cc/40?u=${c.user_uid}`,
+            content: c.content,
+            createdAt: new Date(c.created_at).toLocaleString()
+        };
+    });
 };
 
 export const addFeedComment = async (feedItemId: string, userId: string, content: string): Promise<FeedComment> => {
-    const { data, error } = await supabase.from('feed_comments').insert({
+    // 1. Insert comment without join select
+    const { data: comment, error } = await supabase.from('feed_comments').insert({
         feed_item_id: feedItemId,
         user_uid: userId,
         content: content
-    }).select(`*, user:users ( uid, name, avatar_url )`).single();
+    }).select().single();
 
     if (error) throw new Error(error.message);
     
+    // 2. Fetch user details separately
+    const { data: user } = await supabase
+        .from('users')
+        .select('name, avatar_url')
+        .eq('uid', userId)
+        .single();
+
     return {
-        id: data.id.toString(),
-        feedItemId: data.feed_item_id.toString(),
-        userId: data.user_uid,
-        userName: data.user?.name || 'Unknown',
-        userAvatarUrl: data.user?.avatar_url || `https://i.pravatar.cc/40?u=${data.user_uid}`,
-        content: data.content,
-        createdAt: new Date(data.created_at).toLocaleString()
+        id: comment.id.toString(),
+        feedItemId: comment.feed_item_id.toString(),
+        userId: comment.user_uid,
+        userName: user?.name || 'Unknown Member',
+        userAvatarUrl: user?.avatar_url || `https://i.pravatar.cc/40?u=${comment.user_uid}`,
+        content: comment.content,
+        createdAt: new Date(comment.created_at).toLocaleString()
     };
 };
 
