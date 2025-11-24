@@ -6,23 +6,24 @@ import { predefinedAvatars } from '../constants';
 // --- INTERNAL HELPERS ---
 
 export const notifyAllUsers = async (message: string, linkTo: string, senderId: string) => {
-    // This might be resource intensive if done for ALL users individually in client-side code.
-    // Ideally this is a server-side trigger.
-    // For now, we will insert notifications for all users except sender.
-    const { data: users } = await supabase.from('users').select('uid');
-    if (!users) return;
+    try {
+        const { data: users } = await supabase.from('users').select('uid');
+        if (!users) return;
 
-    const notifications = users
-        .filter(u => u.uid !== senderId)
-        .map(u => ({
-            user_uid: u.uid,
-            message,
-            link_to: linkTo,
-            is_read: false
-        }));
-    
-    if (notifications.length > 0) {
-        await supabase.from('notifications').insert(notifications);
+        const notifications = users
+            .filter(u => u.uid !== senderId)
+            .map(u => ({
+                user_uid: u.uid,
+                message,
+                link_to: linkTo,
+                is_read: false
+            }));
+        
+        if (notifications.length > 0) {
+            await supabase.from('notifications').insert(notifications);
+        }
+    } catch (error) {
+        console.warn("Failed to send notifications:", error);
     }
 };
 
@@ -36,6 +37,7 @@ const uploadFile = async (file: File, bucket: string, path: string): Promise<str
 
 // --- LOCAL STORAGE FALLBACK HELPERS ---
 const LOCAL_SCRIPTS_KEY = 'offline_user_scripts';
+const LOCAL_RSVPS_KEY = 'offline_rsvps';
 
 const getLocalScripts = (): any[] => {
     if (typeof window === 'undefined') return [];
@@ -49,6 +51,29 @@ const getLocalScripts = (): any[] => {
 const setLocalScripts = (scripts: any[]) => {
     if (typeof window === 'undefined') return;
     localStorage.setItem(LOCAL_SCRIPTS_KEY, JSON.stringify(scripts));
+};
+
+const getLocalRSVPs = (): Record<string, string[]> => {
+    if (typeof window === 'undefined') return {};
+    try {
+        return JSON.parse(localStorage.getItem(LOCAL_RSVPS_KEY) || '{}');
+    } catch {
+        return {};
+    }
+};
+
+const saveLocalRSVP = (activityId: string, userId: string, isJoining: boolean) => {
+    const allRsvps = getLocalRSVPs();
+    let activityRsvps = allRsvps[activityId] || [];
+    
+    if (isJoining) {
+        if (!activityRsvps.includes(userId)) activityRsvps.push(userId);
+    } else {
+        activityRsvps = activityRsvps.filter(id => id !== userId);
+    }
+    
+    allRsvps[activityId] = activityRsvps;
+    localStorage.setItem(LOCAL_RSVPS_KEY, JSON.stringify(allRsvps));
 };
 
 // --- AUTH & USER ---
@@ -114,7 +139,7 @@ export const signUpAsPatron = async (userData: Omit<User, 'uid' | 'role' | 'stat
             username: userData.username,
             phone_number: userData.phoneNumber,
             role: 'PATRON',
-            status: 'PENDING', // Patrons also need approval or auto-approve if safe? Assuming PENDING.
+            status: 'PENDING', 
              avatar_url: `https://i.pravatar.cc/150?u=${data.user.id}`
         });
         if (profileError) throw new Error(profileError.message);
@@ -138,18 +163,23 @@ export const resetPasswordWithOtp = async (email: string, token: string, passwor
 };
 
 export const getUsers = async (): Promise<User[]> => {
-    const { data, error } = await supabase.from('users').select('*');
-    if (error) throw new Error(error.message);
-    return data.map((u: any) => ({
-        uid: u.uid,
-        email: u.email,
-        name: u.name,
-        username: u.username,
-        role: u.role,
-        status: u.status,
-        avatarUrl: u.avatar_url,
-        phoneNumber: u.phone_number
-    }));
+    try {
+        const { data, error } = await supabase.from('users').select('*');
+        if (error) throw error;
+        return data.map((u: any) => ({
+            uid: u.uid,
+            email: u.email,
+            name: u.name,
+            username: u.username,
+            role: u.role,
+            status: u.status,
+            avatarUrl: u.avatar_url,
+            phoneNumber: u.phone_number
+        }));
+    } catch (error: any) {
+        console.error("Failed to fetch users:", error);
+        return [];
+    }
 };
 
 export const updateUser = async (uid: string, data: Partial<User>): Promise<void> => {
@@ -164,55 +194,72 @@ export const updateUser = async (uid: string, data: Partial<User>): Promise<void
 };
 
 export const deleteUser = async (uid: string): Promise<void> => {
-    // Note: Deleting from auth.users requires service role usually.
-    // Here we just delete from public.users table assuming cascade or handled manually.
-    // If Supabase Auth deletion is required, it must be done via Edge Function or client with proper rights (rare).
-    // We will assume soft delete or just table deletion for now.
     const { error } = await supabase.from('users').delete().eq('uid', uid);
     if (error) throw new Error(error.message);
 };
 
 export const markAttendanceOnLogin = async (uid: string): Promise<void> => {
-    // Check if there is an activity today
-    const today = new Date().toISOString().split('T')[0];
-    const { data: activities } = await supabase.from('activities').select('*').eq('date', today);
-    
-    if (activities && activities.length > 0) {
-        for (const activity of activities) {
-            // Check if attendance already recorded
-            const { data: existing } = await supabase.from('attendance')
-                .select('*')
-                .eq('activity_id', activity.id)
-                .eq('user_uid', uid)
-                .single();
-            
-            if (!existing) {
-                await supabase.from('attendance').insert({
-                    activity_id: activity.id,
-                    user_uid: uid,
-                    status: 'Present',
-                    date: today,
-                    activity_title: activity.title
-                });
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const { data: activities } = await supabase.from('activities').select('*').eq('date', today);
+        
+        if (activities && activities.length > 0) {
+            for (const activity of activities) {
+                const { data: existing } = await supabase.from('attendance')
+                    .select('*')
+                    .eq('activity_id', activity.id)
+                    .eq('user_uid', uid)
+                    .single();
+                
+                if (!existing) {
+                    await supabase.from('attendance').insert({
+                        activity_id: activity.id,
+                        user_uid: uid,
+                        status: 'Present',
+                        date: today,
+                        activity_title: activity.title
+                    });
+                }
             }
         }
+    } catch (error) {
+        console.warn("Background attendance check failed:", error);
     }
 };
 
 // --- ACTIVITIES ---
 
 export const getActivities = async (): Promise<Activity[]> => {
-    const { data, error } = await supabase.from('activities').select('*');
-    if (error) throw new Error(error.message);
-    return data.map((a: any) => ({
-        id: a.id.toString(),
-        title: a.title,
-        date: a.date,
-        description: a.description,
-        location: a.location,
-        category: a.category,
-        rsvpUserIds: a.rsvp_users || []
-    }));
+    let dbActivities: any[] = [];
+    try {
+        const { data, error } = await supabase.from('activities').select('*');
+        if (error) {
+            // Log but don't throw, allowing fallback to return empty array or partial data
+            console.warn("Error fetching activities:", error.message);
+        }
+        if (data) dbActivities = data;
+    } catch (e) {
+        console.warn("Network error fetching activities:", e);
+    }
+
+    const localRSVPs = getLocalRSVPs();
+
+    return dbActivities.map((a: any) => {
+        const dbRsvps = a.rsvp_users || [];
+        const localActivityRsvps = localRSVPs[a.id.toString()] || [];
+        // Merge local and remote RSVPs
+        const combinedRsvps = Array.from(new Set([...dbRsvps, ...localActivityRsvps]));
+
+        return {
+            id: a.id.toString(),
+            title: a.title,
+            date: a.date,
+            description: a.description,
+            location: a.location,
+            category: a.category,
+            rsvpUserIds: combinedRsvps
+        };
+    });
 };
 
 export const addActivity = async (activity: Omit<Activity, 'id' | 'rsvpUserIds'>): Promise<void> => {
@@ -230,33 +277,52 @@ export const addActivity = async (activity: Omit<Activity, 'id' | 'rsvpUserIds'>
 };
 
 export const toggleRSVP = async (activityId: string, userId: string, isJoining: boolean): Promise<void> => {
-    const { data: activity, error: fetchError } = await supabase.from('activities').select('rsvp_users').eq('id', activityId).single();
-    if (fetchError) throw new Error(fetchError.message);
-    
-    let rsvpUsers: string[] = activity.rsvp_users || [];
-    if (isJoining) {
-        if (!rsvpUsers.includes(userId)) rsvpUsers.push(userId);
-    } else {
-        rsvpUsers = rsvpUsers.filter(id => id !== userId);
+    // Always update local storage first for immediate UI feedback and offline support
+    saveLocalRSVP(activityId, userId, isJoining);
+
+    try {
+        // Try to update DB, but don't fail the operation if DB column is missing or network is down
+        const { data: activity, error: fetchError } = await supabase.from('activities').select('rsvp_users').eq('id', activityId).single();
+        
+        if (fetchError) {
+            console.warn("Could not fetch remote RSVP list (DB might be missing column):", fetchError.message);
+            return;
+        }
+        
+        let rsvpUsers: string[] = activity.rsvp_users || [];
+        if (isJoining) {
+            if (!rsvpUsers.includes(userId)) rsvpUsers.push(userId);
+        } else {
+            rsvpUsers = rsvpUsers.filter((id: any) => id !== userId);
+        }
+        
+        const { error } = await supabase.from('activities').update({ rsvp_users: rsvpUsers }).eq('id', activityId);
+        if (error) {
+            console.warn("Failed to update remote RSVP:", error.message);
+        }
+    } catch (e) {
+        console.warn("Network error updating RSVP:", e);
     }
-    
-    const { error } = await supabase.from('activities').update({ rsvp_users: rsvpUsers }).eq('id', activityId);
-    if (error) throw new Error(error.message);
 };
 
 // --- ATTENDANCE ---
 
 export const getAttendance = async (userId: string): Promise<AttendanceRecord[]> => {
-    const { data, error } = await supabase.from('attendance').select('*').eq('user_uid', userId);
-    if (error) throw new Error(error.message);
-    return data.map((a: any) => ({
-        id: a.id.toString(),
-        activityId: a.activity_id.toString(),
-        activityTitle: a.activity_title,
-        date: a.date,
-        status: a.status,
-        userId: a.user_uid
-    }));
+    try {
+        const { data, error } = await supabase.from('attendance').select('*').eq('user_uid', userId);
+        if (error) throw error;
+        return data.map((a: any) => ({
+            id: a.id.toString(),
+            activityId: a.activity_id.toString(),
+            activityTitle: a.activity_title,
+            date: a.date,
+            status: a.status,
+            userId: a.user_uid
+        }));
+    } catch (error: any) {
+        console.error("Failed to fetch attendance:", error);
+        return [];
+    }
 };
 
 export const addAttendance = async (userId: string, record: Omit<AttendanceRecord, 'id' | 'userId'>): Promise<void> => {
@@ -273,33 +339,38 @@ export const addAttendance = async (userId: string, record: Omit<AttendanceRecor
 // --- FEED ---
 
 export const getFeedItems = async (): Promise<FeedItem[]> => {
-    const { data, error } = await supabase
-        .from('feed_items')
-        .select(`
-            *,
-            author:author_uid ( uid, name, avatar_url ),
-            feed_comments (count)
-        `)
-        .order('created_at', { ascending: false });
-    
-    if (error) throw new Error(error.message);
-    if (!data) return [];
-    
-    return data.map((item: any) => {
-        const authorProfile = item.author as { uid: string; name: string; avatar_url: string } | null;
-        const commentCount = item.feed_comments?.[0]?.count || 0;
+    try {
+        const { data, error } = await supabase
+            .from('feed_items')
+            .select(`
+                *,
+                author:author_uid ( uid, name, avatar_url ),
+                feed_comments (count)
+            `)
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        if (!data) return [];
+        
+        return data.map((item: any) => {
+            const authorProfile = item.author as { uid: string; name: string; avatar_url: string } | null;
+            const commentCount = item.feed_comments?.[0]?.count || 0;
 
-        return {
-            id: item.id.toString(),
-            type: item.type,
-            title: item.title || undefined,
-            message: item.message,
-            author: authorProfile?.name || 'Unknown User',
-            authorAvatarUrl: authorProfile?.avatar_url || `https://i.pravatar.cc/40?u=${item.author_uid}`,
-            timestamp: new Date(item.created_at).toLocaleString('en-US', { timeZone: 'Africa/Kampala' }),
-            commentCount: commentCount,
-        };
-    });
+            return {
+                id: item.id.toString(),
+                type: item.type,
+                title: item.title || undefined,
+                message: item.message,
+                author: authorProfile?.name || 'Unknown User',
+                authorAvatarUrl: authorProfile?.avatar_url || `https://i.pravatar.cc/40?u=${item.author_uid}`,
+                timestamp: new Date(item.created_at).toLocaleString('en-US', { timeZone: 'Africa/Kampala' }),
+                commentCount: commentCount,
+            };
+        });
+    } catch (error: any) {
+        console.error("Failed to fetch feed:", error);
+        return [];
+    }
 };
 
 export const addFeedItem = async (itemData: Omit<FeedItem, 'id' | 'author' | 'authorAvatarUrl' | 'timestamp'>, authorId: string): Promise<void> => {
@@ -361,49 +432,51 @@ export const addFeedComment = async (feedItemId: string, userId: string, content
 // --- PROJECTS ---
 
 export const getProjectData = async (): Promise<ProjectData> => {
-    // Explicitly select * without ordering by created_at as it might not exist
-    const { data: columns, error: colError } = await supabase.from('project_columns').select('*');
-    if (colError) throw new Error(colError.message);
+    try {
+        const { data: columns, error: colError } = await supabase.from('project_columns').select('*');
+        if (colError) throw colError;
 
-    const { data: tasks, error: taskError } = await supabase.from('project_tasks').select('*');
-    if (taskError) throw new Error(taskError.message);
+        const { data: tasks, error: taskError } = await supabase.from('project_tasks').select('*');
+        if (taskError) throw taskError;
 
-    const projectData: ProjectData = {
-        tasks: {},
-        columns: {},
-        columnOrder: columns.map((c: any) => c.id.toString())
-    };
-
-    tasks.forEach((t: any) => {
-        projectData.tasks[t.id.toString()] = {
-            id: t.id.toString(),
-            content: t.content,
-            assigneeIds: t.assignee_ids || [],
-            priority: t.priority,
-            dueDate: t.due_date,
-            tags: t.tags || [],
-            isCompleted: t.is_completed
+        const projectData: ProjectData = {
+            tasks: {},
+            columns: {},
+            columnOrder: columns.map((c: any) => c.id.toString())
         };
-    });
 
-    columns.forEach((c: any) => {
-        projectData.columns[c.id.toString()] = {
-            id: c.id.toString(),
-            title: c.title,
-            // Filter tasks by column
-            taskIds: tasks
-                .filter((t: any) => t.column_id === c.id)
-                // Basic sort by id since order_index might not exist
-                .sort((a: any, b: any) => a.id - b.id) 
-                .map((t: any) => t.id.toString())
-        };
-    });
+        tasks.forEach((t: any) => {
+            projectData.tasks[t.id.toString()] = {
+                id: t.id.toString(),
+                content: t.content,
+                assigneeIds: t.assignee_ids || [],
+                priority: t.priority,
+                dueDate: t.due_date,
+                tags: t.tags || [],
+                isCompleted: t.is_completed
+            };
+        });
 
-    return projectData;
+        columns.forEach((c: any) => {
+            projectData.columns[c.id.toString()] = {
+                id: c.id.toString(),
+                title: c.title,
+                taskIds: tasks
+                    .filter((t: any) => t.column_id === c.id)
+                    .sort((a: any, b: any) => a.id - b.id) 
+                    .map((t: any) => t.id.toString())
+            };
+        });
+
+        return projectData;
+    } catch (error: any) {
+        console.error("Failed to fetch projects:", error);
+        // Return empty structure instead of failing
+        return { tasks: {}, columns: {}, columnOrder: [] };
+    }
 };
 
 export const addProjectTask = async (taskData: { content: string, priority: TaskPriority, dueDate?: string, tags: string[] }): Promise<void> => {
-    // Default to first column
     const { data: columns } = await supabase.from('project_columns').select('id').limit(1);
     if (!columns || columns.length === 0) throw new Error("No columns found");
     
@@ -453,23 +526,28 @@ export const toggleProjectTaskCompletion = async (taskId: string, isCompleted: b
 // --- RESOURCES ---
 
 export const getResources = async (): Promise<Resource[]> => {
-    const { data, error } = await supabase.from('resources').select('*');
-    if (error) throw new Error(error.message);
-    
-    return data.map((r: any) => ({
-        id: r.id.toString(),
-        createdAt: new Date(r.created_at).toLocaleDateString(),
-        title: r.title,
-        description: r.description,
-        type: r.type,
-        category: r.category,
-        topic: r.topic,
-        url: r.url,
-        filePath: r.file_path,
-        uploaderUid: r.uploader_uid,
-        uploaderName: 'Loading...', // Client-side join will fill this
-        uploaderAvatarUrl: undefined
-    }));
+    try {
+        const { data, error } = await supabase.from('resources').select('*');
+        if (error) throw error;
+        
+        return data.map((r: any) => ({
+            id: r.id.toString(),
+            createdAt: new Date(r.created_at).toLocaleDateString(),
+            title: r.title,
+            description: r.description,
+            type: r.type,
+            category: r.category,
+            topic: r.topic,
+            url: r.url,
+            filePath: r.file_path,
+            uploaderUid: r.uploader_uid,
+            uploaderName: 'Loading...',
+            uploaderAvatarUrl: undefined
+        }));
+    } catch (error: any) {
+        console.error("Failed to fetch resources:", error);
+        return [];
+    }
 };
 
 export const addResource = async (resource: Omit<Resource, 'id' | 'createdAt' | 'uploaderName' | 'uploaderAvatarUrl'>): Promise<void> => {
@@ -510,57 +588,56 @@ export const uploadResourceFile = async (file: File, userId: string): Promise<{ 
 // --- CHAT ---
 
 export const getRooms = async (userId: string): Promise<Room[]> => {
-    // 1. Find rooms the user is in using the 'room_members' table
-    // Uses 'user_id' instead of 'user_uid' based on table schema
-    const { data: myParticipations, error: myPartError } = await supabase
-        .from('room_members')
-        .select('room_id')
-        .eq('user_id', userId);
+    try {
+        // 1. Find rooms the user is in
+        const { data: myParticipations, error: myPartError } = await supabase
+            .from('room_members')
+            .select('room_id')
+            .eq('user_id', userId);
+            
+        if (myPartError) throw myPartError;
         
-    if (myPartError) {
-        console.error("Error fetching room members:", myPartError);
+        const roomIds = myParticipations.map((p: any) => p.room_id);
+        if (roomIds.length === 0) return [];
+
+        // 2. Fetch room details
+        const { data: roomsData, error: roomsError } = await supabase
+            .from('rooms')
+            .select('*')
+            .in('id', roomIds)
+            .order('updated_at', { ascending: false });
+            
+        if (roomsError) throw roomsError;
+
+        // 3. Fetch all participants
+        const { data: allParticipants, error: allPartError } = await supabase
+            .from('room_members')
+            .select('room_id, user_id')
+            .in('room_id', roomIds);
+
+        if (allPartError) throw allPartError;
+
+        const participantsMap: Record<string, string[]> = {};
+        allParticipants.forEach((p: any) => {
+            if (!participantsMap[p.room_id]) participantsMap[p.room_id] = [];
+            participantsMap[p.room_id].push(p.user_id);
+        });
+
+        return roomsData.map((r: any) => ({
+            id: r.id.toString(),
+            title: r.title,
+            createdAt: r.created_at,
+            updatedAt: r.updated_at,
+            createdBy: r.created_by,
+            participantIds: participantsMap[r.id] || [],
+        }));
+    } catch (error: any) {
+        console.error("Error fetching rooms (handled gracefully):", error.message);
         return [];
     }
-    
-    const roomIds = myParticipations.map((p: any) => p.room_id);
-    if (roomIds.length === 0) return [];
-
-    // 2. Fetch room details
-    const { data: roomsData, error: roomsError } = await supabase
-        .from('rooms')
-        .select('*')
-        .in('id', roomIds)
-        .order('updated_at', { ascending: false });
-        
-    if (roomsError) throw new Error(roomsError.message);
-
-    // 3. Fetch all participants for these rooms to build the lists
-    const { data: allParticipants, error: allPartError } = await supabase
-        .from('room_members')
-        .select('room_id, user_id')
-        .in('room_id', roomIds);
-
-    if (allPartError) throw new Error(allPartError.message);
-
-    const participantsMap: Record<string, string[]> = {};
-    allParticipants.forEach((p: any) => {
-        if (!participantsMap[p.room_id]) participantsMap[p.room_id] = [];
-        participantsMap[p.room_id].push(p.user_id);
-    });
-
-    // 4. Map to Room interface
-    return roomsData.map((r: any) => ({
-        id: r.id.toString(),
-        title: r.title,
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-        createdBy: r.created_by,
-        participantIds: participantsMap[r.id] || [],
-    }));
 };
 
 export const createRoom = async (title: string | null, participantIds: string[]): Promise<string> => {
-    // 1. Create Room
     const { data: room, error: roomError } = await supabase
         .from('rooms')
         .insert({ title })
@@ -570,7 +647,6 @@ export const createRoom = async (title: string | null, participantIds: string[])
     if (roomError) throw new Error(roomError.message);
     const roomId = room.id;
 
-    // 2. Add Participants (using 'room_members' table)
     const participantsData = participantIds.map(uid => ({
         room_id: roomId,
         user_id: uid
@@ -583,22 +659,27 @@ export const createRoom = async (title: string | null, participantIds: string[])
 };
 
 export const getRoomMessages = async (roomId: string): Promise<Message[]> => {
-    const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('room_id', roomId)
-        .order('created_at', { ascending: true });
-    
-    if (error) throw new Error(error.message);
-    
-    return data.map((m: any) => ({
-        id: m.id.toString(),
-        roomId: m.room_id.toString(),
-        senderId: m.sender_id,
-        content: m.content,
-        createdAt: m.created_at,
-        metadata: m.metadata
-    }));
+    try {
+        const { data, error } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('room_id', roomId)
+            .order('created_at', { ascending: true });
+        
+        if (error) throw error;
+        
+        return data.map((m: any) => ({
+            id: m.id.toString(),
+            roomId: m.room_id.toString(),
+            senderId: m.sender_id,
+            content: m.content,
+            createdAt: m.created_at,
+            metadata: m.metadata
+        }));
+    } catch (error: any) {
+        console.error("Error fetching messages (handled gracefully):", error.message);
+        return [];
+    }
 };
 
 export const sendMessage = async (roomId: string, senderId: string, content: string, metadata?: any): Promise<Message> => {
@@ -615,7 +696,6 @@ export const sendMessage = async (roomId: string, senderId: string, content: str
     
     if (error) throw new Error(error.message);
 
-    // Update room updated_at
     await supabase.from('rooms').update({ updated_at: new Date().toISOString() }).eq('id', roomId);
 
     return {
@@ -675,22 +755,27 @@ export const uploadChatFile = async (file: File, roomId: string, userId: string)
 // --- NOTIFICATIONS ---
 
 export const getNotifications = async (userId: string): Promise<Notification[]> => {
-    const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_uid', userId)
-        .order('created_at', { ascending: false });
-    
-    if (error) throw new Error(error.message);
-    
-    return data.map((n: any) => ({
-        id: n.id.toString(),
-        message: n.message,
-        isRead: n.is_read,
-        createdAt: new Date(n.created_at).toLocaleString('en-US', { timeZone: 'Africa/Kampala' }),
-        linkTo: n.link_to,
-        userId: n.user_uid,
-    }));
+    try {
+        const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('user_uid', userId)
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        return data.map((n: any) => ({
+            id: n.id.toString(),
+            message: n.message,
+            isRead: n.is_read,
+            createdAt: new Date(n.created_at).toLocaleString('en-US', { timeZone: 'Africa/Kampala' }),
+            linkTo: n.link_to,
+            userId: n.user_uid,
+        }));
+    } catch (error: any) {
+        console.error("Failed to fetch notifications:", error);
+        return [];
+    }
 };
 
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
@@ -706,42 +791,46 @@ export const markAllNotificationsAsRead = async (userId: string): Promise<void> 
 // --- SHOWCASE ---
 
 export const getShowcaseItems = async (): Promise<ShowcaseItem[]> => {
-    // Manual join logic to avoid schema introspection errors
-    const { data, error } = await supabase
-        .from('showcase_items')
-        .select('*')
-        .order('created_at', { ascending: false });
+    try {
+        const { data, error } = await supabase
+            .from('showcase_items')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-    if (error) throw new Error(error.message);
+        if (error) throw error;
 
-    // Extract unique user IDs
-    const userIds = [...new Set(data.map((item: any) => item.user_uid))];
-    
-    // Fetch user info manually
-    let usersData: any[] = [];
-    if (userIds.length > 0) {
-        const { data: users, error: userError } = await supabase.from('users').select('uid, name, avatar_url').in('uid', userIds);
-        if (!userError && users) {
-            usersData = users;
+        // Extract unique user IDs
+        const userIds = [...new Set(data.map((item: any) => item.user_uid))];
+        
+        // Fetch user info manually
+        let usersData: any[] = [];
+        if (userIds.length > 0) {
+            const { data: users, error: userError } = await supabase.from('users').select('uid, name, avatar_url').in('uid', userIds);
+            if (!userError && users) {
+                usersData = users;
+            }
         }
-    }
-    
-    const userMap = new Map(usersData.map((u: any) => [u.uid, u]));
+        
+        const userMap = new Map(usersData.map((u: any) => [u.uid, u]));
 
-    return data.map((item: any) => {
-        const user = userMap.get(item.user_uid);
-        return {
-            id: item.id.toString(),
-            createdAt: new Date(item.created_at).toLocaleDateString(),
-            userUid: item.user_uid,
-            userName: user?.name || 'Unknown Member',
-            userAvatarUrl: user?.avatar_url,
-            title: item.title,
-            description: item.description,
-            codeContent: item.code_content,
-            likes: item.likes || []
-        };
-    });
+        return data.map((item: any) => {
+            const user = userMap.get(item.user_uid);
+            return {
+                id: item.id.toString(),
+                createdAt: new Date(item.created_at).toLocaleDateString(),
+                userUid: item.user_uid,
+                userName: user?.name || 'Unknown Member',
+                userAvatarUrl: user?.avatar_url,
+                title: item.title,
+                description: item.description,
+                codeContent: item.code_content,
+                likes: item.likes || []
+            };
+        });
+    } catch (error: any) {
+        console.error("Failed to fetch showcase items:", error);
+        return [];
+    }
 };
 
 export const addShowcaseItem = async (userUid: string, title: string, description: string, codeContent: string): Promise<void> => {
@@ -773,7 +862,7 @@ export const saveUserScript = async (userId: string, name: string, code: string)
         // Check if exists in Supabase
         const { data: existing, error: fetchError } = await supabase.from('user_scripts').select('id').eq('user_uid', userId).eq('name', name).single();
         
-        // PGRST116 is the code for "JSON object requested, multiple (or no) rows returned" - effectively 404 for single()
+        // PGRST116 is the code for "JSON object requested, multiple (or no) rows returned"
         if (fetchError && fetchError.code !== 'PGRST116') {
              throw fetchError;
         }
@@ -822,7 +911,6 @@ export const listUserScripts = async (userId: string): Promise<{id: string, name
         console.warn("Cloud list failed, falling back to local storage:", error.message);
         // Filter local scripts for this user
         const scripts = getLocalScripts().filter((s: any) => s.user_uid === userId);
-        // Sort by updated_at desc
         scripts.sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
         
         return scripts.map((s: any) => ({
@@ -854,7 +942,7 @@ export const deleteUserScript = async (userId: string, name: string): Promise<vo
     } catch (error: any) {
         console.warn("Cloud delete failed, attempting local delete:", error.message);
     } finally {
-        // Always clean up local just in case it exists there
+        // Always clean up local
         const scripts = getLocalScripts().filter((s: any) => !(s.user_uid === userId && s.name === name));
         setLocalScripts(scripts);
     }
