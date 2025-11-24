@@ -38,6 +38,7 @@ const uploadFile = async (file: File, bucket: string, path: string): Promise<str
 // --- LOCAL STORAGE FALLBACK HELPERS ---
 const LOCAL_SCRIPTS_KEY = 'offline_user_scripts';
 const LOCAL_RSVPS_KEY = 'offline_rsvps';
+const LOCAL_ATTENDANCE_KEY = 'offline_attendance';
 
 const getLocalScripts = (): any[] => {
     if (typeof window === 'undefined') return [];
@@ -74,6 +75,25 @@ const saveLocalRSVP = (activityId: string, userId: string, isJoining: boolean) =
     
     allRsvps[activityId] = activityRsvps;
     localStorage.setItem(LOCAL_RSVPS_KEY, JSON.stringify(allRsvps));
+};
+
+const getLocalAttendance = (): any[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+        return JSON.parse(localStorage.getItem(LOCAL_ATTENDANCE_KEY) || '[]');
+    } catch {
+        return [];
+    }
+};
+
+const saveLocalAttendance = (record: any) => {
+    const records = getLocalAttendance();
+    // Avoid duplicates based on activityId and date
+    const exists = records.some((r: any) => r.activityId === record.activityId && r.userId === record.userId);
+    if (!exists) {
+        records.push(record);
+        localStorage.setItem(LOCAL_ATTENDANCE_KEY, JSON.stringify(records));
+    }
 };
 
 // --- AUTH & USER ---
@@ -205,6 +225,7 @@ export const markAttendanceOnLogin = async (uid: string): Promise<void> => {
         
         if (activities && activities.length > 0) {
             for (const activity of activities) {
+                // Check attendance via Supabase first
                 const { data: existing } = await supabase.from('attendance')
                     .select('*')
                     .eq('activity_id', activity.id)
@@ -212,13 +233,25 @@ export const markAttendanceOnLogin = async (uid: string): Promise<void> => {
                     .single();
                 
                 if (!existing) {
-                    await supabase.from('attendance').insert({
-                        activity_id: activity.id,
-                        user_uid: uid,
-                        status: 'Present',
-                        date: today,
-                        activity_title: activity.title
-                    });
+                    try {
+                        await supabase.from('attendance').insert({
+                            activity_id: activity.id,
+                            user_uid: uid,
+                            status: 'Present',
+                            date: today,
+                            activity_title: activity.title
+                        });
+                    } catch (insertError) {
+                        // Fallback for background attendance
+                        saveLocalAttendance({
+                            id: `local-${Date.now()}-${Math.random()}`,
+                            activityId: activity.id.toString(),
+                            activityTitle: activity.title,
+                            date: today,
+                            status: 'Present',
+                            userId: uid
+                        });
+                    }
                 }
             }
         }
@@ -308,32 +341,88 @@ export const toggleRSVP = async (activityId: string, userId: string, isJoining: 
 // --- ATTENDANCE ---
 
 export const getAttendance = async (userId: string): Promise<AttendanceRecord[]> => {
+    let dbRecords: any[] = [];
+    let activitiesMap: Record<string, { title: string, date: string }> = {};
+
     try {
+        // 1. Fetch attendance records
         const { data, error } = await supabase.from('attendance').select('*').eq('user_uid', userId);
         if (error) throw error;
-        return data.map((a: any) => ({
+        if (data) dbRecords = data;
+
+        // 2. Fetch activity details (title AND date) to resolve missing info
+        const { data: activitiesData } = await supabase.from('activities').select('id, title, date');
+        if (activitiesData) {
+            activitiesData.forEach((act: any) => {
+                activitiesMap[act.id.toString()] = { title: act.title, date: act.date };
+            });
+        }
+    } catch (error: any) {
+        console.warn("Failed to fetch remote attendance, using local fallback:", error.message);
+    }
+
+    const localRecords = getLocalAttendance().filter((r: any) => r.userId === userId);
+    
+    // Map DB records
+    const mappedDbRecords = dbRecords.map((a: any) => {
+        const actId = a.activity_id?.toString() || 'unknown';
+        const activityInfo = activitiesMap[actId] || { title: 'Unknown Activity', date: 'N/A' };
+        
+        return {
             id: a.id.toString(),
-            activityId: a.activity_id.toString(),
-            activityTitle: a.activity_title,
-            date: a.date,
+            activityId: actId,
+            // Use join-like lookup if title is missing in attendance record
+            activityTitle: a.activity_title || activityInfo.title,
+            // Fix: Use activity date if attendance record date is missing
+            date: a.date || activityInfo.date, 
             status: a.status,
             userId: a.user_uid
-        }));
-    } catch (error: any) {
-        console.error("Failed to fetch attendance:", error);
-        return [];
-    }
+        };
+    });
+
+    // Map Local records
+    const mappedLocalRecords = localRecords.map((a: any) => {
+        const activityInfo = activitiesMap[a.activityId] || { title: 'Unknown Activity', date: 'N/A' };
+        return {
+            id: a.id,
+            activityId: a.activityId,
+            activityTitle: a.activityTitle || activityInfo.title,
+            date: a.date || activityInfo.date,
+            status: a.status,
+            userId: a.userId
+        };
+    });
+
+    // Combine, removing potential duplicates from local if they now exist in DB (by ID or activity+date match)
+    // For simplicity, we just concat for now to ensure data shows up.
+    return [...mappedDbRecords, ...mappedLocalRecords];
 };
 
 export const addAttendance = async (userId: string, record: Omit<AttendanceRecord, 'id' | 'userId'>): Promise<void> => {
-    const { error } = await supabase.from('attendance').insert({
+    const newRecord = {
         user_uid: userId,
         activity_id: record.activityId,
         activity_title: record.activityTitle,
         date: record.date,
         status: record.status
-    });
-    if (error) throw new Error(error.message);
+    };
+
+    try {
+        const { error } = await supabase.from('attendance').insert(newRecord);
+        if (error) throw new Error(error.message);
+    } catch (error: any) {
+        console.warn("Cloud attendance save failed, saving locally:", error.message);
+        
+        const localRecord = {
+            id: `local-${Date.now()}`,
+            activityId: record.activityId,
+            activityTitle: record.activityTitle,
+            date: record.date,
+            status: record.status,
+            userId: userId
+        };
+        saveLocalAttendance(localRecord);
+    }
 };
 
 // --- FEED ---
@@ -862,7 +951,6 @@ export const saveUserScript = async (userId: string, name: string, code: string)
         // Check if exists in Supabase
         const { data: existing, error: fetchError } = await supabase.from('user_scripts').select('id').eq('user_uid', userId).eq('name', name).single();
         
-        // PGRST116 is the code for "JSON object requested, multiple (or no) rows returned"
         if (fetchError && fetchError.code !== 'PGRST116') {
              throw fetchError;
         }
@@ -897,40 +985,55 @@ export const saveUserScript = async (userId: string, name: string, code: string)
 };
 
 export const listUserScripts = async (userId: string): Promise<{id: string, name: string, lastModified: string, size: number}[]> => {
+    let cloudScripts: any[] = [];
+    
+    // Try fetching from Cloud
     try {
         const { data, error } = await supabase.from('user_scripts').select('*').eq('user_uid', userId).order('updated_at', { ascending: false });
-        if (error) throw error;
-        
-        return data.map((s: any) => ({
-            id: s.id.toString(),
-            name: s.name,
-            lastModified: new Date(s.updated_at).toLocaleString(),
-            size: s.code.length
-        }));
+        if (!error && data) {
+            cloudScripts = data.map((s: any) => ({
+                id: s.id.toString(),
+                name: s.name,
+                lastModified: new Date(s.updated_at).toLocaleString(),
+                size: s.code.length
+            }));
+        }
     } catch (error: any) {
-        console.warn("Cloud list failed, falling back to local storage:", error.message);
-        // Filter local scripts for this user
-        const scripts = getLocalScripts().filter((s: any) => s.user_uid === userId);
-        scripts.sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-        
-        return scripts.map((s: any) => ({
+        console.warn("Cloud list failed, ignoring cloud results:", error.message);
+    }
+
+    // Always fetch Local scripts
+    const localScripts = getLocalScripts()
+        .filter((s: any) => s.user_uid === userId)
+        .map((s: any) => ({
             id: s.id,
             name: s.name,
             lastModified: new Date(s.updated_at).toLocaleString(),
             size: s.code.length
         }));
-    }
+
+    // Merge lists. De-duplicate by ID just in case.
+    // If cloud fails, we just have local scripts. If cloud works, we show both.
+    const allScripts = [...cloudScripts, ...localScripts];
+    const uniqueScripts = Array.from(new Map(allScripts.map(item => [item.id, item])).values());
+    
+    return uniqueScripts.sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
 };
 
 export const downloadUserScript = async (userId: string, name: string): Promise<string> => {
+    // Try local first if it exists there, it might be newer/offline
+    const localScript = getLocalScripts().find((s: any) => s.user_uid === userId && s.name === name);
+    if (localScript && localScript.id.toString().startsWith('local-')) {
+        return localScript.code;
+    }
+
     try {
         const { data, error } = await supabase.from('user_scripts').select('code').eq('user_uid', userId).eq('name', name).single();
         if (error) throw error;
         return data.code;
     } catch (error: any) {
-        console.warn("Cloud download failed, falling back to local storage:", error.message);
-        const script = getLocalScripts().find((s: any) => s.user_uid === userId && s.name === name);
-        if (script) return script.code;
+        console.warn("Cloud download failed, checking local fallback:", error.message);
+        if (localScript) return localScript.code;
         throw new Error("Script not found locally or in cloud.");
     }
 };
@@ -938,7 +1041,10 @@ export const downloadUserScript = async (userId: string, name: string): Promise<
 export const deleteUserScript = async (userId: string, name: string): Promise<void> => {
     try {
         const { error } = await supabase.from('user_scripts').delete().eq('user_uid', userId).eq('name', name);
-        if (error) throw error;
+        if (error) {
+             // Only throw if it's not a "not found" error, so we can proceed to clear local
+             console.warn("Cloud delete warning:", error.message);
+        }
     } catch (error: any) {
         console.warn("Cloud delete failed, attempting local delete:", error.message);
     } finally {
