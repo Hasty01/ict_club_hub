@@ -34,6 +34,23 @@ const uploadFile = async (file: File, bucket: string, path: string): Promise<str
     return publicUrl;
 };
 
+// --- LOCAL STORAGE FALLBACK HELPERS ---
+const LOCAL_SCRIPTS_KEY = 'offline_user_scripts';
+
+const getLocalScripts = (): any[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+        return JSON.parse(localStorage.getItem(LOCAL_SCRIPTS_KEY) || '[]');
+    } catch {
+        return [];
+    }
+};
+
+const setLocalScripts = (scripts: any[]) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(LOCAL_SCRIPTS_KEY, JSON.stringify(scripts));
+};
+
 // --- AUTH & USER ---
 
 export const getUserProfile = async (uid: string): Promise<User | null> => {
@@ -749,40 +766,96 @@ export const toggleShowcaseLike = async (id: string, userUid: string, currentLik
     if (error) throw new Error(error.message);
 };
 
-// --- PLAYGROUND CLOUD ---
+// --- PLAYGROUND CLOUD WITH FALLBACK ---
 
 export const saveUserScript = async (userId: string, name: string, code: string): Promise<void> => {
-    // Check if exists
-    const { data: existing } = await supabase.from('user_scripts').select('id').eq('user_uid', userId).eq('name', name).single();
-    
-    if (existing) {
-        const { error } = await supabase.from('user_scripts').update({ code }).eq('id', existing.id);
-        if (error) throw new Error(error.message);
-    } else {
-        const { error } = await supabase.from('user_scripts').insert({ user_uid: userId, name, code });
-        if (error) throw new Error(error.message);
+    try {
+        // Check if exists in Supabase
+        const { data: existing, error: fetchError } = await supabase.from('user_scripts').select('id').eq('user_uid', userId).eq('name', name).single();
+        
+        // PGRST116 is the code for "JSON object requested, multiple (or no) rows returned" - effectively 404 for single()
+        if (fetchError && fetchError.code !== 'PGRST116') {
+             throw fetchError;
+        }
+
+        if (existing) {
+            const { error } = await supabase.from('user_scripts').update({ code }).eq('id', existing.id);
+            if (error) throw error;
+        } else {
+            const { error } = await supabase.from('user_scripts').insert({ user_uid: userId, name, code });
+            if (error) throw error;
+        }
+    } catch (error: any) {
+        console.warn("Cloud save failed, falling back to local storage:", error.message);
+        // Fallback to LocalStorage
+        const scripts = getLocalScripts();
+        const existingIndex = scripts.findIndex((s: any) => s.user_uid === userId && s.name === name);
+        const now = new Date().toISOString();
+        
+        if (existingIndex >= 0) {
+            scripts[existingIndex] = { ...scripts[existingIndex], code, updated_at: now };
+        } else {
+            scripts.push({
+                id: `local-${Date.now()}`,
+                user_uid: userId,
+                name,
+                code,
+                updated_at: now
+            });
+        }
+        setLocalScripts(scripts);
     }
 };
 
 export const listUserScripts = async (userId: string): Promise<{id: string, name: string, lastModified: string, size: number}[]> => {
-    const { data, error } = await supabase.from('user_scripts').select('*').eq('user_uid', userId).order('updated_at', { ascending: false });
-    if (error) throw new Error(error.message);
-    
-    return data.map((s: any) => ({
-        id: s.id.toString(),
-        name: s.name,
-        lastModified: new Date(s.updated_at).toLocaleString(),
-        size: s.code.length
-    }));
+    try {
+        const { data, error } = await supabase.from('user_scripts').select('*').eq('user_uid', userId).order('updated_at', { ascending: false });
+        if (error) throw error;
+        
+        return data.map((s: any) => ({
+            id: s.id.toString(),
+            name: s.name,
+            lastModified: new Date(s.updated_at).toLocaleString(),
+            size: s.code.length
+        }));
+    } catch (error: any) {
+        console.warn("Cloud list failed, falling back to local storage:", error.message);
+        // Filter local scripts for this user
+        const scripts = getLocalScripts().filter((s: any) => s.user_uid === userId);
+        // Sort by updated_at desc
+        scripts.sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        
+        return scripts.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            lastModified: new Date(s.updated_at).toLocaleString(),
+            size: s.code.length
+        }));
+    }
 };
 
 export const downloadUserScript = async (userId: string, name: string): Promise<string> => {
-    const { data, error } = await supabase.from('user_scripts').select('code').eq('user_uid', userId).eq('name', name).single();
-    if (error) throw new Error(error.message);
-    return data.code;
+    try {
+        const { data, error } = await supabase.from('user_scripts').select('code').eq('user_uid', userId).eq('name', name).single();
+        if (error) throw error;
+        return data.code;
+    } catch (error: any) {
+        console.warn("Cloud download failed, falling back to local storage:", error.message);
+        const script = getLocalScripts().find((s: any) => s.user_uid === userId && s.name === name);
+        if (script) return script.code;
+        throw new Error("Script not found locally or in cloud.");
+    }
 };
 
 export const deleteUserScript = async (userId: string, name: string): Promise<void> => {
-    const { error } = await supabase.from('user_scripts').delete().eq('user_uid', userId).eq('name', name);
-    if (error) throw new Error(error.message);
+    try {
+        const { error } = await supabase.from('user_scripts').delete().eq('user_uid', userId).eq('name', name);
+        if (error) throw error;
+    } catch (error: any) {
+        console.warn("Cloud delete failed, attempting local delete:", error.message);
+    } finally {
+        // Always clean up local just in case it exists there
+        const scripts = getLocalScripts().filter((s: any) => !(s.user_uid === userId && s.name === name));
+        setLocalScripts(scripts);
+    }
 };
