@@ -1,9 +1,6 @@
 
 import React, { useMemo, useEffect, useRef } from 'react';
 import { User, Tab } from '../types';
-import { LogoutIcon } from './icons/LogoutIcon';
-import { SunIcon } from './icons/SunIcon';
-import { MoonIcon } from './icons/MoonIcon';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { HomeIcon } from './icons/HomeIcon';
@@ -24,9 +21,6 @@ import { useData } from '../DataContext';
 
 interface SidebarProps {
   user: User;
-  onLogout: () => void;
-  theme: 'light' | 'dark';
-  onToggleTheme: () => void;
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
   isOpen: boolean;
@@ -97,7 +91,7 @@ const ClubHubLogo = () => (
   </svg>
 );
 
-const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme, activeTab, setActiveTab, isOpen, onClose, isCollapsed, onToggleCollapse }) => {
+const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen, onClose, isCollapsed, onToggleCollapse }) => {
   const { unreadMessageCounts } = useData();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -143,11 +137,14 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme,
     
     const draw = () => {
       // Fade out effect for trails (Darker/Lighter background based on theme to simulate fade)
-      ctx.fillStyle = theme === 'dark' ? 'rgba(17, 24, 39, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+      // Checking theme from document class since prop is removed
+      const isDark = document.documentElement.classList.contains('dark');
+      
+      ctx.fillStyle = isDark ? 'rgba(17, 24, 39, 0.1)' : 'rgba(255, 255, 255, 0.1)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Set text color (Pink/Purple)
-      ctx.fillStyle = theme === 'dark' ? '#ec4899' : '#c026d3'; // Pink-500 / Fuchsia-700
+      ctx.fillStyle = isDark ? '#ec4899' : '#c026d3'; // Pink-500 / Fuchsia-700
       ctx.font = '14px monospace'; // Slightly larger font
 
       for (let i = 0; i < drops.length; i++) {
@@ -183,7 +180,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme,
       cancelAnimationFrame(animationFrameId);
       resizeObserver.disconnect();
     };
-  }, [theme]); 
+  }, []); 
 
   const handleNavClick = (tab: Tab) => {
     setActiveTab(tab);
@@ -296,56 +293,16 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout, theme, onToggleTheme,
             ))}
         </nav>
 
-        {/* Footer */}
+        {/* Footer with Collapse only */}
         <div className="p-4 relative z-10">
-          {/* Collapse Toggle (Desktop) */}
-          <div className="hidden md:flex justify-end mb-4">
+          <div className="hidden md:flex justify-end">
             <button
                 onClick={onToggleCollapse}
-                className="p-1.5 text-gray-400 hover:text-pink-600 dark:text-gray-500 dark:hover:text-pink-400 transition-colors rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="p-1.5 text-gray-400 hover:text-pink-600 dark:text-gray-500 dark:hover:text-pink-400 transition-colors rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 w-full flex justify-center"
                 title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             >
                 {isCollapsed ? <ChevronsRightIcon /> : <ChevronsLeftIcon />}
             </button>
-          </div>
-
-          <div className={`flex items-center gap-3 ${isCollapsed ? 'flex-col justify-center' : ''}`}>
-             <div className="relative group cursor-pointer" onClick={() => handleNavClick('profile')}>
-                <div className={`absolute inset-0 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full blur opacity-25 group-hover:opacity-50 transition-opacity duration-300 ${isCollapsed ? 'w-10 h-10' : 'w-10 h-10'}`}></div>
-                <img 
-                    src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`} 
-                    alt={user.name} 
-                    className="relative w-10 h-10 rounded-full border-2 border-white dark:border-gray-800 object-cover" 
-                />
-             </div>
-             
-             {!isCollapsed && (
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleNavClick('profile')}>
-                    <p className="font-bold text-gray-800 dark:text-gray-200 text-sm truncate leading-tight group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors">
-                        {user.name}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{user.username}</p>
-                </div>
-             )}
-          </div>
-
-          {/* Action Row - Notifications removed */}
-          <div className={`mt-4 flex items-center ${isCollapsed ? 'flex-col gap-3' : 'justify-between gap-2'}`}>
-             <button
-                onClick={onToggleTheme}
-                className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 hover:text-amber-500 dark:hover:text-amber-400 shadow-sm hover:shadow transition-all"
-                title="Toggle Theme"
-             >
-                {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-             </button>
-             
-             <button
-                onClick={onLogout}
-                className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 hover:text-red-500 dark:hover:text-red-400 shadow-sm hover:shadow transition-all"
-                title="Logout"
-             >
-                <LogoutIcon />
-             </button>
           </div>
         </div>
       </aside>

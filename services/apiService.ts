@@ -1,5 +1,4 @@
 
-
 import { supabase } from './supabaseClient';
 import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, Resource, Notification, Room, Message, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType } from '../types';
 
@@ -849,13 +848,41 @@ export const getSubmissions = async (challengeId: string): Promise<ChallengeSubm
 };
 
 export const submitChallenge = async (challengeId: string, userId: string, content: string) => {
+    // 1. Submit the challenge
     const { error } = await supabase.from('challenge_submissions').insert({
         challenge_id: challengeId,
-        user_uid: userId, // mapped to user_uid
+        user_uid: userId,
         content,
         status: 'PENDING'
     });
     if (error) throw error;
+
+    // 2. Notify Patrons
+    try {
+        // Get Challenge Title
+        const { data: challenge } = await supabase.from('challenges').select('title').eq('id', challengeId).single();
+        
+        // Get User Name
+        const { data: user } = await supabase.from('users').select('name').eq('uid', userId).single();
+
+        // Get Patrons
+        const { data: patrons } = await supabase.from('users').select('uid').eq('role', 'PATRON');
+
+        if (challenge && user && patrons && patrons.length > 0) {
+            const notifications = patrons.map((p: any) => ({
+                user_uid: p.uid,
+                message: `New submission for "${challenge.title}" by ${user.name}`,
+                is_read: false,
+                link_to: 'challenges',
+                created_at: new Date().toISOString() // Optional if DB handles default
+            }));
+
+            await supabase.from('notifications').insert(notifications);
+        }
+    } catch (notifyError) {
+        console.error("Failed to notify patrons:", notifyError);
+        // Don't fail the submission if notification fails
+    }
 };
 
 export const reviewSubmission = async (submissionId: string, status: string, challengeTitle: string, userId: string) => {

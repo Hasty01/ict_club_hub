@@ -16,6 +16,9 @@ import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
 import { MenuIcon } from './components/icons/MenuIcon';
 import { DataProvider } from './DataContext';
+import { SunIcon } from './components/icons/SunIcon';
+import { MoonIcon } from './components/icons/MoonIcon';
+import { LogoutIcon } from './components/icons/LogoutIcon';
 
 type View = 'welcome' | 'login' | 'signup' | 'dashboard' | 'patronLogin' | 'patronSignUp';
 type Theme = 'light' | 'dark';
@@ -235,9 +238,6 @@ const App: React.FC = () => {
           <div className="flex h-screen bg-gray-100 dark:bg-gray-900 overflow-hidden">
             <Sidebar
               user={user}
-              onLogout={handleLogout}
-              theme={theme}
-              onToggleTheme={toggleTheme}
               activeTab={activeTab}
               setActiveTab={handleTabChange}
               isOpen={isSidebarOpen}
@@ -262,8 +262,39 @@ const App: React.FC = () => {
                     </h1>
                 </div>
                 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 sm:gap-4">
+                    <button
+                        onClick={toggleTheme}
+                        className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
+                        aria-label="Toggle theme"
+                        title="Toggle Theme"
+                    >
+                        {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+                    </button>
+
                     <Notifications currentUser={user} setActiveTab={handleTabChange} isSidebarCollapsed={false} />
+                    
+                    <button
+                        onClick={handleLogout}
+                        className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                        aria-label="Logout"
+                        title="Logout"
+                    >
+                        <LogoutIcon />
+                    </button>
+
+                    <button 
+                        onClick={() => handleTabChange('profile')}
+                        className="flex-shrink-0 ml-1 group"
+                        aria-label="Go to Profile"
+                        title="Profile"
+                    >
+                        <img 
+                            src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`} 
+                            alt={user.name} 
+                            className="w-8 h-8 rounded-full border-2 border-white dark:border-gray-700 group-hover:border-pink-500 dark:group-hover:border-pink-500 transition-colors object-cover" 
+                        />
+                    </button>
                 </div>
               </header>
 
