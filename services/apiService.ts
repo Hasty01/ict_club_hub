@@ -165,8 +165,18 @@ export const resetPasswordWithOtp = async (email: string, otp: string, newPasswo
 // --- Activities ---
 
 export const getActivities = async (): Promise<Activity[]> => {
-    const { data, error } = await supabase.from('activities').select('*');
+    // Join with activity_rsvps to get user IDs
+    const { data, error } = await supabase
+        .from('activities')
+        .select(`
+            *,
+            activity_rsvps (
+                user_uid
+            )
+        `);
+    
     if (error) throw error;
+    
     return data.map((a: any) => ({
         id: String(a.id),
         title: a.title,
@@ -174,7 +184,7 @@ export const getActivities = async (): Promise<Activity[]> => {
         description: a.description,
         location: a.location,
         category: a.category,
-        rsvpUserIds: a.rsvp_user_ids || []
+        rsvpUserIds: a.activity_rsvps?.map((r: any) => r.user_uid) || []
     }));
 };
 
@@ -184,25 +194,26 @@ export const addActivity = async (activity: Omit<Activity, 'id' | 'rsvpUserIds'>
         date: activity.date,
         description: activity.description,
         location: activity.location,
-        category: activity.category,
-        rsvp_user_ids: []
+        category: activity.category
     });
     if (error) throw error;
 };
 
 export const toggleRSVP = async (activityId: string, userId: string, isJoining: boolean) => {
-    const { data: activity, error: fetchError } = await supabase.from('activities').select('rsvp_user_ids').eq('id', activityId).single();
-    if (fetchError) throw fetchError;
-    
-    let currentRsvps: string[] = activity.rsvp_user_ids || [];
     if (isJoining) {
-        if (!currentRsvps.includes(userId)) currentRsvps.push(userId);
+        const { error } = await supabase.from('activity_rsvps').insert({
+            activity_id: activityId,
+            user_uid: userId
+        });
+        // Ignore duplicate key error if user clicks rapidly
+        if (error && error.code !== '23505') throw error; 
     } else {
-        currentRsvps = currentRsvps.filter(id => id !== userId);
+        const { error } = await supabase.from('activity_rsvps').delete().match({
+            activity_id: activityId,
+            user_uid: userId
+        });
+        if (error) throw error;
     }
-
-    const { error } = await supabase.from('activities').update({ rsvp_user_ids: currentRsvps }).eq('id', activityId);
-    if (error) throw error;
 };
 
 // --- Attendance ---
