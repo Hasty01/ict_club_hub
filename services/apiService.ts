@@ -307,7 +307,7 @@ export const getFeedItems = async (): Promise<FeedItem[]> => {
         timestamp: new Date(item.created_at).toLocaleString(),
         title: item.title,
         message: item.message, // Mapped from 'message' column in schema
-        commentCount: 0 // Column 'comment_count' does not exist in schema
+        commentCount: 0 // 'comment_count' removed from schema
     }));
 };
 
@@ -328,40 +328,58 @@ export const deleteFeedItem = async (id: string) => {
 };
 
 export const getFeedComments = async (feedItemId: string): Promise<FeedComment[]> => {
-    const { data, error } = await supabase.from('feed_comments').select('*').eq('feed_item_id', feedItemId).order('created_at', { ascending: true });
+    // user_uid in feed_comments refs auth.users, so direct join to public.users might not be automatic
+    // We fetch comments first, then fetch user details manually or assume public.users has same uid.
+    const { data: comments, error } = await supabase
+        .from('feed_comments')
+        .select('*')
+        .eq('feed_item_id', feedItemId)
+        .order('created_at', { ascending: true });
+    
     if (error) throw error;
-    return data.map((c: any) => ({
-        id: c.id,
-        feedItemId: c.feed_item_id,
-        userId: c.user_id,
-        userName: c.user_name,
-        userAvatarUrl: c.user_avatar_url,
+
+    // Fetch user details for these comments from public.users
+    const userIds = [...new Set(comments.map((c: any) => c.user_uid))];
+    let usersMap: Record<string, any> = {};
+    
+    if (userIds.length > 0) {
+        const { data: users } = await supabase.from('users').select('uid, name, avatar_url').in('uid', userIds);
+        if (users) {
+            users.forEach((u: any) => {
+                usersMap[u.uid] = u;
+            });
+        }
+    }
+
+    return comments.map((c: any) => ({
+        id: String(c.id),
+        feedItemId: String(c.feed_item_id),
+        userId: c.user_uid,
+        userName: usersMap[c.user_uid]?.name || 'Unknown',
+        userAvatarUrl: usersMap[c.user_uid]?.avatar_url,
         content: c.content,
         createdAt: new Date(c.created_at).toLocaleString()
     }));
 };
 
 export const addFeedComment = async (feedItemId: string, userId: string, content: string): Promise<FeedComment> => {
+    // Fetch user details locally for optimistic update
     const { data: user } = await supabase.from('users').select('name, avatar_url').eq('uid', userId).maybeSingle();
     
     const { data, error } = await supabase.from('feed_comments').insert({
         feed_item_id: feedItemId,
-        user_id: userId,
-        user_name: user?.name || 'Unknown',
-        user_avatar_url: user?.avatar_url,
+        user_uid: userId,
         content: content
     }).select().single();
     
     if (error) throw error;
 
-    // Note: comment_count update removed as column does not exist on feed_items
-
     return {
-        id: data.id,
-        feedItemId: data.feed_item_id,
-        userId: data.user_id,
-        userName: data.user_name,
-        userAvatarUrl: data.user_avatar_url,
+        id: String(data.id),
+        feedItemId: String(data.feed_item_id),
+        userId: data.user_uid,
+        userName: user?.name || 'Unknown',
+        userAvatarUrl: user?.avatar_url,
         content: data.content,
         createdAt: new Date(data.created_at).toLocaleString()
     };
@@ -386,7 +404,7 @@ export const getProjectData = async (): Promise<ProjectData | null> => {
             id: String(t.id),
             content: t.content,
             columnId: String(t.column_id),
-            assigneeId: t.assignee_uid,
+            assigneeId: t.assignee_uid, // Use assignee_uid (single)
             isCompleted: t.is_completed,
             priority: t.priority,
             dueDate: t.due_date,
@@ -431,7 +449,7 @@ export const updateProjectTask = async (taskId: string, data: Partial<ProjectTas
     if (data.dueDate) updates.due_date = data.dueDate;
     if (data.tags) updates.tags = data.tags;
     if (data.isCompleted !== undefined) updates.is_completed = data.isCompleted;
-    if (data.assigneeId !== undefined) updates.assignee_uid = data.assigneeId;
+    if (data.assigneeId !== undefined) updates.assignee_uid = data.assigneeId; // Map assigneeId to assignee_uid
 
     const { error } = await supabase.from('project_tasks').update(updates).eq('id', taskId);
     if (error) throw error;
