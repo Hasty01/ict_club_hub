@@ -489,7 +489,7 @@ export const getResources = async (): Promise<Omit<Resource, 'uploaderName' | 'u
         topic: r.topic,
         url: r.url,
         filePath: r.file_path,
-        uploaderUid: r.uploader_id,
+        uploaderUid: r.uploader_uid,
     }));
 };
 
@@ -522,7 +522,7 @@ export const addResource = async (resource: {
         type: resource.type,
         url: resource.url,
         file_path: resource.filePath,
-        uploader_id: resource.uploaderUid,
+        uploader_uid: resource.uploaderUid,
         topic: resource.topic
     });
     if (error) throw error;

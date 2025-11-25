@@ -10,6 +10,8 @@ import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { GlobeIcon } from './icons/GlobeIcon';
 import { IdentificationIcon } from './icons/IdentificationIcon';
+import { TrophyIcon } from './icons/TrophyIcon';
+import { ChevronRightIcon } from './icons/ChevronRightIcon';
 
 interface FeatureTourModalProps {
   isOpen: boolean;
@@ -25,14 +27,14 @@ const FeatureTourModal: React.FC<FeatureTourModalProps> = ({ isOpen, onClose }) 
     {
       title: "Welcome to ICT Club Hub!",
       description: "We're excited to have you! This is your central place to connect, learn, and build with fellow members. Let's take a tour of what you can do here.",
-      icon: <span className="text-6xl">👋</span>,
+      icon: <span className="text-6xl animate-icon-bounce-in">👋</span>,
       gradient: "from-pink-500 to-purple-600"
     },
     {
       title: "Feed & Announcements",
       description: "Start your day with the **Feed**. Catch up on the latest club news, event announcements, and posts from other members.",
       icon: (
-        <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white">
+        <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white animate-icon-bounce-in">
            <HomeIcon />
         </div>
       ),
@@ -42,7 +44,7 @@ const FeatureTourModal: React.FC<FeatureTourModalProps> = ({ isOpen, onClose }) 
       title: "Activities & Attendance",
       description: "Check the **Activities** tab for upcoming workshops and events. Don't forget to RSVP! Your **Attendance** record tracks your participation stats automatically.",
       icon: (
-        <div className="flex space-x-4 text-white">
+        <div className="flex space-x-4 text-white animate-icon-bounce-in">
            <div className="p-4 bg-white/20 rounded-full backdrop-blur-sm"><CalendarIcon /></div>
            <div className="p-4 bg-white/20 rounded-full backdrop-blur-sm"><CheckCircleIcon /></div>
         </div>
@@ -53,7 +55,7 @@ const FeatureTourModal: React.FC<FeatureTourModalProps> = ({ isOpen, onClose }) 
       title: "Project Management",
       description: "Got a club project? Use the **Projects** Kanban board to create tasks, assign members, set deadlines, and track progress together.",
       icon: (
-        <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white">
+        <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white animate-icon-bounce-in">
            <ClipboardListIcon />
         </div>
       ),
@@ -63,7 +65,7 @@ const FeatureTourModal: React.FC<FeatureTourModalProps> = ({ isOpen, onClose }) 
       title: "Learn & Code",
       description: "Access tutorials in **Resources** or practice coding in the **Playground**—a full Python environment in your browser with cloud saving.",
       icon: (
-         <div className="flex space-x-4 text-white">
+         <div className="flex space-x-4 text-white animate-icon-bounce-in">
            <div className="p-4 bg-white/20 rounded-full backdrop-blur-sm"><BookOpenIcon /></div>
            <div className="p-4 bg-white/20 rounded-full backdrop-blur-sm"><CodeIcon /></div>
         </div>
@@ -74,17 +76,27 @@ const FeatureTourModal: React.FC<FeatureTourModalProps> = ({ isOpen, onClose }) 
       title: "Showcase & Share",
       description: "Proud of your code? Publish it to the **Showcase**! You can browse, like, and clone snippets shared by other members.",
       icon: (
-        <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white">
+        <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white animate-icon-bounce-in">
            <GlobeIcon />
         </div>
       ),
       gradient: "from-indigo-500 to-purple-600"
     },
     {
+      title: "Compete in Challenges",
+      description: "Test your skills in **Challenges**. Solve problems, submit your code, and earn badges to climb the 'Hall of Fame' leaderboard.",
+      icon: (
+        <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white animate-icon-bounce-in">
+           <TrophyIcon />
+        </div>
+      ),
+      gradient: "from-orange-400 to-red-500"
+    },
+    {
       title: "Chat & Collaborate",
       description: "Stay connected with **Messages**. Create group chats for projects, send direct messages, and share code snippets instantly.",
       icon: (
-        <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white">
+        <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white animate-icon-bounce-in">
            <ChatBubbleIcon />
         </div>
       ),
@@ -94,7 +106,7 @@ const FeatureTourModal: React.FC<FeatureTourModalProps> = ({ isOpen, onClose }) 
         title: "Your Profile",
         description: "Customize your avatar, view your personal attendance statistics, and manage your account settings in the **Profile** section.",
         icon: (
-          <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white">
+          <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white animate-icon-bounce-in">
              <IdentificationIcon />
           </div>
         ),
@@ -103,7 +115,7 @@ const FeatureTourModal: React.FC<FeatureTourModalProps> = ({ isOpen, onClose }) 
      {
       title: "Ready to Explore?",
       description: "That's the tour! Dive in, start building, and make the most of the ICT Club Hub.",
-      icon: <span className="text-6xl">🚀</span>,
+      icon: <span className="text-6xl animate-icon-bounce-in">🚀</span>,
       gradient: "from-gray-700 to-black"
     }
   ];
@@ -127,15 +139,32 @@ const FeatureTourModal: React.FC<FeatureTourModalProps> = ({ isOpen, onClose }) 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <style>{`
-        @keyframes fadeInUp {
+        @keyframes initialFadeInUp {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .animate-fade-in-up {
-            animation: fadeInUp 0.4s ease-out forwards;
+        @keyframes iconBounceIn {
+            0% { transform: scale(0.5) rotate(-15deg); opacity: 0; }
+            50% { transform: scale(1.1) rotate(5deg); opacity: 1; }
+            70% { transform: scale(0.9) rotate(-5deg); }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        @keyframes contentFadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-initial-fade-in-up {
+            animation: initialFadeInUp 0.4s ease-out forwards;
+        }
+        .animate-icon-bounce-in {
+            animation: iconBounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        .animate-content-fade-in-up {
+            animation: contentFadeInUp 0.4s ease-out forwards 0.1s;
+            opacity: 0;
         }
       `}</style>
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col min-h-[480px] animate-fade-in-up relative border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col min-h-[500px] animate-initial-fade-in-up relative border border-gray-200 dark:border-gray-700">
         
         {/* Header / Graphic Area */}
         <div className={`h-48 bg-gradient-to-br ${step.gradient} flex items-center justify-center relative transition-colors duration-500`}>
@@ -146,7 +175,7 @@ const FeatureTourModal: React.FC<FeatureTourModalProps> = ({ isOpen, onClose }) 
             >
                 <XIcon />
             </button>
-            <div className="transform scale-125 transition-transform duration-500">
+            <div key={currentStep} className="transform scale-125">
                 {step.icon}
             </div>
             
@@ -159,16 +188,16 @@ const FeatureTourModal: React.FC<FeatureTourModalProps> = ({ isOpen, onClose }) 
         </div>
 
         {/* Content Area */}
-        <div className="px-8 pb-8 pt-2 flex-1 flex flex-col text-center">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-3 transition-all duration-300">{step.title}</h2>
-            <p className="text-gray-600 dark:text-gray-300 leading-relaxed mb-6 flex-grow text-sm sm:text-base">
+        <div key={`content-${currentStep}`} className="px-8 pb-8 pt-2 flex-1 flex flex-col text-center">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-3 animate-content-fade-in-up">{step.title}</h2>
+            <p className="text-gray-600 dark:text-gray-300 leading-relaxed mb-6 flex-grow text-sm sm:text-base animate-content-fade-in-up" style={{ animationDelay: '0.05s' }}>
                 {step.description.split('**').map((part, i) => 
                     i % 2 === 1 ? <strong key={i} className="text-gray-900 dark:text-white font-semibold">{part}</strong> : part
                 )}
             </p>
 
             {/* Dots Indicator */}
-            <div className="flex justify-center space-x-2 mb-6">
+            <div className="flex justify-center space-x-2 mb-8">
                 {steps.map((_, index) => (
                     <div 
                         key={index} 
@@ -182,15 +211,16 @@ const FeatureTourModal: React.FC<FeatureTourModalProps> = ({ isOpen, onClose }) 
                 <button
                     onClick={handlePrev}
                     disabled={currentStep === 0}
-                    className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${currentStep === 0 ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400'}`}
+                    className={`text-sm font-medium px-4 py-2 rounded-lg transition-all ${currentStep === 0 ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-0' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400 opacity-100'}`}
                 >
                     Back
                 </button>
                 <button
                     onClick={handleNext}
-                    className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-6 py-2.5 rounded-xl font-bold hover:opacity-90 hover:shadow-lg transition-all transform hover:-translate-y-0.5 flex-1 max-w-[160px]"
+                    className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-6 py-2.5 rounded-xl font-bold hover:opacity-90 hover:shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-1.5"
                 >
                     {currentStep === steps.length - 1 ? "Get Started" : "Next"}
+                    {currentStep < steps.length - 1 && <ChevronRightIcon className="w-4 h-4" />}
                 </button>
             </div>
         </div>
