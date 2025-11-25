@@ -359,6 +359,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
                 event: 'INSERT', 
                 schema: 'public', 
                 table: 'notifications', 
+                // Uses user_uid column
                 filter: `user_uid=eq.${currentUser.uid}` 
             },
             (payload) => {
@@ -369,6 +370,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
                     isRead: newNotifRaw.is_read,
                     createdAt: new Date(newNotifRaw.created_at).toLocaleString('en-US', { timeZone: 'Africa/Kampala' }),
                     linkTo: newNotifRaw.link_to,
+                    // Uses user_uid column
                     userId: newNotifRaw.user_uid,
                 };
                 setNotifications(prev => [newNotif, ...prev]);
