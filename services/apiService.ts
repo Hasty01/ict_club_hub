@@ -615,7 +615,7 @@ export const uploadTaskSubmission = async (taskId: string, file: File, userId: s
   const filePath = `${userId}/${taskId}/${Date.now()}.${fileExt}`;
 
   const { error: uploadError } = await supabase.storage
-    .from('task_submissions')
+    .from('resource_uploads')
     .upload(filePath, file);
 
   if (uploadError) throw uploadError;
@@ -627,7 +627,7 @@ export const uploadTaskSubmission = async (taskId: string, file: File, userId: s
 
   if (updateError) {
     // If DB update fails, try to clean up the uploaded file
-    await supabase.storage.from('task_submissions').remove([filePath]);
+    await supabase.storage.from('resource_uploads').remove([filePath]);
     throw updateError;
   }
 
@@ -636,7 +636,7 @@ export const uploadTaskSubmission = async (taskId: string, file: File, userId: s
 
 export const deleteTaskSubmission = async (taskId: string, filePath: string) => {
   const { error: deleteError } = await supabase.storage
-    .from('task_submissions')
+    .from('resource_uploads')
     .remove([filePath]);
 
   if (deleteError) throw deleteError;
@@ -650,7 +650,7 @@ export const deleteTaskSubmission = async (taskId: string, filePath: string) => 
 };
 
 export const getSubmissionPublicUrl = (filePath: string) => {
-    const { data } = supabase.storage.from('task_submissions').getPublicUrl(filePath);
+    const { data } = supabase.storage.from('resource_uploads').getPublicUrl(filePath);
     return data.publicUrl;
 }
 
@@ -678,10 +678,10 @@ export const uploadResourceFile = async (file: File, userId: string) => {
     const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
     const filePath = `${userId}/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage.from('resource_uploads').upload(filePath, file);
+    const { error: uploadError } = await supabase.storage.from('resource_files').upload(filePath, file);
     if (uploadError) throw uploadError;
 
-    const { data } = supabase.storage.from('resource_uploads').getPublicUrl(filePath);
+    const { data } = supabase.storage.from('resource_files').getPublicUrl(filePath);
     return { url: data.publicUrl, path: filePath };
 };
 
@@ -710,7 +710,7 @@ export const addResource = async (resource: {
 
 export const deleteResource = async (resource: Resource) => {
     if (resource.filePath) {
-        await supabase.storage.from('resource_uploads').remove([resource.filePath]);
+        await supabase.storage.from('resource_files').remove([resource.filePath]);
     }
     const { error } = await supabase.from('resources').delete().eq('id', resource.id);
     if (error) throw error;

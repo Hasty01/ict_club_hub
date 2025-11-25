@@ -42,7 +42,15 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = (props) => {
         return { unassignedTasks: unassigned, assignedTasks: assigned };
     }, [data.tasks]);
 
-    const approvedMembers = allUsers.filter(u => u.status === 'APPROVED');
+    const membersToDisplay = useMemo(() => {
+        const approved = allUsers.filter(u => u.status === 'APPROVED');
+        if (currentUser.role === 'PATRON') {
+            return approved;
+        }
+        // For members, only show their own column
+        return approved.filter(u => u.uid === currentUser.uid);
+    }, [allUsers, currentUser]);
+
 
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string, columnId: string) => {
         if (currentUser.role !== 'PATRON') return;
@@ -96,7 +104,7 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = (props) => {
             </div>
             
             {/* Assigned Columns */}
-            {approvedMembers.map(member => (
+            {membersToDisplay.map(member => (
                 <div
                     key={member.uid}
                     onDragOver={(e) => { e.preventDefault(); setOverZoneId(member.uid); }}
