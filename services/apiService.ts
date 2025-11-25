@@ -273,32 +273,39 @@ export const markAttendanceOnLogin = async (userId: string) => {
 // --- Feed ---
 
 export const getFeedItems = async (): Promise<FeedItem[]> => {
-    const { data, error } = await supabase.from('feed_items').select('*').order('created_at', { ascending: false });
+    // Join with users table using foreign key `author_uid`
+    const { data, error } = await supabase
+        .from('feed_items')
+        .select(`
+            *,
+            users (
+                name,
+                avatar_url
+            )
+        `)
+        .order('created_at', { ascending: false });
+
     if (error) throw error;
+    
     return data.map((item: any) => ({
-        id: item.id,
+        id: String(item.id),
         type: item.type,
-        author: item.author_name,
-        authorAvatarUrl: item.author_avatar_url,
+        author: item.users?.name || 'Unknown',
+        authorAvatarUrl: item.users?.avatar_url,
         timestamp: new Date(item.created_at).toLocaleString(),
         title: item.title,
-        message: item.content,
-        commentCount: item.comment_count
+        message: item.message, // Mapped from 'message' column in schema
+        commentCount: 0 // Column 'comment_count' does not exist in schema
     }));
 };
 
 export const addFeedItem = async (item: { title: string, message: string, type: FeedItemType }, userId: string) => {
-    // Use 'uid' to find user in public.users
-    const { data: user } = await supabase.from('users').select('name, avatar_url').eq('uid', userId).maybeSingle();
-    
+    // Insert uses 'message' and 'author_uid'
     const { error } = await supabase.from('feed_items').insert({
         type: item.type,
         title: item.title,
-        content: item.message,
-        author_id: userId,
-        author_name: user?.name || 'Unknown',
-        author_avatar_url: user?.avatar_url,
-        comment_count: 0
+        message: item.message,
+        author_uid: userId,
     });
     if (error) throw error;
 };
@@ -335,10 +342,7 @@ export const addFeedComment = async (feedItemId: string, userId: string, content
     
     if (error) throw error;
 
-    const { data: feedItem } = await supabase.from('feed_items').select('comment_count').eq('id', feedItemId).maybeSingle();
-    if (feedItem) {
-        await supabase.from('feed_items').update({ comment_count: (feedItem.comment_count || 0) + 1 }).eq('id', feedItemId);
-    }
+    // Note: comment_count update removed as column does not exist on feed_items
 
     return {
         id: data.id,
