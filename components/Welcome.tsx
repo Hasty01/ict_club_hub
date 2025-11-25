@@ -97,6 +97,10 @@ const Welcome: React.FC<WelcomeProps> = ({ onNavigateToLogin, onNavigateToSignUp
             50% { transform: translateY(-15px); }
             100% { transform: translateY(0px); }
         }
+        @keyframes fade-in-up {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
         .animate-gradient-x {
             background-size: 200% 200%;
             animation: gradient-x 4s ease infinite;
@@ -119,6 +123,9 @@ const Welcome: React.FC<WelcomeProps> = ({ onNavigateToLogin, onNavigateToSignUp
         }
         .animate-float {
             animation: float 6s ease-in-out infinite;
+        }
+        .animate-fade-in-up {
+            animation: fade-in-up 0.8s ease-out forwards;
         }
         .shine-effect {
             position: relative;
@@ -185,7 +192,7 @@ const Welcome: React.FC<WelcomeProps> = ({ onNavigateToLogin, onNavigateToSignUp
           </div>
 
           {/* Main Heading with Hacker Effect and Constant Motion Gradient */}
-          <h1 className="text-6xl sm:text-8xl md:text-9xl font-black tracking-tighter drop-shadow-sm pb-6 leading-[1.1]">
+          <h1 className="text-6xl sm:text-8xl md:text-9xl font-black tracking-tighter drop-shadow-sm pb-4 leading-[1.1]">
             <div className="flex flex-col items-center">
                 <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent animate-gradient-fast">
                     <HackerText text="ICT CLUB" />
@@ -196,35 +203,35 @@ const Welcome: React.FC<WelcomeProps> = ({ onNavigateToLogin, onNavigateToSignUp
             </div>
           </h1>
           
-          {/* Hero CTA - Login & Sign Up Buttons (Moved directly below heading) */}
-          <div className="mt-8 flex flex-col sm:flex-row items-center gap-4 w-full justify-center animate-fade-in-up opacity-0" style={{ animationDelay: '0.5s', animationFillMode: 'forwards' }}>
+          {/* Hero CTA - Login & Sign Up Buttons (Directly below heading) */}
+          <div className="mt-6 flex flex-col sm:flex-row items-center gap-4 w-full justify-center animate-fade-in-up opacity-0" style={{ animationDelay: '0.3s', animationFillMode: 'forwards' }}>
               <button
                 onClick={onNavigateToLogin}
-                className="w-full sm:w-40 px-8 py-4 text-lg font-bold text-gray-700 bg-white border border-gray-200 dark:text-white dark:bg-gray-800 dark:border-gray-700 rounded-xl shadow-lg hover:scale-105 transition-all"
+                className="w-full sm:w-40 px-8 py-4 text-lg font-bold text-gray-700 bg-white border border-gray-200 dark:text-white dark:bg-gray-800 dark:border-gray-700 rounded-xl shadow-lg hover:scale-105 transition-all hover:shadow-xl"
               >
                 Login
               </button>
               
               <button
                 onClick={onNavigateToSignUp}
-                className="group w-full sm:w-auto px-12 py-5 text-xl font-black text-white rounded-2xl shadow-2xl shadow-purple-500/40 overflow-hidden transition-all hover:scale-110 hover:shadow-purple-500/60 focus:outline-none focus:ring-4 focus:ring-purple-500/50 shine-effect border-4 border-transparent bg-gradient-to-r from-pink-600 to-purple-600 bg-origin-border"
+                className="group w-full sm:w-auto px-12 py-4 text-xl font-black text-white rounded-xl shadow-xl shadow-pink-500/30 overflow-hidden transition-all hover:scale-105 hover:shadow-pink-500/50 focus:outline-none focus:ring-4 focus:ring-pink-500/50 shine-effect border-2 border-transparent bg-gradient-to-r from-pink-600 to-purple-600"
               >
-                 <span className="relative flex items-center justify-center gap-3 z-10">
-                    SIGN UP <span className="group-hover:translate-x-2 transition-transform text-2xl">🚀</span>
+                 <span className="relative flex items-center justify-center gap-2 z-10">
+                    Sign Up <span className="group-hover:translate-x-1 transition-transform">🚀</span>
                 </span>
               </button>
           </div>
 
-          <div className="mt-4 animate-fade-in-up opacity-0" style={{ animationDelay: '0.7s', animationFillMode: 'forwards' }}>
+          <div className="mt-6 animate-fade-in-up opacity-0" style={{ animationDelay: '0.5s', animationFillMode: 'forwards' }}>
              <button
                 onClick={onNavigateToPatronLogin}
-                className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-pink-600 dark:hover:text-pink-400 transition-colors underline"
+                className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors underline decoration-dotted underline-offset-4"
               >
-                Patron Access
+                Are you a Patron? Access here
               </button>
           </div>
           
-          <p className="mt-8 text-lg md:text-2xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto animate-fade-in-up opacity-0 leading-relaxed font-light" style={{ animationDelay: '0.9s', animationFillMode: 'forwards' }}>
+          <p className="mt-8 text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto animate-fade-in-up opacity-0 leading-relaxed font-light" style={{ animationDelay: '0.7s', animationFillMode: 'forwards' }}>
             Connect. Code. Create. <br/>
             <span className="text-sm font-mono text-pink-500 mt-2 block">System.Status: LOCOMOTING...</span>
           </p>
