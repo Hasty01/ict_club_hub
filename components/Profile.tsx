@@ -362,7 +362,7 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
                             {/* Badges Section */}
                             <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
                                 <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
-                                    <BadgeCheckIcon className="h-6 w-6 text-yellow-500" />
+                                    <BadgeCheckIcon className="text-yellow-500" />
                                     Badges & Achievements
                                 </h3>
                                 {!currentUser.badges || currentUser.badges.length === 0 ? (
