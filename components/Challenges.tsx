@@ -11,6 +11,8 @@ import { BadgeCheckIcon } from './icons/BadgeCheckIcon';
 import { XIcon } from './icons/XIcon';
 import { CheckIcon } from './icons/CheckIcon';
 import { CalendarIcon } from './icons/CalendarIcon';
+import { PlayIcon } from './icons/PlayIcon';
+import CodeRunnerModal from './CodeRunnerModal';
 
 interface ChallengesProps {
     currentUser: User;
@@ -304,6 +306,11 @@ const ReviewSubmissionsModal: React.FC<{
 }> = ({ isOpen, onClose, challengeId, challengeTitle }) => {
     const [submissions, setSubmissions] = useState<ChallengeSubmission[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    
+    // Runner State
+    const [runnerOpen, setRunnerOpen] = useState(false);
+    const [runnerCode, setRunnerCode] = useState('');
+    const [runnerTitle, setRunnerTitle] = useState('');
 
     useEffect(() => {
         if (isOpen && challengeId) {
@@ -328,53 +335,74 @@ const ReviewSubmissionsModal: React.FC<{
         }
     };
 
+    const handleRunCode = (code: string, userName: string) => {
+        setRunnerCode(code);
+        setRunnerTitle(`Submission by ${userName}`);
+        setRunnerOpen(true);
+    };
+
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[80vh]">
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400"><XIcon /></button>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Submissions: {challengeTitle}</h3>
-                
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
-                    {isLoading ? (
-                        <p className="text-center text-gray-500">Loading submissions...</p>
-                    ) : submissions.length === 0 ? (
-                        <p className="text-center text-gray-500">No submissions yet.</p>
-                    ) : (
-                        submissions.map(sub => (
-                            <div key={sub.id} className="bg-gray-50 dark:bg-gray-750 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
-                                <div className="flex justify-between items-start mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <img src={sub.userAvatarUrl || `https://i.pravatar.cc/40?u=${sub.userId}`} className="w-8 h-8 rounded-full" alt={sub.userName} />
-                                        <div>
-                                            <p className="text-sm font-bold text-gray-900 dark:text-white">{sub.userName}</p>
-                                            <p className="text-xs text-gray-500">{new Date(sub.submittedAt).toLocaleDateString()}</p>
+        <>
+            <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[80vh]">
+                    <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400"><XIcon /></button>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Submissions: {challengeTitle}</h3>
+                    
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                        {isLoading ? (
+                            <p className="text-center text-gray-500">Loading submissions...</p>
+                        ) : submissions.length === 0 ? (
+                            <p className="text-center text-gray-500">No submissions yet.</p>
+                        ) : (
+                            submissions.map(sub => (
+                                <div key={sub.id} className="bg-gray-50 dark:bg-gray-750 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <img src={sub.userAvatarUrl || `https://i.pravatar.cc/40?u=${sub.userId}`} className="w-8 h-8 rounded-full" alt={sub.userName} />
+                                            <div>
+                                                <p className="text-sm font-bold text-gray-900 dark:text-white">{sub.userName}</p>
+                                                <p className="text-xs text-gray-500">{new Date(sub.submittedAt).toLocaleDateString()}</p>
+                                            </div>
                                         </div>
+                                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${sub.status === 'APPROVED' ? 'bg-green-100 text-green-700' : sub.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                            {sub.status}
+                                        </span>
                                     </div>
-                                    <span className={`text-xs px-2 py-1 rounded-full font-bold ${sub.status === 'APPROVED' ? 'bg-green-100 text-green-700' : sub.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                        {sub.status}
-                                    </span>
-                                </div>
-                                <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600 mb-3">
-                                    <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono">{sub.content}</pre>
-                                </div>
-                                {sub.status === 'PENDING' && (
-                                    <div className="flex gap-2 justify-end">
-                                        <button onClick={() => handleReview(sub.id, 'REJECTED', sub.userId)} className="px-3 py-1.5 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-lg flex items-center gap-1">
-                                            <XCircleIcon className="w-4 h-4" /> Reject
+                                    <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600 mb-3 relative group">
+                                        <button 
+                                            onClick={() => handleRunCode(sub.content, sub.userName)}
+                                            className="absolute top-2 right-2 p-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md text-gray-500 dark:text-gray-400 transition-all opacity-0 group-hover:opacity-100 shadow-sm border border-gray-200 dark:border-gray-600"
+                                            title="Run Code"
+                                        >
+                                            <PlayIcon className="w-4 h-4" />
                                         </button>
-                                        <button onClick={() => handleReview(sub.id, 'APPROVED', sub.userId)} className="px-3 py-1.5 text-sm text-white bg-green-600 hover:bg-green-700 rounded-lg flex items-center gap-1">
-                                            <CheckIcon className="w-4 h-4" /> Approve & Award Badge
-                                        </button>
+                                        <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono max-h-60 overflow-y-auto custom-scrollbar">{sub.content}</pre>
                                     </div>
-                                )}
-                            </div>
-                        ))
-                    )}
+                                    {sub.status === 'PENDING' && (
+                                        <div className="flex gap-2 justify-end">
+                                            <button onClick={() => handleReview(sub.id, 'REJECTED', sub.userId)} className="px-3 py-1.5 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-lg flex items-center gap-1">
+                                                <XCircleIcon className="w-4 h-4" /> Reject
+                                            </button>
+                                            <button onClick={() => handleReview(sub.id, 'APPROVED', sub.userId)} className="px-3 py-1.5 text-sm text-white bg-green-600 hover:bg-green-700 rounded-lg flex items-center gap-1">
+                                                <CheckIcon className="w-4 h-4" /> Approve & Award Badge
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
             </div>
-        </div>
+            <CodeRunnerModal 
+                isOpen={runnerOpen}
+                onClose={() => setRunnerOpen(false)}
+                code={runnerCode}
+                title={runnerTitle}
+            />
+        </>
     );
 };
 
