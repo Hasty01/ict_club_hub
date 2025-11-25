@@ -10,10 +10,43 @@ import { XCircleIcon } from './icons/XCircleIcon';
 import { BadgeCheckIcon } from './icons/BadgeCheckIcon';
 import { XIcon } from './icons/XIcon';
 import { CheckIcon } from './icons/CheckIcon';
+import { CalendarIcon } from './icons/CalendarIcon';
 
 interface ChallengesProps {
     currentUser: User;
 }
+
+const RankAvatar: React.FC<{ user: User, rank: number, className?: string }> = ({ user, rank, className }) => {
+    let ringColor = 'border-gray-200 dark:border-gray-700';
+    let badgeColor = 'bg-gray-500';
+    
+    if (rank === 1) { ringColor = 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]'; badgeColor = 'bg-yellow-400 text-yellow-900'; }
+    else if (rank === 2) { ringColor = 'border-slate-300 shadow-[0_0_10px_rgba(203,213,225,0.4)]'; badgeColor = 'bg-slate-300 text-slate-900'; }
+    else if (rank === 3) { ringColor = 'border-amber-600 shadow-[0_0_10px_rgba(217,119,6,0.4)]'; badgeColor = 'bg-amber-600 text-amber-100'; }
+
+    return (
+        <div className={`relative flex flex-col items-center ${className}`}>
+            <div className="relative">
+                <img 
+                    src={user.avatarUrl || `https://i.pravatar.cc/80?u=${user.username}`} 
+                    className={`rounded-full object-cover border-4 ${ringColor} transition-transform hover:scale-105 ${rank === 1 ? 'w-20 h-20 md:w-24 md:h-24' : 'w-16 h-16 md:w-20 md:h-20'}`}
+                    alt={user.name} 
+                />
+                <div className={`absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm font-bold border-2 border-white dark:border-gray-800 ${badgeColor}`}>
+                    {rank}
+                </div>
+            </div>
+            <div className="mt-3 text-center">
+                <p className="font-bold text-white text-sm md:text-base truncate max-w-[100px] md:max-w-[120px] leading-tight">
+                    {user.name}
+                </p>
+                <p className="text-xs text-white/80 flex items-center justify-center gap-1 mt-0.5">
+                    <BadgeCheckIcon className="w-3 h-3" /> {user.badges?.length || 0}
+                </p>
+            </div>
+        </div>
+    );
+};
 
 const Leaderboard: React.FC<{ users: User[] }> = ({ users }) => {
     const rankedUsers = useMemo(() => {
@@ -24,36 +57,71 @@ const Leaderboard: React.FC<{ users: User[] }> = ({ users }) => {
 
     if (rankedUsers.length === 0) return null;
 
+    const topThree = rankedUsers.slice(0, 3);
+    const runnersUp = rankedUsers.slice(3);
+
+    // Rearrange top three for podium display: 2nd, 1st, 3rd
+    const podiumOrder = [];
+    if (topThree[1]) podiumOrder.push({ user: topThree[1], rank: 2 }); // 2nd Place
+    if (topThree[0]) podiumOrder.push({ user: topThree[0], rank: 1 }); // 1st Place
+    if (topThree[2]) podiumOrder.push({ user: topThree[2], rank: 3 }); // 3rd Place
+
     return (
-        <div className="mb-10 bg-gradient-to-r from-amber-600 to-orange-600 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
-            <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]"></div>
+        <div className="mb-10 bg-gradient-to-br from-gray-900 to-gray-800 dark:from-black dark:to-gray-900 rounded-3xl p-6 md:p-8 text-white shadow-2xl relative overflow-hidden border border-gray-800">
+            {/* Abstract Background Shapes */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/20 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-pink-600/20 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
             
             <div className="relative z-10">
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <TrophyIcon className="h-6 w-6 text-yellow-300" /> Badge Leaderboard
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {rankedUsers.map((user, index) => (
-                        <div key={user.uid} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 flex items-center gap-3 border border-white/10 hover:bg-white/20 transition-colors">
-                            <div className="relative">
-                                <img 
-                                    src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`} 
-                                    className={`w-10 h-10 rounded-full border-2 ${index === 0 ? 'border-yellow-300' : index === 1 ? 'border-gray-300' : index === 2 ? 'border-orange-400' : 'border-white/30'}`}
-                                    alt={user.name} 
-                                />
-                                <div className={`absolute -top-1 -left-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border border-white/20 ${index === 0 ? 'bg-yellow-400 text-yellow-900' : index === 1 ? 'bg-gray-300 text-gray-900' : index === 2 ? 'bg-orange-500 text-white' : 'bg-black/50 text-white'}`}>
-                                    {index + 1}
-                                </div>
-                            </div>
-                            <div className="min-w-0">
-                                <p className="text-sm font-semibold truncate">{user.name}</p>
-                                <p className="text-xs text-yellow-100 flex items-center gap-1">
-                                    <BadgeCheckIcon className="w-3 h-3" /> {user.badges?.length || 0} Badges
-                                </p>
-                            </div>
-                        </div>
+                <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-2xl font-bold flex items-center gap-2">
+                        <TrophyIcon className="h-7 w-7 text-yellow-400" /> 
+                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-200 to-yellow-500">
+                            Hall of Fame
+                        </span>
+                    </h3>
+                    <span className="text-xs font-medium bg-white/10 px-3 py-1 rounded-full text-white/70">
+                        Top Badge Earners
+                    </span>
+                </div>
+
+                {/* Podium */}
+                <div className="flex justify-center items-end gap-4 md:gap-8 mb-10 min-h-[160px]">
+                    {podiumOrder.map((item) => (
+                        <RankAvatar 
+                            key={item.user.uid} 
+                            user={item.user} 
+                            rank={item.rank} 
+                            className={item.rank === 1 ? '-mt-8 z-10' : ''} 
+                        />
                     ))}
                 </div>
+
+                {/* Runners Up List */}
+                {runnersUp.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white/5 rounded-2xl p-4 backdrop-blur-sm border border-white/5">
+                        {runnersUp.map((user, index) => (
+                            <div key={user.uid} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl transition-colors">
+                                <div className="w-8 h-8 flex items-center justify-center font-bold text-white/50 text-sm">
+                                    #{index + 4}
+                                </div>
+                                <img 
+                                    src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`} 
+                                    className="w-10 h-10 rounded-full border border-white/10"
+                                    alt={user.name} 
+                                />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-semibold truncate">{user.name}</p>
+                                    <p className="text-xs text-white/50 truncate">@{user.username}</p>
+                                </div>
+                                <div className="flex items-center gap-1 bg-white/10 px-2 py-1 rounded-lg">
+                                    <BadgeCheckIcon className="w-3 h-3 text-yellow-400" />
+                                    <span className="text-xs font-bold">{user.badges?.length || 0}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -67,55 +135,83 @@ const ChallengeCard: React.FC<{
 }> = ({ challenge, currentUser, onOpenSubmission, onOpenReview }) => {
     const isPatron = currentUser.role === 'PATRON';
     const hasBadge = currentUser.badges?.includes(challenge.title);
-    const isExpired = new Date(challenge.deadline) < new Date();
+    const today = new Date();
+    const deadline = new Date(challenge.deadline);
+    const isExpired = deadline < today;
+    
+    // Calculate days left
+    const timeDiff = deadline.getTime() - today.getTime();
+    const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+    let statusColor = "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400";
+    let statusText = "Closed";
+
+    if (hasBadge) {
+        statusColor = "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+        statusText = "Completed";
+    } else if (isExpired) {
+        statusColor = "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400";
+        statusText = "Expired";
+    } else if (challenge.status === 'ACTIVE') {
+        if (daysLeft <= 3) {
+             statusColor = "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
+             statusText = `${daysLeft} Day${daysLeft !== 1 ? 's' : ''} Left`;
+        } else {
+             statusColor = "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
+             statusText = "Active";
+        }
+    }
 
     return (
-        <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border transition-all duration-300 hover:shadow-md flex flex-col ${hasBadge ? 'border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-900/10' : 'border-gray-200 dark:border-gray-700'}`}>
-            <div className="p-5 flex-1">
-                <div className="flex justify-between items-start mb-2">
-                    <h4 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">{challenge.title}</h4>
-                    {hasBadge && <BadgeCheckIcon className="text-green-500 h-6 w-6 flex-shrink-0" />}
+        <div className={`group relative bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm hover:shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 flex flex-col h-full ${hasBadge ? 'ring-1 ring-green-500/20' : ''}`}>
+            <div className="flex-1">
+                <div className="flex justify-between items-start mb-3">
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide ${statusColor}`}>
+                        {statusText}
+                    </span>
+                    {hasBadge && <div className="bg-green-100 dark:bg-green-900/30 p-1.5 rounded-full text-green-600 dark:text-green-400"><BadgeCheckIcon className="w-5 h-5" /></div>}
                 </div>
                 
-                <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-3 gap-2">
-                    <span className={`px-2 py-0.5 rounded-full font-medium ${challenge.status === 'ACTIVE' && !isExpired ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
-                        {challenge.status === 'ACTIVE' && !isExpired ? 'Active' : 'Closed'}
-                    </span>
-                    <span>• Deadline: {new Date(challenge.deadline).toLocaleDateString()}</span>
-                </div>
-
-                <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
+                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2 line-clamp-2 group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors">
+                    {challenge.title}
+                </h4>
+                
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 leading-relaxed line-clamp-3">
                     {challenge.description}
                 </p>
             </div>
 
-            <div className="px-5 py-3 bg-gray-50 dark:bg-gray-750 border-t border-gray-100 dark:border-gray-700 flex justify-end">
+            <div className="pt-4 border-t border-gray-100 dark:border-gray-700 mt-auto">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                        <CalendarIcon />
+                        <span className="ml-1.5">Due {deadline.toLocaleDateString()}</span>
+                    </div>
+                </div>
+
                 {isPatron ? (
                     <button 
                         onClick={() => onOpenReview(challenge.id, challenge.title)}
-                        className="text-sm font-medium text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 transition-colors"
+                        className="w-full py-2.5 rounded-xl text-sm font-semibold bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:hover:bg-purple-900/30 transition-colors flex items-center justify-center gap-2"
                     >
                         Review Submissions
                     </button>
                 ) : (
-                    !hasBadge && challenge.status === 'ACTIVE' && !isExpired && (
+                    !hasBadge && challenge.status === 'ACTIVE' && !isExpired ? (
                         <button 
                             onClick={() => onOpenSubmission(challenge.id)}
-                            className="text-sm font-medium bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
+                            className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                         >
                             Submit Solution
                         </button>
+                    ) : (
+                       <button 
+                            disabled 
+                            className="w-full py-2.5 rounded-xl text-sm font-semibold bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {hasBadge ? 'Badge Earned' : 'Challenge Closed'}
+                        </button> 
                     )
-                )}
-                {hasBadge && !isPatron && (
-                    <span className="text-sm font-medium text-green-600 dark:text-green-400 flex items-center gap-1">
-                        <CheckCircleIcon className="w-4 h-4" /> Completed
-                    </span>
-                )}
-                 {!hasBadge && (challenge.status !== 'ACTIVE' || isExpired) && !isPatron && (
-                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                        Expired
-                    </span>
                 )}
             </div>
         </div>
@@ -289,6 +385,9 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [selectedChallengeId, setSelectedChallengeId] = useState<string | null>(null);
     const [selectedReviewChallenge, setSelectedReviewChallenge] = useState<{ id: string, title: string } | null>(null);
+    
+    // Filter State
+    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'COMPLETED' | 'ALL'>('ACTIVE');
 
     const isPatron = currentUser.role === 'PATRON';
 
@@ -319,20 +418,46 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
         setIsReviewModalOpen(true);
     };
 
-    if (isLoadingChallenges) return <div className="text-center p-8 text-gray-500">Loading challenges...</div>;
+    const filteredChallenges = useMemo(() => {
+        const today = new Date();
+        return challenges.filter(c => {
+            const isExpired = new Date(c.deadline) < today;
+            const hasBadge = currentUser.badges?.includes(c.title);
+
+            if (activeTab === 'ACTIVE') {
+                return c.status === 'ACTIVE' && !isExpired && !hasBadge;
+            }
+            if (activeTab === 'COMPLETED') {
+                return hasBadge;
+            }
+            return true; // ALL
+        });
+    }, [challenges, activeTab, currentUser.badges]);
+
+    if (isLoadingChallenges) return (
+        <div className="flex flex-col items-center justify-center h-64 text-gray-500 gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
+            <p>Loading challenges...</p>
+        </div>
+    );
+    
     if (challengesError) return <div className="text-center p-8 text-red-500">Error: {challengesError}</div>;
 
     return (
-        <div className="max-w-6xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div className="max-w-7xl mx-auto px-2 sm:px-0">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-10 gap-6">
                 <div>
-                    <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Challenges & Badges</h2>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">Complete challenges to earn badges and climb the leaderboard.</p>
+                    <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tight mb-2">
+                        Challenges & <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">Badges</span>
+                    </h2>
+                    <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl">
+                        Push your limits, solve problems, and earn exclusive badges to climb the club leaderboard.
+                    </p>
                 </div>
                 {isPatron && (
                     <button 
                         onClick={() => setIsCreateModalOpen(true)}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-pink-500/25 transition-all"
+                        className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
                     >
                         <PlusCircleIcon /> Create Challenge
                     </button>
@@ -341,15 +466,46 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
 
             <Leaderboard users={allUsers} />
 
-            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">Active Challenges</h3>
+            <div className="mb-8">
+                <div className="flex border-b border-gray-200 dark:border-gray-700 space-x-1">
+                    <button
+                        onClick={() => setActiveTab('ACTIVE')}
+                        className={`pb-3 px-4 sm:px-6 text-sm sm:text-base font-medium transition-colors relative focus:outline-none ${activeTab === 'ACTIVE' ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                    >
+                        Active Challenges
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('COMPLETED')}
+                        className={`pb-3 px-4 sm:px-6 text-sm sm:text-base font-medium transition-colors relative focus:outline-none ${activeTab === 'COMPLETED' ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                    >
+                        Completed ({currentUser.badges?.length || 0})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('ALL')}
+                        className={`pb-3 px-4 sm:px-6 text-sm sm:text-base font-medium transition-colors relative focus:outline-none ${activeTab === 'ALL' ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                    >
+                        All History
+                    </button>
+                </div>
+            </div>
             
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {challenges.length === 0 ? (
-                    <div className="col-span-full text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-gray-500">
-                        No active challenges at the moment.
+            {filteredChallenges.length === 0 ? (
+                <div className="text-center py-20 bg-gray-50 dark:bg-gray-800/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+                    <div className="w-20 h-20 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <TrophyIcon className="h-10 w-10 text-gray-400 dark:text-gray-500" />
                     </div>
-                ) : (
-                    challenges.map(challenge => (
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                        {activeTab === 'COMPLETED' ? "No badges earned yet" : "No challenges found"}
+                    </h3>
+                    <p className="text-gray-500 dark:text-gray-400">
+                        {activeTab === 'COMPLETED' 
+                            ? "Participate in active challenges to start earning badges!" 
+                            : "Check back later for new challenges."}
+                    </p>
+                </div>
+            ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {filteredChallenges.map(challenge => (
                         <ChallengeCard 
                             key={challenge.id}
                             challenge={challenge}
@@ -357,9 +513,9 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
                             onOpenSubmission={openSubmission}
                             onOpenReview={openReview}
                         />
-                    ))
-                )}
-            </div>
+                    ))}
+                </div>
+            )}
 
             <CreateChallengeModal 
                 isOpen={isCreateModalOpen} 
