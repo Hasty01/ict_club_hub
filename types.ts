@@ -66,7 +66,8 @@ export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 export interface ProjectTask {
   id: string;
   content: string;
-  assigneeIds: string[]; // Changed to array of strings for multiple assignees
+  columnId: string; 
+  assigneeId?: string; // Changed to single string for new schema
   isCompleted?: boolean;
   priority: TaskPriority;
   dueDate?: string;

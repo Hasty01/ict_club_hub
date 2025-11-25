@@ -64,6 +64,9 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
 
     const [movedTask] = sourceCol.taskIds.splice(originalIndex, 1);
     destCol.taskIds.splice(newIndex, 0, movedTask);
+    
+    // Optimistically update the task's columnId
+    newData.tasks[currentDraggedItemId].columnId = destinationColumnId;
 
     setProjectData(newData);
 
@@ -93,8 +96,13 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
         // Edit existing
         await api.updateProjectTask(editingTask.id, taskData);
     } else {
-        // Create new - Pass currentUser.uid for notifications
-        await api.addProjectTask(taskData, currentUser.uid);
+        // Create new - Find first column to add to
+        const firstColumnId = data?.columnOrder[0];
+        if (firstColumnId) {
+             await api.addProjectTask(taskData, currentUser.uid, firstColumnId);
+        } else {
+            alert("No columns available to add tasks.");
+        }
     }
     await fetchProjectData();
   };
@@ -116,27 +124,25 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     }
   };
 
-  const handleToggleTaskAssignee = async (taskId: string, userId: string) => {
+  const handleAssignTask = async (taskId: string, userId: string) => {
     if (!data) return;
     
     // Optimistic update
     const task = data.tasks[taskId];
     if (!task) return;
 
-    const currentAssignees = task.assigneeIds || [];
-    const newAssignees = currentAssignees.includes(userId)
-        ? currentAssignees.filter(id => id !== userId)
-        : [...currentAssignees, userId];
+    const currentAssignee = task.assigneeId;
+    const newAssignee = currentAssignee === userId ? null : userId;
 
     const newData = JSON.parse(JSON.stringify(data));
-    newData.tasks[taskId].assigneeIds = newAssignees;
+    newData.tasks[taskId].assigneeId = newAssignee;
     setProjectData(newData);
 
     try {
-        await api.updateTaskAssignees(taskId, newAssignees);
+        await api.updateTaskAssignee(taskId, newAssignee);
     } catch (error: any) {
         console.error("Failed to assign task:", error);
-        alert(`Could not update assignees: ${error.message}`);
+        alert(`Could not update assignee: ${error.message}`);
         await fetchProjectData(); // Revert
     }
   };
@@ -202,7 +208,7 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
               onDragStart={handleDragStart}
               onDrop={handleDrop}
               onDeleteTask={handleDeleteTaskClick}
-              onToggleTaskAssignee={handleToggleTaskAssignee}
+              onToggleTaskAssignee={handleAssignTask}
               onToggleTaskCompletion={handleToggleTaskCompletion}
               // Pass the edit handler down
               onEditTask={handleOpenEditTaskModal}

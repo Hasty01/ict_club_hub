@@ -355,7 +355,7 @@ export const addFeedComment = async (feedItemId: string, userId: string, content
 
 export const getProjectData = async (): Promise<ProjectData | null> => {
     const { data: columns, error: colError } = await supabase.from('project_columns').select('*').order('order_index');
-    const { data: tasks, error: taskError } = await supabase.from('project_tasks').select('*');
+    const { data: tasks, error: taskError } = await supabase.from('project_tasks').select('*').order('created_at', { ascending: true });
     
     if (colError || taskError) return null;
 
@@ -367,9 +367,10 @@ export const getProjectData = async (): Promise<ProjectData | null> => {
 
     tasks.forEach((t: any) => {
         projectData.tasks[t.id] = {
-            id: t.id,
+            id: String(t.id),
             content: t.content,
-            assigneeIds: t.assignee_ids || [],
+            columnId: String(t.column_id),
+            assigneeId: t.assignee_uid,
             isCompleted: t.is_completed,
             priority: t.priority,
             dueDate: t.due_date,
@@ -378,35 +379,33 @@ export const getProjectData = async (): Promise<ProjectData | null> => {
     });
 
     columns.forEach((c: any) => {
+        // Filter tasks that belong to this column
+        const colTasks = tasks.filter((t: any) => String(t.column_id) === String(c.id));
+        const taskIds = colTasks.map((t: any) => String(t.id));
+
         projectData.columns[c.id] = {
-            id: c.id,
+            id: String(c.id),
             title: c.title,
-            taskIds: c.task_ids || [] 
+            taskIds: taskIds 
         };
-        projectData.columnOrder.push(c.id);
+        projectData.columnOrder.push(String(c.id));
     });
 
     return projectData;
 };
 
-export const addProjectTask = async (taskData: { content: string, priority: TaskPriority, dueDate?: string, tags: string[] }, userId: string) => {
-    const { data: task, error } = await supabase.from('project_tasks').insert({
+export const addProjectTask = async (taskData: { content: string, priority: TaskPriority, dueDate?: string, tags: string[] }, userId: string, columnId: string) => {
+    const { error } = await supabase.from('project_tasks').insert({
         content: taskData.content,
         priority: taskData.priority,
         due_date: taskData.dueDate,
         tags: taskData.tags,
-        assignee_ids: [],
+        column_id: columnId,
+        assignee_uid: null,
         is_completed: false
-    }).select().single();
+    });
     
     if (error) throw error;
-
-    const { data: columns } = await supabase.from('project_columns').select('*').order('order_index').limit(1);
-    if (columns && columns.length > 0) {
-        const col = columns[0];
-        const newTaskIds = [...(col.task_ids || []), task.id];
-        await supabase.from('project_columns').update({ task_ids: newTaskIds }).eq('id', col.id);
-    }
 };
 
 export const updateProjectTask = async (taskId: string, data: Partial<ProjectTask>) => {
@@ -416,7 +415,7 @@ export const updateProjectTask = async (taskId: string, data: Partial<ProjectTas
     if (data.dueDate) updates.due_date = data.dueDate;
     if (data.tags) updates.tags = data.tags;
     if (data.isCompleted !== undefined) updates.is_completed = data.isCompleted;
-    if (data.assigneeIds) updates.assignee_ids = data.assigneeIds;
+    if (data.assigneeId !== undefined) updates.assignee_uid = data.assigneeId;
 
     const { error } = await supabase.from('project_tasks').update(updates).eq('id', taskId);
     if (error) throw error;
@@ -425,39 +424,15 @@ export const updateProjectTask = async (taskId: string, data: Partial<ProjectTas
 export const deleteProjectTask = async (taskId: string, columnId: string) => {
     const { error } = await supabase.from('project_tasks').delete().eq('id', taskId);
     if (error) throw error;
-
-    const { data: col } = await supabase.from('project_columns').select('task_ids').eq('id', columnId).single();
-    if (col) {
-        const newTaskIds = (col.task_ids || []).filter((id: string) => id !== taskId);
-        await supabase.from('project_columns').update({ task_ids: newTaskIds }).eq('id', columnId);
-    }
 };
 
 export const moveProjectTask = async (taskId: string, destinationColumnId: string) => {
-    const { data: columns } = await supabase.from('project_columns').select('*');
-    if (!columns) return;
-
-    let sourceColId = '';
-    for (const col of columns) {
-        if (col.task_ids && col.task_ids.includes(taskId)) {
-            sourceColId = col.id;
-            break;
-        }
-    }
-
-    if (sourceColId && sourceColId !== destinationColumnId) {
-        const sourceCol = columns.find((c: any) => c.id === sourceColId);
-        const newSourceTaskIds = sourceCol.task_ids.filter((id: string) => id !== taskId);
-        await supabase.from('project_columns').update({ task_ids: newSourceTaskIds }).eq('id', sourceColId);
-
-        const destCol = columns.find((c: any) => c.id === destinationColumnId);
-        const newDestTaskIds = [...(destCol.task_ids || []), taskId];
-        await supabase.from('project_columns').update({ task_ids: newDestTaskIds }).eq('id', destinationColumnId);
-    }
+    const { error } = await supabase.from('project_tasks').update({ column_id: destinationColumnId }).eq('id', taskId);
+    if (error) throw error;
 };
 
-export const updateTaskAssignees = async (taskId: string, assigneeIds: string[]) => {
-    const { error } = await supabase.from('project_tasks').update({ assignee_ids: assigneeIds }).eq('id', taskId);
+export const updateTaskAssignee = async (taskId: string, assigneeId: string | null) => {
+    const { error } = await supabase.from('project_tasks').update({ assignee_uid: assigneeId }).eq('id', taskId);
     if (error) throw error;
 };
 
