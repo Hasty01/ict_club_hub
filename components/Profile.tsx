@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, AttendanceRecord, AttendanceStatus } from '../types';
 import * as api from '../services/apiService';
@@ -147,7 +149,7 @@ const ChangePasswordForm: React.FC<{ currentUser: User }> = ({ currentUser }) =>
 };
 
 const AppearanceSettings: React.FC = () => {
-    const [selectedCursor, setSelectedCursor] = useState<CursorVariant>('normal');
+    const [selectedCursor, setSelectedCursor] = useState<CursorVariant>('figma');
 
     useEffect(() => {
         const saved = localStorage.getItem('app_cursor') as CursorVariant;
@@ -162,17 +164,6 @@ const AppearanceSettings: React.FC = () => {
     };
 
     const cursors: { id: CursorVariant, name: string, preview: React.ReactNode }[] = [
-        {
-            id: 'normal',
-            name: 'System Default',
-            preview: (
-                <div className="relative w-12 h-12 flex items-center justify-center text-gray-900 dark:text-white">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="white" strokeWidth="1.5" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
-                        <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
-                    </svg>
-                </div>
-            )
-        },
         { 
             id: 'figma', 
             name: 'Figma Style', 
@@ -180,6 +171,17 @@ const AppearanceSettings: React.FC = () => {
                 <div className="relative w-12 h-12 flex items-center justify-center">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
                         <path d="M5.65376 12.3673H5.46026L5.31717 12.4976L0.500002 16.8829L0.500002 1.1943L11.7841 12.3673H5.65376Z" fill="black" stroke="white" strokeWidth="1"/>
+                    </svg>
+                </div>
+            )
+        },
+        {
+            id: 'normal',
+            name: 'System Default',
+            preview: (
+                <div className="relative w-12 h-12 flex items-center justify-center text-gray-900 dark:text-white">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="white" strokeWidth="1.5" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
+                        <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
                     </svg>
                 </div>
             )
