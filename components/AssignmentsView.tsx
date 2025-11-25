@@ -14,7 +14,7 @@ interface AssignmentsViewProps {
     onDeleteTask: (taskId: string, columnId: string) => void;
     onToggleTaskCompletion: (taskId: string, currentStatus: boolean) => void;
     onSubmitTaskFile: (taskId: string, file: File) => Promise<void>;
-    onDeleteSubmission: (taskId: string, filePath: string) => Promise<void>;
+    onDeleteSubmission: (taskId: string, userId: string, filePath: string) => Promise<void>;
 }
 
 
@@ -136,6 +136,7 @@ const AssignmentsView: React.FC<AssignmentsViewProps> = (props) => {
                                 onEditTask={props.onEditTask}
                                 onSubmitTaskFile={props.onSubmitTaskFile}
                                 onDeleteSubmission={props.onDeleteSubmission}
+                                submissionOwner={member}
                             />
                         ))}
                          {(assignedTasks[member.uid] || []).length === 0 && <div className="h-24"></div>}

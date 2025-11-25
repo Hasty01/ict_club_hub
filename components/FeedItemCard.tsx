@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FeedItem, FeedItemType, User, FeedComment } from '../types';
 import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
 import { SendIcon } from './icons/SendIcon';
@@ -33,9 +33,10 @@ interface FeedItemCardProps {
   item: FeedItem;
   currentUser: User;
   onDelete?: (id: string) => void;
+  staggerDelay?: number;
 }
 
-const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete }) => {
+const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete, staggerDelay = 0 }) => {
   const config = badgeConfig[item.type];
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<FeedComment[]>([]);
@@ -47,6 +48,27 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
   
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = cardRef.current;
+    if (!element) return;
+    
+    element.style.transitionDelay = `${staggerDelay}ms`;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          element.classList.add('is-visible');
+          observer.unobserve(element);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [staggerDelay]);
 
   useEffect(() => {
       const handleClickOutside = () => setContextMenu(null);
@@ -116,8 +138,9 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
   
   return (
     <div 
+        ref={cardRef}
         onContextMenu={handleContextMenu}
-        className="group bg-white dark:bg-gray-800 rounded-3xl p-1 shadow-sm hover:shadow-xl border border-gray-100 dark:border-gray-700 transition-all duration-300"
+        className="scroll-animate group bg-white dark:bg-gray-800 rounded-3xl p-1 shadow-sm hover:shadow-xl border border-gray-100 dark:border-gray-700 transition-all duration-300"
     >
         <div className="bg-white dark:bg-gray-800 rounded-[1.4rem] p-5 sm:p-6 h-full relative overflow-hidden">
              {/* Decorative gradient blur top right */}

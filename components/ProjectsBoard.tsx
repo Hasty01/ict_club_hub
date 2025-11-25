@@ -205,9 +205,9 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     }
   };
 
-  const handleDeleteSubmission = async (taskId: string, filePath: string) => {
+  const handleDeleteSubmission = async (taskId: string, userId: string, filePath: string) => {
     try {
-        await api.deleteTaskSubmission(taskId, filePath);
+        await api.deleteTaskSubmission(taskId, userId, filePath);
         await fetchProjectData();
     } catch (error: any) {
         console.error("Failed to delete submission:", error);

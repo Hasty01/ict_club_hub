@@ -1,5 +1,4 @@
 
-
 import React, { memo, useState, useEffect, useRef } from 'react';
 import { ProjectTask, User } from '../types';
 import { TrashIcon } from './icons/TrashIcon';
@@ -19,13 +18,14 @@ interface ProjectTaskCardProps {
   isPatron: boolean;
   currentUser: User;
   allUsers: User[];
+  submissionOwner?: User;
   onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string, sourceColumnId: string) => void;
   onDeleteTask: (taskId: string, columnId: string) => void;
   onToggleTaskAssignee: (taskId: string, userId: string) => void;
   onToggleTaskCompletion: (taskId: string, currentStatus: boolean) => void;
   onEditTask: (task: ProjectTask) => void;
   onSubmitTaskFile: (taskId: string, file: File) => Promise<void>;
-  onDeleteSubmission: (taskId: string, filePath: string) => Promise<void>;
+  onDeleteSubmission: (taskId: string, userId: string, filePath: string) => Promise<void>;
 }
 
 const DRAGGING_CLASSES = ['opacity-75', 'ring-2', 'ring-pink-500', 'rotate-3', 'scale-105', 'shadow-2xl'];
@@ -45,7 +45,7 @@ const PriorityBadge: React.FC<{ priority: string }> = ({ priority }) => {
 
 const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
     const { 
-        task, columnId, isBeingDragged, isPatron, currentUser, allUsers, 
+        task, columnId, isBeingDragged, isPatron, currentUser, allUsers, submissionOwner,
         onDragStart, onDeleteTask, onToggleTaskAssignee, onToggleTaskCompletion, onEditTask,
         onSubmitTaskFile, onDeleteSubmission
     } = props;
@@ -54,18 +54,38 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const assignees = task.assigneeIds.map(id => allUsers.find(u => u.uid === id)).filter(Boolean) as User[];
   const approvedMembers = allUsers.filter(u => u.status === 'APPROVED');
   const isCompleted = task.isCompleted;
-  const isAssignee = task.assigneeIds.includes(currentUser.uid);
 
-  const submissionUrl = task.submissionFilePath ? api.getSubmissionPublicUrl(task.submissionFilePath) : null;
-  const fileName = task.submissionFilePath ? task.submissionFilePath.split('/').pop() : null;
+  const displayUser = submissionOwner || currentUser;
+  const submission = task.submissions?.[displayUser.uid];
 
+  const submissionUrl = submission?.filePath ? api.getSubmissionPublicUrl(submission.filePath) : null;
+  const fileName = submission?.filePath ? submission.filePath.split('/').pop() : null;
+
+  const isAssignee = task.assigneeIds.includes(displayUser.uid);
   const isOverdue = task.dueDate ? new Date(task.dueDate) < new Date() && !isCompleted : false;
 
   const canToggleCompletion = isPatron || task.assigneeIds.includes(currentUser.uid);
+  
+  const canUnsubmit = (currentUser.uid === displayUser.uid) && !task.isCompleted;
+  const canSubmit = (currentUser.uid === displayUser.uid) && isAssignee && !task.isCompleted;
+  
+  useEffect(() => {
+    const element = cardRef.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(([entry]) => {
+        if (entry.isIntersecting) {
+            element.classList.add('is-visible');
+            observer.unobserve(element);
+        }
+    }, { threshold: 0.1 });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
@@ -89,8 +109,8 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
 
   const handleUnsubmit = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (task.submissionFilePath) {
-          onDeleteSubmission(task.id, task.submissionFilePath);
+      if (submission?.filePath) {
+          onDeleteSubmission(task.id, displayUser.uid, submission.filePath);
       }
   };
 
@@ -104,6 +124,7 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
             accept=".py"
         />
         <div
+        ref={cardRef}
         draggable={isPatron}
         onDragStart={isPatron ? (e) => {
             DRAGGING_CLASSES.forEach(c => e.currentTarget.classList.add(c));
@@ -115,7 +136,7 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
         onClick={() => isPatron && onEditTask(task)} // Click to edit
         data-task-id={task.id}
         data-dragging={isBeingDragged}
-        className={`bg-white dark:bg-gray-800 p-4 rounded-md border transform transition-all duration-300 shadow-sm relative group ${
+        className={`scroll-animate bg-white dark:bg-gray-800 p-4 rounded-md border transform transition-all duration-300 shadow-sm relative group ${
             isPatron ? 'cursor-grab hover:border-pink-300 dark:hover:border-pink-700' : ''
         } ${
             isBeingDragged ? 'opacity-40' : ''
@@ -170,12 +191,12 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
 
         <div className="pt-3 mt-3 border-t border-gray-100 dark:border-gray-700/50 space-y-4">
             {/* Submission Section */}
-             {task.submissionFilePath && submissionUrl && fileName ? (
+             {submission && submissionUrl && fileName ? (
                 <div onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Submission</span>
-                        <span className="text-xs text-gray-400 dark:text-gray-500" title={task.submittedAt ? new Date(task.submittedAt).toLocaleString() : ''}>
-                            {task.submittedAt ? `on ${new Date(task.submittedAt).toLocaleDateString()}` : ''}
+                        <span className="text-xs text-gray-400 dark:text-gray-500" title={submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : ''}>
+                            {submission.submittedAt ? `on ${new Date(submission.submittedAt).toLocaleDateString()}` : ''}
                         </span>
                     </div>
                     <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex items-center justify-between gap-2">
@@ -185,14 +206,14 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
                                 {fileName}
                             </a>
                         </div>
-                        {isAssignee && !task.isCompleted && (
+                        {canUnsubmit && (
                             <button onClick={handleUnsubmit} className="p-1 text-gray-400 hover:text-red-500 transition-colors" title="Unsubmit file">
                                 <XCircleIcon className="w-5 h-5"/>
                             </button>
                         )}
                     </div>
                 </div>
-             ) : isAssignee && !task.isCompleted ? (
+             ) : canSubmit ? (
                 <div onClick={e => e.stopPropagation()}>
                     <button
                         onClick={() => fileInputRef.current?.click()}

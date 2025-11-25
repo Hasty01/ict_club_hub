@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { ClipboardListIcon } from './icons/ClipboardListIcon';
 import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
@@ -7,6 +7,25 @@ import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
 interface WelcomeProps {
   onNavigateToLogin: () => void;
   onNavigateToPatronLogin: () => void;
+}
+
+const AnimatedFeatureCard: React.FC<{ children: React.ReactNode, delay?: number }> = ({ children, delay = 0 }) => {
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const element = ref.current;
+        if (!element) return;
+        element.style.transitionDelay = `${delay}ms`;
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) {
+                element.classList.add('is-visible');
+                observer.unobserve(element);
+            }
+        }, { threshold: 0.1 });
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [delay]);
+    
+    return <div ref={ref} className="scroll-animate">{children}</div>
 }
 
 const Welcome: React.FC<WelcomeProps> = ({ onNavigateToLogin, onNavigateToPatronLogin }) => {
@@ -115,37 +134,43 @@ const Welcome: React.FC<WelcomeProps> = ({ onNavigateToLogin, onNavigateToPatron
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
                 {/* Feature 1 */}
-                <div className="group p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl shadow-gray-200/50 dark:shadow-none hover:shadow-2xl hover:shadow-pink-500/10 transition-all duration-300 hover:-translate-y-1">
-                    <div className="w-14 h-14 mb-6 rounded-2xl bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center text-pink-600 dark:text-pink-400 group-hover:scale-110 transition-transform duration-300">
-                        <CalendarIcon />
-                    </div>
-                    <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">Track Activities</h3>
-                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                        Stay up-to-date with all club events, workshops, and meetings. View them in a list or calendar format and never miss an opportunity.
-                    </p>
-                </div>
+                <AnimatedFeatureCard delay={0}>
+                  <div className="group p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl shadow-gray-200/50 dark:shadow-none hover:shadow-2xl hover:shadow-pink-500/10 transition-all duration-300 hover:-translate-y-1">
+                      <div className="w-14 h-14 mb-6 rounded-2xl bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center text-pink-600 dark:text-pink-400 group-hover:scale-110 transition-transform duration-300">
+                          <CalendarIcon />
+                      </div>
+                      <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">Track Activities</h3>
+                      <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                          Stay up-to-date with all club events, workshops, and meetings. View them in a list or calendar format and never miss an opportunity.
+                      </p>
+                  </div>
+                </AnimatedFeatureCard>
                 
                 {/* Feature 2 */}
-                <div className="group p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl shadow-gray-200/50 dark:shadow-none hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-300 hover:-translate-y-1">
-                    <div className="w-14 h-14 mb-6 rounded-2xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform duration-300">
-                        <ClipboardListIcon />
-                    </div>
-                    <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">Project Management</h3>
-                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                        Organize and manage club projects with our interactive Kanban board. Assign tasks, track progress, and collaborate effectively.
-                    </p>
-                </div>
+                <AnimatedFeatureCard delay={100}>
+                  <div className="group p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl shadow-gray-200/50 dark:shadow-none hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-300 hover:-translate-y-1">
+                      <div className="w-14 h-14 mb-6 rounded-2xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform duration-300">
+                          <ClipboardListIcon />
+                      </div>
+                      <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">Project Management</h3>
+                      <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                          Organize and manage club projects with our interactive Kanban board. Assign tasks, track progress, and collaborate effectively.
+                      </p>
+                  </div>
+                </AnimatedFeatureCard>
                 
                 {/* Feature 3 */}
-                <div className="group p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl shadow-gray-200/50 dark:shadow-none hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300 hover:-translate-y-1">
-                    <div className="w-14 h-14 mb-6 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform duration-300">
-                        <ChatBubbleIcon />
-                    </div>
-                    <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">Real-time Chat</h3>
-                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                        Engage with fellow members through direct messages and group chats. Share ideas, ask questions, and build a community.
-                    </p>
-                </div>
+                <AnimatedFeatureCard delay={200}>
+                  <div className="group p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl shadow-gray-200/50 dark:shadow-none hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300 hover:-translate-y-1">
+                      <div className="w-14 h-14 mb-6 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform duration-300">
+                          <ChatBubbleIcon />
+                      </div>
+                      <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">Real-time Chat</h3>
+                      <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                          Engage with fellow members through direct messages and group chats. Share ideas, ask questions, and build a community.
+                      </p>
+                  </div>
+                </AnimatedFeatureCard>
             </div>
         </div>
       </section>

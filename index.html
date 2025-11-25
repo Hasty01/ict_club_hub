@@ -79,6 +79,26 @@
       .dark ::-webkit-scrollbar-thumb:hover {
         background: #6b7280;
       }
+
+      /* Scroll Animation */
+      .scroll-animate {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        will-change: opacity, transform;
+      }
+      
+      .scroll-animate-fade {
+        opacity: 0;
+        transition: opacity 0.5s ease-out;
+        will-change: opacity;
+      }
+
+      .scroll-animate.is-visible,
+      .scroll-animate-fade.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
     </style>
   </head>
   <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 antialiased selection:bg-pink-500 selection:text-white">

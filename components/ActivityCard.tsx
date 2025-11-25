@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Activity, User } from '../types';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 
@@ -42,11 +42,31 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, currentUser, onTo
   const categoryStyle = categoryStyles[activity.category] || categoryStyles['OTHER'];
   const rsvpCount = activity.rsvpUserIds ? activity.rsvpUserIds.length : 0;
   const isAttending = currentUser && activity.rsvpUserIds && activity.rsvpUserIds.includes(currentUser.uid);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = cardRef.current;
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          element.classList.add('is-visible');
+          observer.unobserve(element);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div 
+      ref={cardRef}
       onContextMenu={onContextMenu}
-      className="group bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm hover:shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 transform hover:-translate-y-1 hover:border-pink-200 dark:hover:border-pink-900/50 relative overflow-hidden flex flex-col h-full"
+      className="scroll-animate group bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm hover:shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 transform hover:-translate-y-1 hover:border-pink-200 dark:hover:border-pink-900/50 relative overflow-hidden flex flex-col h-full"
     >
       
       {/* Category Badge */}

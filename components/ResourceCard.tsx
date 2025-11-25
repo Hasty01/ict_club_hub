@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Resource, User, Tab } from '../types';
 import { LinkIcon } from './icons/LinkIcon';
 import { VideoCameraIcon } from './icons/VideoCameraIcon';
@@ -29,6 +29,20 @@ const getResourceIcon = (type: Resource['type']) => {
 const ResourceCard: React.FC<ResourceCardProps> = ({ resource, currentUser, onDelete, setActiveTab }) => {
     const isPatron = currentUser.role === 'PATRON';
     const [isLoading, setIsLoading] = useState(false);
+    const cardRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const element = cardRef.current;
+        if (!element) return;
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) {
+                element.classList.add('is-visible');
+                observer.unobserve(element);
+            }
+        }, { threshold: 0.1 });
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
 
     const handleOpenAction = async (e: React.MouseEvent) => {
         if (resource.type === 'PYTHON') {
@@ -65,7 +79,7 @@ const ResourceCard: React.FC<ResourceCardProps> = ({ resource, currentUser, onDe
     };
     
     return (
-        <div className="group bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm hover:shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row items-start gap-5 transition-all duration-300 transform hover:-translate-y-1 hover:border-pink-200 dark:hover:border-pink-900/50">
+        <div ref={cardRef} className="scroll-animate group bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm hover:shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row items-start gap-5 transition-all duration-300 transform hover:-translate-y-1 hover:border-pink-200 dark:hover:border-pink-900/50">
             <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-gray-50 dark:bg-gray-700 flex items-center justify-center text-pink-500 dark:text-pink-400 group-hover:bg-pink-50 dark:group-hover:bg-pink-900/20 group-hover:scale-110 transition-all duration-300">
                 {getResourceIcon(resource.type)}
             </div>

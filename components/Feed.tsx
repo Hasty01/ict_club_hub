@@ -13,16 +13,8 @@ interface FeedProps {
 
 const Feed: React.FC<FeedProps> = ({ currentUser }) => {
   const { feedItems: items, isLoadingFeed, feedItemsError, fetchFeedItems } = useData();
-  const [isMounted, setIsMounted] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   
-  useEffect(() => {
-    if(!isLoadingFeed) {
-        const timer = setTimeout(() => setIsMounted(true), 100);
-        return () => clearTimeout(timer);
-    }
-  }, [isLoadingFeed]);
-
   const handleAddAnnouncement = useCallback(async (data: { title: string, message: string, type: FeedItemType }) => {
     await api.addFeedItem({ ...data }, currentUser.uid);
     await fetchFeedItems();
@@ -124,7 +116,7 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
                  <div className="text-center py-20 backdrop-blur-md bg-white/50 dark:bg-gray-800/50 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
                     <div className="text-gray-300 dark:text-gray-600 mb-4">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3h2m-4 3h2m-4 3h2m-4 3h2m-4 3h2" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3h2m-4 3h2m-4 3h2m-4 3h2" />
                         </svg>
                     </div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">All Caught Up!</h3>
@@ -134,8 +126,7 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
                 items.map((item, index) => (
                 <div
                     key={item.id}
-                    className={`transform transition-all duration-700 ease-out pl-0 md:pl-20 relative ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
-                    style={{ transitionDelay: `${index * 100}ms` }}
+                    className="pl-0 md:pl-20 relative"
                 >
                     {/* Timeline Dot (Desktop only) */}
                     <div className="hidden md:flex absolute left-6 top-8 w-4 h-4 rounded-full border-4 border-white dark:border-gray-900 bg-gradient-to-r from-pink-500 to-purple-600 shadow-md z-10"></div>
@@ -144,6 +135,7 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
                         item={item} 
                         currentUser={currentUser} 
                         onDelete={setItemToDelete}
+                        staggerDelay={index * 100}
                     />
                 </div>
                 ))

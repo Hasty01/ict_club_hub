@@ -403,20 +403,32 @@ export const getProjectData = async (): Promise<ProjectData | null> => {
         throw taskError;
     }
 
-    const { data: assignments, error: assignError } = await supabase.from('project_task_assignees').select('task_id, user_uid');
+    const { data: assignments, error: assignError } = await supabase.from('project_task_assignees').select('*');
     if (assignError) {
         console.error("Failed to get task assignments:", assignError);
         throw assignError;
     }
 
-    // Create a map of taskId -> [userIds] for easy lookup
+    // Create maps for assignees and submissions
     const assignmentsMap = new Map<string, string[]>();
+    const submissionsMap = new Map<string, { [userId: string]: { filePath: string; submittedAt: string } }>();
+
     assignments.forEach(a => {
         const taskIdStr = String(a.task_id);
         if (!assignmentsMap.has(taskIdStr)) {
             assignmentsMap.set(taskIdStr, []);
         }
         assignmentsMap.get(taskIdStr)!.push(a.user_uid);
+
+        if (a.submission_file_path && a.submitted_at) {
+            if (!submissionsMap.has(taskIdStr)) {
+                submissionsMap.set(taskIdStr, {});
+            }
+            submissionsMap.get(taskIdStr)![a.user_uid] = {
+                filePath: a.submission_file_path,
+                submittedAt: a.submitted_at
+            };
+        }
     });
 
     const projectData: ProjectData = {
@@ -431,13 +443,12 @@ export const getProjectData = async (): Promise<ProjectData | null> => {
             id: taskIdStr,
             content: t.content,
             columnId: String(t.column_id),
-            assigneeIds: assignmentsMap.get(taskIdStr) || [], // Populate from the map
+            assigneeIds: assignmentsMap.get(taskIdStr) || [],
             isCompleted: t.is_completed,
             priority: t.priority,
             dueDate: t.due_date,
             tags: t.tags || [],
-            submissionFilePath: t.submission_file_path,
-            submittedAt: t.submitted_at,
+            submissions: submissionsMap.get(taskIdStr)
         };
     });
 
@@ -621,9 +632,9 @@ export const uploadTaskSubmission = async (taskId: string, file: File, userId: s
   if (uploadError) throw uploadError;
 
   const { error: updateError } = await supabase
-    .from('project_tasks')
+    .from('project_task_assignees')
     .update({ submission_file_path: filePath, submitted_at: new Date().toISOString() })
-    .eq('id', taskId);
+    .match({ task_id: taskId, user_uid: userId });
 
   if (updateError) {
     // If DB update fails, try to clean up the uploaded file
@@ -634,7 +645,7 @@ export const uploadTaskSubmission = async (taskId: string, file: File, userId: s
   return filePath;
 };
 
-export const deleteTaskSubmission = async (taskId: string, filePath: string) => {
+export const deleteTaskSubmission = async (taskId: string, userId: string, filePath: string) => {
   const { error: deleteError } = await supabase.storage
     .from('resource_uploads')
     .remove([filePath]);
@@ -642,9 +653,9 @@ export const deleteTaskSubmission = async (taskId: string, filePath: string) => 
   if (deleteError) throw deleteError;
 
   const { error: updateError } = await supabase
-    .from('project_tasks')
+    .from('project_task_assignees')
     .update({ submission_file_path: null, submitted_at: null })
-    .eq('id', taskId);
+    .match({ task_id: taskId, user_uid: userId });
   
   if (updateError) throw updateError;
 };

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, AttendanceRecord, AttendanceStatus } from '../types';
 import * as api from '../services/apiService';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
@@ -51,16 +52,32 @@ const AvatarSelectionModal: React.FC<{
 };
 
 
-const StatCard: React.FC<{icon: React.ReactElement<{className?: string}>, label: string, value: number, percentage: string, color: string}> = ({ icon, label, value, percentage, color }) => (
-    <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
-        <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${color}`}>
-            {React.cloneElement(icon, { className: 'h-6 w-6' })}
+const StatCard: React.FC<{icon: React.ReactElement<{className?: string}>, label: string, value: number, percentage: string, color: string}> = ({ icon, label, value, percentage, color }) => {
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const element = ref.current;
+        if (!element) return;
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) {
+                element.classList.add('is-visible');
+                observer.unobserve(element);
+            }
+        }, { threshold: 0.1 });
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
+
+    return (
+        <div ref={ref} className="scroll-animate bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+            <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${color}`}>
+                {React.cloneElement(icon, { className: 'h-6 w-6' })}
+            </div>
+            <p className="text-3xl font-bold mt-2 text-gray-800 dark:text-gray-200">{value}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
+            <p className="text-xs font-mono text-gray-400 dark:text-gray-500 mt-1">{percentage}%</p>
         </div>
-        <p className="text-3xl font-bold mt-2 text-gray-800 dark:text-gray-200">{value}</p>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
-        <p className="text-xs font-mono text-gray-400 dark:text-gray-500 mt-1">{percentage}%</p>
-    </div>
-);
+    );
+};
 
 const ChangePasswordForm: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     const [newPassword, setNewPassword] = useState('');
@@ -70,6 +87,20 @@ const ChangePasswordForm: React.FC<{ currentUser: User }> = ({ currentUser }) =>
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isNewPasswordVisible, setIsNewPasswordVisible] = useState(false);
     const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const element = ref.current;
+        if (!element) return;
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) {
+                element.classList.add('is-visible');
+                observer.unobserve(element);
+            }
+        }, { threshold: 0.1 });
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -100,7 +131,7 @@ const ChangePasswordForm: React.FC<{ currentUser: User }> = ({ currentUser }) =>
     };
 
     return (
-        <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+        <div ref={ref} className="scroll-animate mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Change Password</h3>
             <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
                  <div>
@@ -148,6 +179,20 @@ const ChangePasswordForm: React.FC<{ currentUser: User }> = ({ currentUser }) =>
 
 const AppearanceSettings: React.FC = () => {
     const [selectedCursor, setSelectedCursor] = useState<CursorVariant>('normal');
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const element = ref.current;
+        if (!element) return;
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) {
+                element.classList.add('is-visible');
+                observer.unobserve(element);
+            }
+        }, { threshold: 0.1 });
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
 
     useEffect(() => {
         const saved = localStorage.getItem('app_cursor') as CursorVariant;
@@ -198,7 +243,7 @@ const AppearanceSettings: React.FC = () => {
     ];
 
     return (
-        <div className="mt-6">
+        <div ref={ref} className="scroll-animate mt-6">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Cursor Customization</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
                 Personalize your experience by choosing a custom cursor style. 
@@ -241,6 +286,25 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
     const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'details' | 'appearance'>('details');
     const { fetchUsers, fetchFeedItems, fetchProjectData } = useData();
+    const badgesRef = useRef<HTMLDivElement>(null);
+    const summaryRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const elements = [badgesRef.current, summaryRef.current].filter(Boolean);
+        if (elements.length === 0) return;
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.1 });
+
+        elements.forEach(el => el && observer.observe(el));
+        return () => observer.disconnect();
+    }, []);
 
     useEffect(() => {
         const fetchAttendance = async () => {
@@ -360,7 +424,7 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
                             </div>
 
                             {/* Badges Section */}
-                            <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+                            <div ref={badgesRef} className="scroll-animate mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
                                 <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
                                     <BadgeCheckIcon className="h-6 w-6 text-yellow-500" />
                                     Badges & Achievements
@@ -381,7 +445,7 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
                                 )}
                             </div>
 
-                            <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+                            <div ref={summaryRef} className="scroll-animate mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
                                 <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Attendance Summary</h3>
                                 {isLoading ? (
                                     <p className="text-gray-500 dark:text-gray-400">Loading attendance data...</p>

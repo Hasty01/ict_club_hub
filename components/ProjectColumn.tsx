@@ -1,6 +1,5 @@
 
-
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { ProjectColumn as ProjectColumnType, ProjectTask, User } from '../types';
 import ProjectTaskCard from './ProjectTaskCard';
 import DropIndicator from './DropIndicator';
@@ -21,7 +20,7 @@ interface ProjectColumnProps {
   onToggleTaskCompletion: (taskId: string, currentStatus: boolean) => void;
   onEditTask: (task: ProjectTask) => void;
   onSubmitTaskFile: (taskId: string, file: File) => Promise<void>;
-  onDeleteSubmission: (taskId: string, filePath: string) => Promise<void>;
+  onDeleteSubmission: (taskId: string, userId: string, filePath: string) => Promise<void>;
 }
 
 const getDragAfterElement = (container: HTMLElement, y: number) => {
@@ -45,6 +44,26 @@ const ProjectColumn: React.FC<ProjectColumnProps> = (props) => {
     onDragStart, onDrop, onDeleteTask, onToggleTaskAssignee, onToggleTaskCompletion, onEditTask,
     onSubmitTaskFile, onDeleteSubmission
   } = props;
+
+  const columnRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const element = columnRef.current;
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          element.classList.add('is-visible');
+          observer.unobserve(element);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -70,7 +89,8 @@ const ProjectColumn: React.FC<ProjectColumnProps> = (props) => {
 
   return (
     <div
-      className="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-4 w-80 flex-shrink-0 border border-gray-200 dark:border-gray-700 h-full flex flex-col"
+      ref={columnRef}
+      className="scroll-animate-fade bg-gray-100 dark:bg-gray-800/50 rounded-lg p-4 w-80 flex-shrink-0 border border-gray-200 dark:border-gray-700 h-full flex flex-col"
     >
       <h3 className="font-bold text-gray-700 dark:text-gray-300 mb-4 flex-shrink-0">{column.title} ({tasks.length})</h3>
       <div 

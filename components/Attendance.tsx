@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { AttendanceRecord, AttendanceStatus, User } from '../types';
 import * as api from '../services/apiService';
@@ -45,6 +45,32 @@ const formatDate = (dateString: string) => {
   }
 };
 
+const useScrollAnimation = (delay = 0) => {
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const element = ref.current;
+        if (!element) return;
+        
+        element.style.transitionDelay = `${delay}ms`;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    element.classList.add('is-visible');
+                    observer.unobserve(element);
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [delay]);
+
+    return ref;
+};
+
 const Attendance: React.FC<AttendanceProps> = ({ currentUser, visible = true }) => {
   const { 
     attendance: attendanceRecords, 
@@ -61,6 +87,12 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, visible = true }) 
   const [selectedStatus, setSelectedStatus] = useState<AttendanceStatus>('Present');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shouldRenderChart, setShouldRenderChart] = useState(false);
+
+  // Animation Refs
+  const formRef = useScrollAnimation();
+  const logRef = useScrollAnimation(100);
+  const summaryRef = useScrollAnimation(200);
+  const trendRef = useScrollAnimation(100);
 
   // Delay chart rendering slightly to allow layout to compute dimensions
   useEffect(() => {
@@ -204,7 +236,7 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, visible = true }) 
 
   return (
     <>
-      <div className="mb-8 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+      <div ref={formRef} className="scroll-animate mb-8 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Record Your Attendance</h2>
@@ -283,7 +315,7 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, visible = true }) 
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3 mb-8">
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+        <div ref={logRef} className="scroll-animate lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">Attendance Log</h2>
           <div className="overflow-x-auto">
              {attendanceRecords.length > 0 ? (
@@ -314,7 +346,7 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, visible = true }) 
              )}
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+        <div ref={summaryRef} className="scroll-animate bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4 text-center">Summary</h2>
           <div style={{ width: '100%', height: 300 }}>
             {shouldRenderChart ? (
@@ -350,7 +382,7 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, visible = true }) 
         </div>
       </div>
       
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+      <div ref={trendRef} className="scroll-animate bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">Attendance Trend</h2>
            {lineChartData.length > 1 ? (
             <div className="h-80 w-full">
