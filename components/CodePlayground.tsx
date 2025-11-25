@@ -505,7 +505,7 @@ builtins.input = custom_input_async
             <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Code Playground</h2>
             <p className="text-gray-600 dark:text-gray-400 mt-1">Execute Python code locally in your browser.</p>
         </div>
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center flex-wrap justify-end gap-2 sm:gap-4">
             <button
                 onClick={triggerFileUpload}
                 className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors shadow-sm"
