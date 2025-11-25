@@ -85,11 +85,12 @@ export const signUpAsPatron = async (userData: Omit<User, 'uid' | 'role' | 'stat
 
 export const getUserProfile = async (userId: string): Promise<User | null> => {
   // Query using 'uid' as primary key
-  const { data, error } = await supabase.from('users').select('*').eq('uid', userId).single();
+  const { data, error } = await supabase.from('users').select('*').eq('uid', userId).maybeSingle();
   if (error) {
       console.error("Error fetching user profile:", error);
       return null;
   }
+  if (!data) return null;
   return {
       uid: data.uid,
       email: data.email,
@@ -556,14 +557,20 @@ export const markAllNotificationsAsRead = async (userId: string) => {
 // --- Chat ---
 
 export const getRooms = async (userId: string): Promise<Room[]> => {
-    const { data, error } = await supabase.from('rooms').select('*').contains('participant_ids', [userId]);
+    // Use metadata containment check for participants, as there is no participant_ids column in the provided schema
+    const { data, error } = await supabase
+        .from('rooms')
+        .select('*')
+        .contains('metadata', { participants: [userId] });
+
     if (error) throw error;
     return data.map((r: any) => ({
         id: r.id,
         title: r.title,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
-        participantIds: r.participant_ids,
+        // Extract participants from metadata
+        participantIds: r.metadata?.participants || [],
         createdBy: r.created_by,
     }));
 };
@@ -571,8 +578,9 @@ export const getRooms = async (userId: string): Promise<Room[]> => {
 export const createRoom = async (title: string | null, participantIds: string[]): Promise<string> => {
     const { data, error } = await supabase.from('rooms').insert({
         title,
-        participant_ids: participantIds,
-        created_by: participantIds[0]
+        // Store participants in metadata JSONB
+        metadata: { participants: participantIds },
+        created_by: participantIds[0] // Assuming first user is creator, schema has created_by column
     }).select().single();
     if (error) throw error;
     return data.id;
@@ -590,18 +598,24 @@ export const deleteRoom = async (roomId: string) => {
 };
 
 export const addRoomMembers = async (roomId: string, userIds: string[]) => {
-    const { data: room } = await supabase.from('rooms').select('participant_ids').eq('id', roomId).single();
+    const { data: room } = await supabase.from('rooms').select('metadata').eq('id', roomId).single();
     if (room) {
-        const newParticipants = [...new Set([...room.participant_ids, ...userIds])];
-        await supabase.from('rooms').update({ participant_ids: newParticipants }).eq('id', roomId);
+        const currentParticipants = room.metadata?.participants || [];
+        const newParticipants = [...new Set([...currentParticipants, ...userIds])];
+        await supabase.from('rooms').update({ 
+            metadata: { ...room.metadata, participants: newParticipants } 
+        }).eq('id', roomId);
     }
 };
 
 export const removeGroupMember = async (roomId: string, userId: string) => {
-    const { data: room } = await supabase.from('rooms').select('participant_ids').eq('id', roomId).single();
+    const { data: room } = await supabase.from('rooms').select('metadata').eq('id', roomId).single();
     if (room) {
-        const newParticipants = room.participant_ids.filter((id: string) => id !== userId);
-        await supabase.from('rooms').update({ participant_ids: newParticipants }).eq('id', roomId);
+        const currentParticipants = room.metadata?.participants || [];
+        const newParticipants = currentParticipants.filter((id: string) => id !== userId);
+        await supabase.from('rooms').update({ 
+            metadata: { ...room.metadata, participants: newParticipants } 
+        }).eq('id', roomId);
     }
 };
 
