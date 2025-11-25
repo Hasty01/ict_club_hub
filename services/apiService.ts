@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, Resource, Notification, Room, Message, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType } from '../types';
+import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, Resource, Notification, Room, Message, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab } from '../types';
 
 // --- Auth & User ---
 
@@ -466,14 +466,74 @@ export const moveProjectTask = async (taskId: string, destinationColumnId: strin
     if (error) throw error;
 };
 
-export const updateTaskAssignee = async (taskId: string, assigneeId: string | null) => {
+export const updateTaskAssignee = async (taskId: string, assigneeId: string | null, assigner: { uid: string, name: string }) => {
+    // Get task details before update to check old assignee
+    const { data: taskBeforeUpdate, error: taskFetchError } = await supabase
+        .from('project_tasks')
+        .select('content, assignee_uid')
+        .eq('id', taskId)
+        .single();
+    if (taskFetchError) throw taskFetchError;
+
+    const oldAssigneeId = taskBeforeUpdate.assignee_uid;
+
+    // Perform the update
     const { error } = await supabase.from('project_tasks').update({ assignee_uid: assigneeId }).eq('id', taskId);
     if (error) throw error;
+
+    // If new assignee exists, is different from old one, and is not the assigner themselves
+    if (assigneeId && assigneeId !== oldAssigneeId && assigneeId !== assigner.uid) {
+        try {
+            await supabase.from('notifications').insert({
+                user_uid: assigneeId,
+                message: `${assigner.name} assigned you a task: "${taskBeforeUpdate.content}"`,
+                is_read: false,
+                link_to: 'projects'
+            });
+        } catch (notifError) {
+            console.error("Failed to send assignment notification:", notifError);
+            // Don't fail the whole operation if notification fails
+        }
+    }
 };
 
 export const toggleProjectTaskCompletion = async (taskId: string, isCompleted: boolean, userId: string) => {
     const { error } = await supabase.from('project_tasks').update({ is_completed: isCompleted }).eq('id', taskId);
     if (error) throw error;
+
+    // If task is being marked as complete, notify patrons
+    if (isCompleted) {
+        try {
+            // Get user who completed the task
+            const { data: user } = await supabase.from('users').select('name').eq('uid', userId).single();
+            if (!user) return; // User not found, can't create message
+
+            // Get task content
+            const { data: task } = await supabase.from('project_tasks').select('content').eq('id', taskId).single();
+            if (!task) return; // Task not found
+
+            // Get all patrons but not the user who completed it if they are a patron
+            const { data: patrons } = await supabase.from('users').select('uid').eq('role', 'PATRON');
+
+            if (patrons && patrons.length > 0) {
+                const notifications = patrons
+                    .filter(p => p.uid !== userId) // Don't notify person who completed it
+                    .map((p: any) => ({
+                        user_uid: p.uid,
+                        message: `${user.name} completed the task: "${task.content}"`,
+                        is_read: false,
+                        link_to: 'projects' as Tab,
+                    }));
+
+                if (notifications.length > 0) {
+                    await supabase.from('notifications').insert(notifications);
+                }
+            }
+        } catch (notifError) {
+            console.error("Failed to send task completion notification:", notifError);
+            // Don't fail the whole operation
+        }
+    }
 };
 
 // --- Resources ---
