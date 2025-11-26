@@ -11,7 +11,6 @@ import PatronSignUp from './components/PatronSignUp';
 import PendingApprovalModal from './components/PendingApprovalModal';
 import FeatureTourModal from './components/FeatureTourModal';
 import CustomCursor from './components/CustomCursor';
-import Notifications from './components/Notifications';
 import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
 import { MenuIcon } from './components/icons/MenuIcon';
@@ -283,8 +282,6 @@ const App: React.FC = () => {
                         {theme === 'light' ? <MoonIcon /> : <SunIcon />}
                     </button>
 
-                    <Notifications currentUser={user} setActiveTab={handleTabChange} isSidebarCollapsed={false} />
-                    
                     <button
                         onClick={handleLogout}
                         className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-red-500 dark:hover:text-red-400 transition-colors"

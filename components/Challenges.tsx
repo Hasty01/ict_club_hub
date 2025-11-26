@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { User, Challenge, ChallengeSubmission, SubmissionStatus } from '../types';
 import { useData } from '../DataContext';
 import * as api from '../services/apiService';
+import { analyzeChallengeSubmission } from '../services/geminiService';
 import { TrophyIcon } from './icons/TrophyIcon';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
@@ -12,6 +13,7 @@ import { XIcon } from './icons/XIcon';
 import { CheckIcon } from './icons/CheckIcon';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { PlayIcon } from './icons/PlayIcon';
+import { SparklesIcon } from './icons/SparklesIcon';
 import CodeRunnerModal from './CodeRunnerModal';
 
 interface ChallengesProps {
@@ -298,6 +300,49 @@ const SubmitSolutionModal: React.FC<{ isOpen: boolean, onClose: () => void, onSu
     );
 };
 
+const AnalysisModal: React.FC<{ isOpen: boolean, onClose: () => void, content: string, isLoading: boolean }> = ({ isOpen, onClose, content, isLoading }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[80vh]">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded-full transition-colors"><XIcon /></button>
+                
+                <div className="flex items-center gap-4 mb-6">
+                    <div className="p-3 bg-pink-100 dark:bg-pink-900/30 rounded-xl">
+                        <SparklesIcon className="w-8 h-8 text-pink-600 dark:text-pink-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                            AI Analysis
+                        </h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Powered by Gemini</p>
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                    {isLoading ? (
+                        <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
+                            <p className="text-gray-500 animate-pulse">Analyzing submission...</p>
+                        </div>
+                    ) : (
+                        content
+                    )}
+                </div>
+                
+                <div className="mt-6 flex justify-end">
+                    <button 
+                        onClick={onClose} 
+                        className="px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:opacity-90 transition-opacity"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 const ReviewSubmissionsModal: React.FC<{ 
     isOpen: boolean, 
     onClose: () => void, 
@@ -311,6 +356,13 @@ const ReviewSubmissionsModal: React.FC<{
     const [runnerOpen, setRunnerOpen] = useState(false);
     const [runnerCode, setRunnerCode] = useState('');
     const [runnerTitle, setRunnerTitle] = useState('');
+
+    // AI Analysis State
+    const [analysis, setAnalysis] = useState<{ isOpen: boolean, content: string, isLoading: boolean }>({
+        isOpen: false,
+        content: '',
+        isLoading: false
+    });
 
     useEffect(() => {
         if (isOpen && challengeId) {
@@ -340,6 +392,16 @@ const ReviewSubmissionsModal: React.FC<{
         setRunnerTitle(`Submission by ${userName}`);
         setRunnerOpen(true);
     };
+
+    const handleAnalyze = async (sub: ChallengeSubmission) => {
+        setAnalysis({ isOpen: true, content: '', isLoading: true });
+        try {
+            const result = await analyzeChallengeSubmission(challengeTitle, sub.content);
+            setAnalysis({ isOpen: true, content: result, isLoading: false });
+        } catch (e) {
+            setAnalysis({ isOpen: true, content: "Error analyzing submission. Please ensure your API key is configured.", isLoading: false });
+        }
+    }
 
     if (!isOpen) return null;
 
@@ -371,14 +433,23 @@ const ReviewSubmissionsModal: React.FC<{
                                         </span>
                                     </div>
                                     <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600 mb-3 relative group">
-                                        <button 
-                                            onClick={() => handleRunCode(sub.content, sub.userName)}
-                                            className="absolute top-2 right-2 p-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md text-gray-500 dark:text-gray-400 transition-all shadow-sm border border-gray-200 dark:border-gray-600"
-                                            title="Run Code"
-                                        >
-                                            <PlayIcon className="w-4 h-4" />
-                                        </button>
-                                        <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono max-h-60 overflow-y-auto custom-scrollbar">{sub.content}</pre>
+                                        <div className="absolute top-2 right-2 flex gap-1">
+                                            <button 
+                                                onClick={() => handleAnalyze(sub)}
+                                                className="p-1.5 bg-gray-100 hover:bg-purple-100 hover:text-purple-600 dark:bg-gray-700 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 rounded-md text-gray-500 dark:text-gray-400 transition-all shadow-sm border border-gray-200 dark:border-gray-600"
+                                                title="Analyze with AI"
+                                            >
+                                                <SparklesIcon className="w-4 h-4" />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleRunCode(sub.content, sub.userName)}
+                                                className="p-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md text-gray-500 dark:text-gray-400 transition-all shadow-sm border border-gray-200 dark:border-gray-600"
+                                                title="Run Code"
+                                            >
+                                                <PlayIcon className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono max-h-60 overflow-y-auto custom-scrollbar pt-8">{sub.content}</pre>
                                     </div>
                                     {sub.status === 'PENDING' && (
                                         <div className="flex gap-2 justify-end">
@@ -401,6 +472,12 @@ const ReviewSubmissionsModal: React.FC<{
                 onClose={() => setRunnerOpen(false)}
                 code={runnerCode}
                 title={runnerTitle}
+            />
+            <AnalysisModal 
+                isOpen={analysis.isOpen}
+                content={analysis.content}
+                isLoading={analysis.isLoading}
+                onClose={() => setAnalysis(prev => ({ ...prev, isOpen: false }))}
             />
         </>
     );

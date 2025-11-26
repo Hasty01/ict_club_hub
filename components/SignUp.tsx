@@ -1,4 +1,6 @@
 
+
+
 import React, { useState } from 'react';
 import { User } from '../types';
 import { EyeIcon } from './icons/EyeIcon';
@@ -7,6 +9,7 @@ import { UserIcon } from './icons/UserIcon';
 import { MailIcon } from './icons/MailIcon';
 import { PhoneIcon } from './icons/PhoneIcon';
 import { LockClosedIcon } from './icons/LockClosedIcon';
+import { AcademicCapIcon } from './icons/AcademicCapIcon';
 import PendingApprovalModal from './PendingApprovalModal';
 
 interface SignUpProps {
@@ -19,6 +22,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [skillLevel, setSkillLevel] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'>('BEGINNER');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,14 +36,14 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
     setError(null);
     setMessage(null);
 
-    if (!name || !username || !email || !password) {
+    if (!name || !username || !email || !password || !phoneNumber) {
         setError("All fields are required.");
         return;
     }
     
     setIsLoading(true);
     try {
-        await onSignUp({ name, username, email, password, phoneNumber });
+        await onSignUp({ name, username, email, password, phoneNumber, skillLevel });
         setMessage('Sign up successful! Your account is pending approval.');
         setIsSignedUp(true);
         setShowPendingModal(true);
@@ -48,6 +52,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
         setEmail('');
         setPassword('');
         setPhoneNumber('');
+        setSkillLevel('BEGINNER');
     } catch (err: any) {
         setError(err.message || 'An unknown error occurred.');
     } finally {
@@ -148,22 +153,45 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onNavigateToLogin }) => {
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label htmlFor="phone-number" className="block text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Phone (Optional)</label>
-            <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                    <PhoneIcon />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1">
+                <label htmlFor="phone-number" className="block text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Phone</label>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                        <PhoneIcon />
+                    </div>
+                    <input
+                    id="phone-number"
+                    type="tel"
+                    required
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                    placeholder="+1 234..."
+                    disabled={isLoading || isSignedUp}
+                    autoComplete="tel"
+                    />
                 </div>
-                <input
-                id="phone-number"
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
-                placeholder="+1 234 567 890"
-                disabled={isLoading || isSignedUp}
-                autoComplete="tel"
-                />
+            </div>
+
+            <div className="space-y-1">
+                <label htmlFor="skill-level" className="block text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Skill Level</label>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                        <AcademicCapIcon className="w-5 h-5" />
+                    </div>
+                    <select
+                        id="skill-level"
+                        value={skillLevel}
+                        onChange={(e) => setSkillLevel(e.target.value as 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED')}
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all appearance-none"
+                        disabled={isLoading || isSignedUp}
+                    >
+                        <option value="BEGINNER">Beginner</option>
+                        <option value="INTERMEDIATE">Intermediate</option>
+                        <option value="ADVANCED">Advanced</option>
+                    </select>
+                </div>
             </div>
           </div>
 

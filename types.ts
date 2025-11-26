@@ -11,6 +11,7 @@ export interface User {
   status: 'APPROVED' | 'PENDING';
   avatarUrl?: string;
   phoneNumber?: string;
+  skillLevel?: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
   badges?: string[]; // List of challenge titles won
   lastLogin?: string; // ISO Date string
 }

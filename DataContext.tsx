@@ -391,6 +391,9 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
                     userId: newNotifRaw.user_uid,
                 };
                 setNotifications(prev => [newNotif, ...prev]);
+                
+                // Trigger Toast for new notification
+                showToast(newNotif.message, 'info');
             }
         )
         .subscribe();
@@ -399,7 +402,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         supabase.removeChannel(messageChannel);
         supabase.removeChannel(notificationChannel);
     };
-  }, [currentUser, rooms]); 
+  }, [currentUser, rooms, showToast]); 
 
 
   // Fetch all data when the provider mounts

@@ -1,5 +1,6 @@
 
 
+
 import { supabase } from './supabaseClient';
 import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, Resource, Notification, Room, Message, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab } from '../types';
 
@@ -25,6 +26,7 @@ export const signUp = async (userData: Omit<User, 'uid' | 'role' | 'status' | 'a
         name: userData.name,
         username: userData.username,
         phoneNumber: userData.phoneNumber,
+        skillLevel: userData.skillLevel,
         role: 'MEMBER',
         status: 'PENDING'
       }
@@ -40,6 +42,7 @@ export const signUp = async (userData: Omit<User, 'uid' | 'role' | 'status' | 'a
           name: userData.name,
           username: userData.username,
           phone_number: userData.phoneNumber,
+          skill_level: userData.skillLevel,
           role: 'MEMBER',
           status: 'PENDING'
       }).select().single();
@@ -101,6 +104,7 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
       status: data.status,
       avatarUrl: data.avatar_url,
       phoneNumber: data.phone_number,
+      skillLevel: data.skill_level,
       badges: data.badges,
       lastLogin: data.last_login
   };
@@ -118,6 +122,7 @@ export const getUsers = async (): Promise<User[]> => {
         status: u.status,
         avatarUrl: u.avatar_url,
         phoneNumber: u.phone_number,
+        skillLevel: u.skill_level,
         badges: u.badges,
         lastLogin: u.last_login
     }));
@@ -131,6 +136,7 @@ export const updateUser = async (uid: string, data: Partial<User>) => {
     if (data.status) updates.status = data.status;
     if (data.avatarUrl) updates.avatar_url = data.avatarUrl;
     if (data.phoneNumber) updates.phone_number = data.phoneNumber;
+    if (data.skillLevel) updates.skill_level = data.skillLevel;
     if (data.badges) updates.badges = data.badges;
     if (data.lastLogin) updates.last_login = data.lastLogin;
 

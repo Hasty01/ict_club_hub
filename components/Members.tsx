@@ -93,6 +93,7 @@ const Members: React.FC<MembersProps> = ({ currentUser }) => {
                             <tr>
                                 <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Name</th>
                                 <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Phone Number</th>
+                                <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Skill Level</th>
                                 <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Role</th>
                                 {activeTab === 'active' && (
                                     <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Last Seen</th>
@@ -123,6 +124,9 @@ const Members: React.FC<MembersProps> = ({ currentUser }) => {
                                     </td>
                                     <td className="py-4 px-4 text-sm text-gray-500 dark:text-gray-400">
                                         {user.phoneNumber || 'N/A'}
+                                    </td>
+                                    <td className="py-4 px-4 text-sm text-gray-500 dark:text-gray-400">
+                                        {user.skillLevel || '-'}
                                     </td>
                                     <td className="py-4 px-4">
                                         <span className={`px-3 py-1 text-xs font-medium rounded-full ${user.role === 'PATRON' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'}`}>

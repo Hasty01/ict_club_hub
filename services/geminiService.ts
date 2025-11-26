@@ -70,3 +70,34 @@ export const getAIChatResponse = async (history: { role: 'user' | 'model', parts
     const response = await chat.sendMessage({ message });
     return response.text;
 };
+
+export const analyzeChallengeSubmission = async (challengeTitle: string, submissionContent: string): Promise<string> => {
+  const model = "gemini-2.5-flash";
+  const prompt = `
+    You are an expert coding tutor for a high school ICT club.
+    A student has submitted a solution for the challenge: "${challengeTitle}".
+
+    Here is their submission:
+    """
+    ${submissionContent}
+    """
+
+    Please provide a short, constructive analysis.
+    1. Is it correct/does it solve the problem? (If you can't tell for sure, say so).
+    2. Code quality/Style feedback.
+    3. A clear recommendation: APPROVE or REJECT.
+    
+    Format the output clearly.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+    });
+    return response.text || "No analysis generated.";
+  } catch (error) {
+    console.error("Gemini Analysis Error:", error);
+    throw new Error("Failed to analyze submission.");
+  }
+};
