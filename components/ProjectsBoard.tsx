@@ -26,7 +26,8 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     isLoadingUsers, 
     projectDataError,
     allUsersError,
-    fetchProjectData 
+    fetchProjectData,
+    showToast
   } = useData();
 
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
@@ -83,7 +84,7 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
             await api.moveProjectTask(currentDraggedItemId, destinationColumnId);
         } catch (error: any) {
             console.error("Failed to move task:", error);
-            alert(`An error occurred while moving the task. Reverting changes.`);
+            showToast("Failed to move task. Reverting changes.", "error");
             setProjectData(oldData); 
         }
     }
@@ -103,13 +104,15 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     if (editingTask) {
         // Edit existing task
         await api.updateProjectTask(editingTask.id, taskData, { uid: currentUser.uid, name: currentUser.name });
+        showToast("Task updated successfully!", "success");
     } else {
         // Create new task
         const firstColumnId = data?.columnOrder[0];
         if (firstColumnId) {
              await api.addProjectTask(taskData, currentUser.uid, firstColumnId);
+             showToast("New task created!", "success");
         } else {
-            alert("No columns available to add tasks.");
+            showToast("No columns available to add tasks.", "error");
         }
     }
     await fetchProjectData();
@@ -124,9 +127,10 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     try {
         await api.deleteProjectTask(taskToDelete.taskId, taskToDelete.columnId);
         await fetchProjectData();
+        showToast("Task deleted.", "info");
     } catch (error: any) {
         console.error("Failed to delete task:", error);
-        alert(`Could not delete the task: ${error.message}`);
+        showToast(`Could not delete task: ${error.message}`, "error");
     } finally {
         setTaskToDelete(null);
     }
@@ -151,7 +155,7 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
         await api.updateTaskAssignees(taskId, newAssignees, { uid: currentUser.uid, name: currentUser.name });
     } catch (error: any) {
         console.error("Failed to assign task:", error);
-        alert(`Could not update assignee: ${error.message}`);
+        showToast(`Could not update assignee: ${error.message}`, "error");
         setProjectData(oldData);
     }
   };
@@ -175,7 +179,7 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
         await api.updateTaskAssignees(taskId, newAssignees, { uid: currentUser.uid, name: currentUser.name });
     } catch (error: any) {
         console.error("Failed to set task assignee:", error);
-        alert(`Could not set assignee: ${error.message}`);
+        showToast(`Could not set assignee: ${error.message}`, "error");
         setProjectData(oldData); // Revert on failure
     }
   };
@@ -190,8 +194,10 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     }
     try {
         await api.toggleProjectTaskCompletion(taskId, !currentStatus, currentUser.uid);
+        if (!currentStatus) showToast("Task marked as complete!", "success");
     } catch (error: any) {
         console.error("Failed to toggle task:", error);
+        showToast("Failed to update task status.", "error");
         await fetchProjectData();
     }
   };
@@ -200,9 +206,10 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     try {
         await api.uploadTaskSubmission(taskId, file, currentUser.uid);
         await fetchProjectData();
+        showToast("File submitted successfully!", "success");
     } catch (error: any) {
         console.error("Failed to submit file:", error);
-        alert(`Could not submit file: ${error.message}`);
+        showToast(`Could not submit file: ${error.message}`, "error");
     }
   };
 
@@ -210,9 +217,10 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
     try {
         await api.deleteTaskSubmission(taskId, userId, filePath);
         await fetchProjectData();
+        showToast("Submission removed.", "info");
     } catch (error: any) {
         console.error("Failed to delete submission:", error);
-        alert(`Could not delete submission: ${error.message}`);
+        showToast(`Could not delete submission: ${error.message}`, "error");
     }
   };
 
@@ -227,12 +235,13 @@ const ProjectsBoard: React.FC<ProjectsBoardProps> = ({ currentUser }) => {
                   setProjectData(newData);
               }
           }
+          showToast("Grade saved!", "success");
       } catch (error: any) {
           console.error("Failed to grade submission:", error);
-          alert(`Could not save grade: ${error.message}`);
+          showToast(`Could not save grade: ${error.message}`, "error");
           await fetchProjectData(); // Revert on failure
       }
-  }, [data, setProjectData, fetchProjectData]);
+  }, [data, setProjectData, fetchProjectData, showToast]);
 
   if (isLoadingProjects || isLoadingUsers) {
     return <div className="text-center p-8 text-gray-500 dark:text-gray-400">Loading project board...</div>;

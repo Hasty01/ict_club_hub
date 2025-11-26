@@ -90,7 +90,7 @@ const AttendeesModal: React.FC<AttendeesModalProps> = ({ isOpen, onClose, activi
 };
 
 const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
-  const { activities, isLoadingActivities, activitiesError, fetchActivities, allUsers } = useData();
+  const { activities, isLoadingActivities, activitiesError, fetchActivities, allUsers, showToast } = useData();
   const [filter, setFilter] = useState<FilterType>('UPCOMING');
   const [viewMode, setViewMode] = useState<'LIST' | 'CALENDAR'>('LIST');
   
@@ -137,7 +137,8 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
   const handleAddActivity = useCallback(async (newActivity: Omit<Activity, 'id' | 'rsvpUserIds'>) => {
     await api.addActivity(newActivity);
     await fetchActivities(); // Refetch from context
-  }, [fetchActivities]);
+    showToast("Activity added successfully!", "success");
+  }, [fetchActivities, showToast]);
 
   const initiateRSVP = useCallback((activityId: string, isJoining: boolean) => {
       const activity = activities.find(a => a.id === activityId);
@@ -155,13 +156,14 @@ const Activities: React.FC<ActivitiesProps> = ({ currentUser }) => {
       try {
           await api.toggleRSVP(rsvpState.activityId, currentUser.uid, rsvpState.isJoining);
           await fetchActivities();
+          showToast(rsvpState.isJoining ? "RSVP Confirmed!" : "RSVP Cancelled.", "success");
       } catch (error) {
           console.error("RSVP failed", error);
-          alert("Failed to update RSVP status.");
+          showToast("Failed to update RSVP status.", "error");
       } finally {
           setRsvpState(prev => ({ ...prev, isOpen: false }));
       }
-  }, [rsvpState.activityId, rsvpState.isJoining, currentUser.uid, fetchActivities]);
+  }, [rsvpState.activityId, rsvpState.isJoining, currentUser.uid, fetchActivities, showToast]);
 
   const filteredAndSortedActivities = useMemo(() => {
     // Get today's date in EAT (YYYY-MM-DD)

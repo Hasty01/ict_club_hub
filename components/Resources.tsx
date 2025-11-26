@@ -14,7 +14,7 @@ interface ResourcesProps {
 }
 
 const Resources: React.FC<ResourcesProps> = ({ currentUser, setActiveTab }) => {
-    const { resources, isLoadingResources, resourcesError, fetchResources } = useData();
+    const { resources, isLoadingResources, resourcesError, fetchResources, showToast } = useData();
     const isPatron = currentUser.role === 'PATRON';
 
     // Form state
@@ -89,11 +89,12 @@ const Resources: React.FC<ResourcesProps> = ({ currentUser, setActiveTab }) => {
             setSelectedFile(null);
             
             await fetchResources(); // Refresh data
+            showToast("Resource added successfully!", "success");
         } catch (err: any) {
             console.error("Failed to add resource:", err);
             // Check for common RLS error message
             if (err.message && err.message.toLowerCase().includes('row-level security')) {
-                 setError("Permission Denied: Database Row-Level Security (RLS) policies are preventing this action. Please ensure you have enabled RLS and created policies for the 'resources' table and 'resource_files' storage bucket in your Supabase dashboard.");
+                 setError("Permission Denied: Database Row-Level Security (RLS) policies are preventing this action.");
             } else {
                  setError(err.message || "An unexpected error occurred.");
             }
@@ -111,9 +112,10 @@ const Resources: React.FC<ResourcesProps> = ({ currentUser, setActiveTab }) => {
         try {
             await api.deleteResource(resourceToDelete);
             await fetchResources();
+            showToast("Resource deleted.", "info");
         } catch (err: any) {
             console.error("Failed to delete resource:", err);
-            alert(err.message || "An error occurred.");
+            showToast(err.message || "An error occurred.", "error");
         } finally {
             setResourceToDelete(null);
         }

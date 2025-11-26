@@ -15,7 +15,7 @@ interface ShareCodeModalProps {
 }
 
 const ShareCodeModal: React.FC<ShareCodeModalProps> = ({ isOpen, onClose, code, currentUser }) => {
-    const { rooms, allUsers, fetchRooms } = useData();
+    const { rooms, allUsers, fetchRooms, showToast } = useData();
     const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]); // Stores Room IDs or User IDs
     const [searchTerm, setSearchTerm] = useState('');
     const [isSending, setIsSending] = useState(false);
@@ -102,13 +102,13 @@ const ShareCodeModal: React.FC<ShareCodeModalProps> = ({ isOpen, onClose, code, 
             // Refresh rooms just in case new ones were created
             await fetchRooms();
 
-            alert(`Code shared with ${selectedTargetIds.length} recipient(s)!`);
+            showToast(`Code shared with ${selectedTargetIds.length} recipient(s)!`, "success");
             onClose();
             setSelectedTargetIds([]);
             setComment('');
         } catch (error) {
             console.error("Failed to share code:", error);
-            alert("Failed to share code.");
+            showToast("Failed to share code.", "error");
         } finally {
             setIsSending(false);
         }

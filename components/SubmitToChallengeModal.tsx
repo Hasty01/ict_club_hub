@@ -15,7 +15,7 @@ interface SubmitToChallengeModalProps {
 }
 
 const SubmitToChallengeModal: React.FC<SubmitToChallengeModalProps> = ({ isOpen, onClose, code, currentUser }) => {
-    const { challenges, fetchChallenges } = useData();
+    const { challenges, fetchChallenges, showToast } = useData();
     const [selectedChallengeId, setSelectedChallengeId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -34,12 +34,12 @@ const SubmitToChallengeModal: React.FC<SubmitToChallengeModalProps> = ({ isOpen,
         try {
             await api.submitChallenge(selectedChallengeId, currentUser.uid, code);
             await fetchChallenges(); // Refresh data to potentially update UI elsewhere if needed
-            alert("Challenge submitted successfully!");
+            showToast("Challenge submitted successfully!", "success");
             onClose();
             setSelectedChallengeId(null);
         } catch (error: any) {
             console.error("Submission failed:", error);
-            alert("Failed to submit: " + error.message);
+            showToast("Failed to submit: " + error.message, "error");
         } finally {
             setIsSubmitting(false);
         }

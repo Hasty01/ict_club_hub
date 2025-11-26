@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
-import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, Notification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission } from './types';
+import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, Notification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType } from './types';
 import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
 
@@ -21,6 +21,11 @@ interface IDataContext {
   suggestions: Suggestion[];
   challenges: Challenge[];
   
+  // Toasts
+  toasts: Toast[];
+  showToast: (message: string, type?: ToastType) => void;
+  removeToast: (id: string) => void;
+
   // Chat Unread State
   unreadMessageCounts: Record<string, number>;
   clearUnreadCount: (roomId: string) => void;
@@ -85,6 +90,9 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [unreadMessageCounts, setUnreadMessageCounts] = useState<Record<string, number>>({});
+  
+  // Toast State
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
   const [isLoadingActivities, setIsLoadingActivities] = useState(true);
   const [isLoadingAttendance, setIsLoadingAttendance] = useState(true);
@@ -109,6 +117,15 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [showcaseError, setShowcaseError] = useState<string | null>(null);
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
   const [challengesError, setChallengesError] = useState<string | null>(null);
+
+  const showToast = useCallback((message: string, type: ToastType = 'info') => {
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    setToasts((prev) => [...prev, { id, message, type }]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
   // ... (keep existing fetch functions: fetchActivities, fetchAttendance, fetchFeedItems, etc.)
   const fetchActivities = useCallback(async () => {
@@ -455,6 +472,11 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     fetchShowcaseItems,
     fetchSuggestions,
     fetchChallenges,
+    
+    // New Toast exports
+    toasts,
+    showToast,
+    removeToast,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

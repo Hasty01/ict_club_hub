@@ -1,5 +1,4 @@
 
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { User, Tab } from './types';
 import Login from './components/Login';
@@ -16,13 +15,20 @@ import Notifications from './components/Notifications';
 import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
 import { MenuIcon } from './components/icons/MenuIcon';
-import { DataProvider } from './DataContext';
+import { DataProvider, useData } from './DataContext';
 import { SunIcon } from './components/icons/SunIcon';
 import { MoonIcon } from './components/icons/MoonIcon';
 import { LogoutIcon } from './components/icons/LogoutIcon';
+import ToastContainer from './components/Toast';
 
 type View = 'welcome' | 'login' | 'signup' | 'dashboard' | 'patronLogin' | 'patronSignUp';
 type Theme = 'light' | 'dark';
+
+// Helper component to render toasts inside the provider context
+const ToastRenderer = () => {
+    const { toasts, removeToast } = useData();
+    return <ToastContainer toasts={toasts} removeToast={removeToast} />;
+};
 
 const App: React.FC = () => {
   // Initialize theme from localStorage or default to 'dark'
@@ -315,6 +321,7 @@ const App: React.FC = () => {
               </main>
             </div>
           </div>
+          <ToastRenderer />
         </DataProvider>
       );
     }

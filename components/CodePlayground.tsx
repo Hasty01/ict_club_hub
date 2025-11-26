@@ -120,7 +120,7 @@ const PublishModal: React.FC<{ isOpen: boolean, onClose: () => void, onPublish: 
 };
 
 const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, setActiveTab }) => {
-  const { fetchShowcaseItems } = useData();
+  const { fetchShowcaseItems, showToast } = useData();
   const [code, setCode] = useState<string>(() => {
       if (typeof window !== 'undefined') {
           return localStorage.getItem('playground_code') || DEFAULT_CODE;
@@ -368,10 +368,10 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           if (setActiveTab) {
               setActiveTab('showcase');
           }
-          alert("Code published successfully!");
+          showToast("Code published successfully!", "success");
       } catch (error: any) {
           console.error("Publish failed:", error);
-          alert("Failed to publish code: " + error.message);
+          showToast("Failed to publish code: " + error.message, "error");
       }
   };
 
