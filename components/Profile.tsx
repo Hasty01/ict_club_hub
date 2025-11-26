@@ -420,11 +420,6 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
                                     <span className={`mt-3 inline-block px-3 py-1 text-sm font-semibold rounded-full ${currentUser.role === 'PATRON' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'}`}>
                                         {currentUser.role}
                                     </span>
-                                    {currentUser.skillLevel && (
-                                        <span className="mt-3 ml-2 inline-block px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">
-                                            {currentUser.skillLevel}
-                                        </span>
-                                    )}
                                 </div>
                             </div>
 
