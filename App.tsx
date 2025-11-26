@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { User, Tab } from './types';
 import Login from './components/Login';
@@ -78,6 +79,10 @@ const App: React.FC = () => {
                   if (!hasSeenTour) {
                       setShowTourModal(true);
                   }
+
+                  // Update Last Login
+                  api.updateUser(userId, { lastLogin: new Date().toISOString() })
+                     .catch(err => console.error("Failed to update last login:", err));
 
                   // Run attendance marking in background
                   api.markAttendanceOnLogin(userProfile.uid)

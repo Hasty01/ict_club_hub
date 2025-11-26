@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { User } from '../types';
 import * as api from '../services/apiService';
@@ -93,6 +94,9 @@ const Members: React.FC<MembersProps> = ({ currentUser }) => {
                                 <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Name</th>
                                 <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Phone Number</th>
                                 <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Role</th>
+                                {activeTab === 'active' && (
+                                    <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Last Seen</th>
+                                )}
                                 <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-400 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -125,6 +129,11 @@ const Members: React.FC<MembersProps> = ({ currentUser }) => {
                                             {user.role}
                                         </span>
                                     </td>
+                                    {activeTab === 'active' && (
+                                        <td className="py-4 px-4 text-sm text-gray-500 dark:text-gray-400">
+                                            {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Never'}
+                                        </td>
+                                    )}
                                     <td className="py-4 px-4 text-right">
                                         <div className="inline-flex items-center space-x-2">
                                             {activeTab === 'pending' && (

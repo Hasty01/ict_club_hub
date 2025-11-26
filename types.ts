@@ -12,6 +12,7 @@ export interface User {
   avatarUrl?: string;
   phoneNumber?: string;
   badges?: string[]; // List of challenge titles won
+  lastLogin?: string; // ISO Date string
 }
 
 export type ActivityCategory = 'WORKSHOP' | 'SOCIAL' | 'COMPETITION' | 'GUEST_SPEAKER' | 'OTHER';

@@ -101,7 +101,8 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
       status: data.status,
       avatarUrl: data.avatar_url,
       phoneNumber: data.phone_number,
-      badges: data.badges
+      badges: data.badges,
+      lastLogin: data.last_login
   };
 };
 
@@ -117,7 +118,8 @@ export const getUsers = async (): Promise<User[]> => {
         status: u.status,
         avatarUrl: u.avatar_url,
         phoneNumber: u.phone_number,
-        badges: u.badges
+        badges: u.badges,
+        lastLogin: u.last_login
     }));
 };
 
@@ -130,6 +132,7 @@ export const updateUser = async (uid: string, data: Partial<User>) => {
     if (data.avatarUrl) updates.avatar_url = data.avatarUrl;
     if (data.phoneNumber) updates.phone_number = data.phoneNumber;
     if (data.badges) updates.badges = data.badges;
+    if (data.lastLogin) updates.last_login = data.lastLogin;
 
     // Update where 'uid' matches
     const { error } = await supabase.from('users').update(updates).eq('uid', uid);
