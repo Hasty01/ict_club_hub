@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { User, Message, Room, Tab } from '../types';
 import { useData } from '../DataContext';
@@ -27,6 +29,7 @@ import ConfirmationModal from './ConfirmationModal';
 interface ChatProps {
     currentUser: User;
     setActiveTab: (tab: Tab) => void;
+    theme: 'light' | 'dark';
 }
 
 // --- Syntax Highlighting Components ---
@@ -450,7 +453,7 @@ const RoomDetailsModal: React.FC<{
     );
 };
 
-const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
+const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
     const { rooms, allUsers, isLoadingRooms, fetchRooms, unreadMessageCounts, clearUnreadCount, onlineUsers } = useData();
     const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -1154,7 +1157,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                                 <div className="absolute bottom-20 left-4 z-20 shadow-2xl rounded-xl overflow-hidden" ref={emojiPickerRef}>
                                     <EmojiPicker 
                                         onEmojiClick={onEmojiClick} 
-                                        theme={Theme.AUTO}
+                                        theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
                                         searchDisabled
                                         width={300}
                                         height={350}
@@ -1165,7 +1168,10 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab }) => {
                             <form onSubmit={handleSendMessage} className="flex items-end space-x-2 max-w-4xl mx-auto">
                                 <button
                                     type="button"
-                                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowEmojiPicker(!showEmojiPicker);
+                                    }}
                                     className="p-3 text-gray-400 dark:text-gray-500 hover:text-pink-500 dark:hover:text-pink-400 transition-colors rounded-full hover:bg-white dark:hover:bg-gray-800 shadow-sm border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
                                     aria-label="Insert Emoji"
                                 >

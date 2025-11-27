@@ -73,7 +73,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
             <Resources currentUser={currentUser} setActiveTab={setActiveTab} />
         </TabPanel>
         <TabPanel active={activeTab === 'chat'} className="h-full">
-            <Chat currentUser={currentUser} setActiveTab={setActiveTab} />
+            <Chat currentUser={currentUser} setActiveTab={setActiveTab} theme={theme} />
         </TabPanel>
         <TabPanel active={activeTab === 'suggestions'}>
             <Suggestions currentUser={currentUser} />
