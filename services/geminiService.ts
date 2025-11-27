@@ -122,6 +122,38 @@ export const getAIChatResponse = async (history: { role: 'user' | 'model', parts
     }
 };
 
+export const getAiTutorResponse = async (history: { role: 'user' | 'model', parts: [{ text: string }] }[], message: string) => {
+    if (!ai) {
+        return "I'm offline right now (API Key Missing).";
+    }
+
+    try {
+        const chat = ai.chats.create({
+            model: 'gemini-2.5-flash',
+            config: {
+                systemInstruction: `You are a friendly, patient, and wise AI Tutor for a high school ICT Club. 
+                Your goal is to TEACH, not to do the work for the students.
+                
+                CRITICAL RULES:
+                1. DO NOT write complete, functional code solutions for the user's specific problem.
+                2. If the user asks for code (e.g., "Write a calculator"), refuse politely and offer to explain the *logic*, *algorithm*, or provide *pseudocode* or *flowchart descriptions*.
+                3. You MAY provide generic syntax examples (e.g., "Here is the syntax for a python function") but do not fill it with the user's specific logic.
+                4. Guide the user with hints, questions, and debugging tips. Ask them Socratic questions to lead them to the answer.
+                5. If the user presents code that is broken, explain *why* it is broken and hint at the fix, do not just rewrite it fixed.
+                6. Be encouraging and fun. Use emojis occasionally.
+                7. Keep responses concise and easy to read.`
+            },
+            history: history
+        });
+
+        const response = await chat.sendMessage({ message });
+        return response.text;
+    } catch (error) {
+        console.error("Tutor Error:", error);
+        return "I'm having a bit of trouble thinking right now. Try again in a moment.";
+    }
+};
+
 export const analyzeChallengeSubmission = async (challengeTitle: string, submissionContent: string): Promise<string> => {
   if (!ai) {
       return "AI Analysis Unavailable: System configuration missing (API Key). Please check your Vercel Environment Variables.";

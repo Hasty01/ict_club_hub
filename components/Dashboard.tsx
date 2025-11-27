@@ -1,6 +1,7 @@
 
 import React, { Suspense, lazy } from 'react';
 import { User, Tab } from '../types';
+import AiTutor from './AiTutor';
 
 const Feed = lazy(() => import('./Feed'));
 const Activities = lazy(() => import('./Activities'));
@@ -83,6 +84,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
             </TabPanel>
         )}
       </Suspense>
+      
+      {/* Floating AI Tutor Widget */}
+      <AiTutor currentUser={currentUser} />
     </div>
   );
 };
