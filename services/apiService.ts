@@ -611,7 +611,12 @@ export const uploadTaskSubmission = async (taskId: string, file: File, userId: s
     .from('resource_uploads')
     .upload(filePath, file);
 
-  if (uploadError) throw uploadError;
+  if (uploadError) {
+      if (uploadError.message.includes("row-level security")) {
+          throw new Error("Storage not configured. Please run the SQL commands in README.md");
+      }
+      throw uploadError;
+  }
 
   const { error: updateError } = await supabase
     .from('project_task_assignees')
@@ -631,7 +636,9 @@ export const deleteTaskSubmission = async (taskId: string, userId: string, fileP
     .from('resource_uploads')
     .remove([filePath]);
 
-  if (deleteError) throw deleteError;
+  if (deleteError) {
+      console.warn("Failed to delete file from storage, but proceeding to clear DB reference.", deleteError);
+  }
 
   const { error: updateError } = await supabase
     .from('project_task_assignees')
@@ -671,7 +678,12 @@ export const uploadResourceFile = async (file: File, userId: string) => {
     const filePath = `${userId}/${fileName}`;
 
     const { error: uploadError } = await supabase.storage.from('resource_files').upload(filePath, file);
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+        if (uploadError.message.includes("row-level security")) {
+            throw new Error("Storage not configured. Please run the SQL commands in README.md");
+        }
+        throw uploadError;
+    }
 
     const { data } = supabase.storage.from('resource_files').getPublicUrl(filePath);
     return { url: data.publicUrl, path: filePath };
@@ -840,7 +852,12 @@ export const uploadChatFile = async (file: File, roomId: string, userId: string)
     const fileName = `${roomId}/${userId}/${Date.now()}.${fileExt}`;
     
     const { error: uploadError } = await supabase.storage.from('chat_files').upload(fileName, file);
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+        if (uploadError.message.includes("row-level security")) {
+            throw new Error("Storage not configured. Please run the SQL commands in README.md");
+        }
+        throw uploadError;
+    }
 
     const { data } = supabase.storage.from('chat_files').getPublicUrl(fileName);
     return data.publicUrl;
