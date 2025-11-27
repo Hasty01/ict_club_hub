@@ -1,6 +1,8 @@
 
+
+
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
-import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, Notification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType } from './types';
+import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, Notification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType, Roadmap } from './types';
 import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
 
@@ -20,6 +22,7 @@ interface IDataContext {
   showcaseItems: ShowcaseItem[];
   suggestions: Suggestion[];
   challenges: Challenge[];
+  roadmaps: Roadmap[];
   
   // Toasts
   toasts: Toast[];
@@ -42,6 +45,7 @@ interface IDataContext {
   isLoadingShowcase: boolean;
   isLoadingSuggestions: boolean;
   isLoadingChallenges: boolean;
+  isLoadingRoadmaps: boolean;
   isInitialLoading: boolean;
 
   // Error states
@@ -56,6 +60,7 @@ interface IDataContext {
   showcaseError: string | null;
   suggestionsError: string | null;
   challengesError: string | null;
+  roadmapsError: string | null;
 
   // Refetch functions
   fetchActivities: () => Promise<void>;
@@ -69,6 +74,7 @@ interface IDataContext {
   fetchShowcaseItems: () => Promise<void>;
   fetchSuggestions: () => Promise<void>;
   fetchChallenges: () => Promise<void>;
+  fetchRoadmaps: () => Promise<void>;
 }
 
 // Create the context with a default value
@@ -89,6 +95,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [showcaseItems, setShowcaseItems] = useState<ShowcaseItem[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
   const [unreadMessageCounts, setUnreadMessageCounts] = useState<Record<string, number>>({});
   
   // Toast State
@@ -105,6 +112,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [isLoadingShowcase, setIsLoadingShowcase] = useState(true);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(true);
   const [isLoadingChallenges, setIsLoadingChallenges] = useState(true);
+  const [isLoadingRoadmaps, setIsLoadingRoadmaps] = useState(true);
 
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
@@ -117,6 +125,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [showcaseError, setShowcaseError] = useState<string | null>(null);
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
   const [challengesError, setChallengesError] = useState<string | null>(null);
+  const [roadmapsError, setRoadmapsError] = useState<string | null>(null);
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -280,6 +289,20 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         setIsLoadingChallenges(false);
     }
   }, []);
+
+  const fetchRoadmaps = useCallback(async () => {
+    setIsLoadingRoadmaps(true);
+    setRoadmapsError(null);
+    try {
+        const data = await api.getRoadmaps();
+        setRoadmaps(data);
+    } catch (e: any) {
+        console.error("Failed to fetch roadmaps", e);
+        setRoadmapsError(e.message || 'An unknown error occurred.');
+    } finally {
+        setIsLoadingRoadmaps(false);
+    }
+  }, []);
   
   const clearUnreadCount = useCallback((roomId: string) => {
     setUnreadMessageCounts(prev => {
@@ -419,11 +442,12 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         fetchShowcaseItems(),
         fetchSuggestions(),
         fetchChallenges(),
+        fetchRoadmaps(),
       ]).then(() => {
         fetchResources();
       });
     }
-  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources, fetchNotifications, fetchRooms, fetchShowcaseItems, fetchSuggestions, fetchChallenges]);
+  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources, fetchNotifications, fetchRooms, fetchShowcaseItems, fetchSuggestions, fetchChallenges, fetchRoadmaps]);
 
   const value = {
     activities,
@@ -439,6 +463,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     showcaseItems,
     suggestions,
     challenges,
+    roadmaps,
     unreadMessageCounts,
     clearUnreadCount,
     isLoadingActivities,
@@ -452,6 +477,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     isLoadingShowcase,
     isLoadingSuggestions,
     isLoadingChallenges,
+    isLoadingRoadmaps,
     activitiesError,
     attendanceError,
     feedItemsError,
@@ -463,7 +489,8 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     showcaseError,
     suggestionsError,
     challengesError,
-    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources || isLoadingNotifications || isLoadingRooms || isLoadingShowcase || isLoadingSuggestions || isLoadingChallenges,
+    roadmapsError,
+    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources || isLoadingNotifications || isLoadingRooms || isLoadingShowcase || isLoadingSuggestions || isLoadingChallenges || isLoadingRoadmaps,
     fetchActivities,
     fetchAttendance,
     fetchFeedItems,
@@ -475,6 +502,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     fetchShowcaseItems,
     fetchSuggestions,
     fetchChallenges,
+    fetchRoadmaps,
     
     // New Toast exports
     toasts,

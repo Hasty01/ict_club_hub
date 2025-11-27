@@ -1,4 +1,6 @@
 
+
+
 import React, { useMemo } from 'react';
 import { User, Tab } from '../types';
 import { CalendarIcon } from './icons/CalendarIcon';
@@ -16,6 +18,7 @@ import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
 import { GlobeIcon } from './icons/GlobeIcon';
 import { LightBulbIcon } from './icons/LightBulbIcon';
 import { TrophyIcon } from './icons/TrophyIcon';
+import { MapIcon } from './icons/MapIcon';
 import { useData } from '../DataContext';
 import MatrixRain from './MatrixRain';
 
@@ -129,6 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen
       {
           title: "Learn & Share",
           items: [
+              { tab: 'roadmap' as Tab, label: 'Roadmap', icon: <MapIcon /> },
               { tab: 'resources' as Tab, label: 'Resources', icon: <BookOpenIcon /> },
               { tab: 'playground' as Tab, label: 'Playground', icon: <CodeIcon /> },
               { tab: 'showcase' as Tab, label: 'Showcase', icon: <GlobeIcon /> },

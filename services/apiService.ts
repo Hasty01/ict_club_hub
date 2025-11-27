@@ -1,8 +1,9 @@
 
 
 
+
 import { supabase } from './supabaseClient';
-import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, Resource, Notification, Room, Message, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab } from '../types';
+import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, Resource, Notification, Room, Message, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab, Roadmap } from '../types';
 
 // --- Auth & User ---
 
@@ -1108,6 +1109,35 @@ export const reviewSubmission = async (submissionId: string, status: string, cha
             }
         }
     }
+};
+
+// --- Roadmaps ---
+
+export const getRoadmaps = async (): Promise<Roadmap[]> => {
+    const { data, error } = await supabase.from('roadmaps').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    
+    return data.map((r: any) => ({
+        id: r.id,
+        skillLevel: r.skill_level,
+        topic: r.topic,
+        milestones: r.milestones || [],
+        updatedAt: r.created_at
+    }));
+};
+
+export const addRoadmap = async (roadmap: Roadmap) => {
+    const { error } = await supabase.from('roadmaps').insert({
+        skill_level: roadmap.skillLevel,
+        topic: roadmap.topic,
+        milestones: roadmap.milestones
+    });
+    if (error) throw error;
+};
+
+export const deleteRoadmap = async (roadmapId: string) => {
+    const { error } = await supabase.from('roadmaps').delete().eq('id', roadmapId);
+    if (error) throw error;
 };
 
 // --- User Scripts (Playground) ---

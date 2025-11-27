@@ -193,3 +193,68 @@ export const analyzeChallengeSubmission = async (challengeTitle: string, code: s
         throw new Error("Failed to analyze submission.");
     }
 };
+
+export const generateLearningRoadmap = async (topic: string, skillLevel: string) => {
+    if (!ai) throw new Error("API Key Missing");
+
+    const model = "gemini-2.5-flash";
+    const prompt = `
+        Create a 4-milestone learning roadmap for "${topic}" suitable for a "${skillLevel}" student in an ICT Club.
+        
+        For each milestone, provide:
+        - title: A clear step name.
+        - description: What they will learn.
+        - duration: Estimated time (e.g., "1 week").
+        - resources: An array of 2-3 specific learning resources (Tutorials, Docs, or Video titles).
+          - type: 'VIDEO' | 'ARTICLE' | 'DOCS' | 'PRACTICE'
+          - title: Name of the resource.
+          - url: A valid-looking URL (e.g. youtube.com/... or docs.python.org/...)
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        milestones: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    title: { type: Type.STRING },
+                                    description: { type: Type.STRING },
+                                    duration: { type: Type.STRING },
+                                    resources: {
+                                        type: Type.ARRAY,
+                                        items: {
+                                            type: Type.OBJECT,
+                                            properties: {
+                                                type: { type: Type.STRING, enum: ['VIDEO', 'ARTICLE', 'DOCS', 'PRACTICE'] },
+                                                title: { type: Type.STRING },
+                                                url: { type: Type.STRING }
+                                            },
+                                            required: ['type', 'title', 'url']
+                                        }
+                                    }
+                                },
+                                required: ['title', 'description', 'duration', 'resources']
+                            }
+                        }
+                    },
+                    required: ['milestones']
+                }
+            }
+        });
+
+        const text = response.text;
+        if (!text) throw new Error("No response");
+        return JSON.parse(text).milestones;
+    } catch (error) {
+        console.error("Roadmap Generation Error:", error);
+        throw new Error("Failed to generate roadmap.");
+    }
+};

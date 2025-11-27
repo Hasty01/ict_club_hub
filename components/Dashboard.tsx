@@ -1,4 +1,6 @@
 
+
+
 import React, { Suspense, lazy } from 'react';
 import { User, Tab } from '../types';
 import AiTutor from './AiTutor';
@@ -15,6 +17,7 @@ const Chat = lazy(() => import('./Chat'));
 const Showcase = lazy(() => import('./Showcase'));
 const Suggestions = lazy(() => import('./Suggestions'));
 const Challenges = lazy(() => import('./Challenges'));
+const RoadmapView = lazy(() => import('./RoadmapView'));
 
 
 type Theme = 'light' | 'dark';
@@ -77,6 +80,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
         </TabPanel>
         <TabPanel active={activeTab === 'challenges'}>
             <Challenges currentUser={currentUser} />
+        </TabPanel>
+        <TabPanel active={activeTab === 'roadmap'}>
+            <RoadmapView currentUser={currentUser} />
         </TabPanel>
         {currentUser.role === 'PATRON' && (
             <TabPanel active={activeTab === 'members'}>
