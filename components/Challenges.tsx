@@ -15,6 +15,7 @@ import { CalendarIcon } from './icons/CalendarIcon';
 import { PlayIcon } from './icons/PlayIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
 import CodeRunnerModal from './CodeRunnerModal';
+import { FormattedMessage } from './FormattedMessage';
 
 interface ChallengesProps {
     currentUser: User;
@@ -304,7 +305,7 @@ const AnalysisModal: React.FC<{ isOpen: boolean, onClose: () => void, content: s
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[80vh]">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[80vh]">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded-full transition-colors"><XIcon /></button>
                 
                 <div className="flex items-center gap-4 mb-6">
@@ -319,14 +320,14 @@ const AnalysisModal: React.FC<{ isOpen: boolean, onClose: () => void, content: s
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                <div className="flex-1 overflow-y-auto custom-scrollbar bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50">
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center py-8 space-y-4">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
                             <p className="text-gray-500 animate-pulse">Analyzing submission...</p>
                         </div>
                     ) : (
-                        content
+                        <FormattedMessage text={content} isUser={false} />
                     )}
                 </div>
                 

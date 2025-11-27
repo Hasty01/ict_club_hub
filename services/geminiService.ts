@@ -166,20 +166,35 @@ export const analyzeChallengeSubmission = async (challengeTitle: string, code: s
 
     const model = "gemini-2.5-flash";
     const prompt = `
-      You are a Code Reviewer for the ICT Club.
-      Challenge Title: ${challengeTitle}
+      You are a friendly but rigorous Code Mentor for a high school ICT Club.
+      Review the following Python submission for the challenge: "${challengeTitle}".
       
-      Student Submission (Python):
+      Student Code:
       \`\`\`python
       ${code}
       \`\`\`
       
-      Please provide a brief, constructive review.
-      1. Is it correct? (Does it likely solve the challenge?)
-      2. Code Style/Efficiency tips.
-      3. A short encouraging comment.
+      Provide a structured review in Markdown format:
       
-      Keep it under 150 words. Use Markdown.
+      **🧐 Analysis**
+      - State clearly if the code solves the problem (Yes/No/Partial).
+      - Briefly explain the logic used or identify the main bug.
+      
+      **🚀 Style & Efficiency**
+      - Comment on variable naming, readability, or indentation.
+      - Mention time complexity if relevant (keep it simple).
+      - Suggest Pythonic improvements (e.g., "Use a list comprehension here").
+      
+      **💡 Better Approach**
+      - Provide a short, optimized code snippet demonstrating a better way to solve part of the problem.
+      \`\`\`python
+      # Example improvement
+      \`\`\`
+      
+      **🌟 Verdict**
+      - A short, encouraging closing sentence to motivate the student.
+      
+      Keep the tone constructive, helpful, and fun.
     `;
 
     try {
