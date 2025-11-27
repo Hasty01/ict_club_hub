@@ -5,7 +5,9 @@ import * as api from '../services/apiService';
 import StarRating from './StarRating';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
+import { PlayIcon } from './icons/PlayIcon';
 import AiGradingModal from './AiGradingModal';
+import CodeRunnerModal from './CodeRunnerModal';
 
 interface GradingViewProps {
     data: ProjectData | null;
@@ -21,6 +23,11 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
         submissionCode: '',
         taskId: '',
         userId: ''
+    });
+
+    // State for Code Runner Modal
+    const [runnerState, setRunnerState] = useState<{isOpen: boolean, code: string, title: string}>({
+        isOpen: false, code: '', title: ''
     });
 
     // Defensive check: Ensure data and tasks exist before processing
@@ -40,6 +47,20 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
     if (allUsers) {
         allUsers.forEach(user => userMap.set(user.uid, user));
     }
+
+    const handleRunCode = async (submission: any, userName: string) => {
+        if (!submission.filePath) return;
+        try {
+            const url = api.getSubmissionPublicUrl(submission.filePath);
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("Failed to fetch code");
+            const text = await response.text();
+            setRunnerState({ isOpen: true, code: text, title: `Submission: ${userName}` });
+        } catch (error) {
+            console.error("Run error:", error);
+            alert("Failed to load code.");
+        }
+    };
 
     const handleAiGradeClick = async (task: ProjectTask, submission: any, userId: string) => {
         if (!submission.filePath) return;
@@ -129,13 +150,22 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
                                                     <span className="truncate max-w-[150px]">{fileName}</span>
                                                 </a>
                                                 {isPythonFile && (
-                                                    <button 
-                                                        onClick={() => handleAiGradeClick(task, submission, userId)}
-                                                        className="p-1.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-full shadow-sm hover:shadow-md hover:scale-105 transition-all"
-                                                        title="Auto-Grade with AI"
-                                                    >
-                                                        <SparklesIcon className="w-3 h-3" />
-                                                    </button>
+                                                    <>
+                                                        <button 
+                                                            onClick={() => handleRunCode(submission, user.name)}
+                                                            className="p-1.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full shadow-sm hover:shadow-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
+                                                            title="Run Code"
+                                                        >
+                                                            <PlayIcon className="w-3 h-3" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleAiGradeClick(task, submission, userId)}
+                                                            className="p-1.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-full shadow-sm hover:shadow-md hover:scale-105 transition-all"
+                                                            title="Auto-Grade with AI"
+                                                        >
+                                                            <SparklesIcon className="w-3 h-3" />
+                                                        </button>
+                                                    </>
                                                 )}
                                             </div>
                                         ) : (
@@ -162,6 +192,13 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
                 taskContent={aiModal.taskContent}
                 submissionCode={aiModal.submissionCode}
                 onApplyGrade={handleApplyAiGrade}
+            />
+
+            <CodeRunnerModal
+                isOpen={runnerState.isOpen}
+                onClose={() => setRunnerState(prev => ({ ...prev, isOpen: false }))}
+                code={runnerState.code}
+                title={runnerState.title}
             />
         </div>
     );

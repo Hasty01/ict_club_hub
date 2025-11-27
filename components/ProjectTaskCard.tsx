@@ -8,6 +8,7 @@ import { UserAddIcon } from './icons/UserAddIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
 import { UploadIcon } from './icons/UploadIcon';
 import { XCircleIcon } from './icons/XCircleIcon';
+import { StarIcon } from './icons/StarIcon';
 import * as api from '../services/apiService';
 
 
@@ -195,9 +196,17 @@ const ProjectTaskCard: React.FC<ProjectTaskCardProps> = (props) => {
                 <div onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Submission</span>
-                        <span className="text-xs text-gray-400 dark:text-gray-500" title={submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : ''}>
-                            {submission.submittedAt ? `on ${new Date(submission.submittedAt).toLocaleDateString()}` : ''}
-                        </span>
+                        <div className="flex items-center gap-2">
+                            {submission.grade ? (
+                                <span className="flex items-center gap-1 text-xs font-bold text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30 px-2 py-0.5 rounded-full">
+                                    <StarIcon className="w-3 h-3" filled />
+                                    {submission.grade}/5
+                                </span>
+                            ) : null}
+                            <span className="text-xs text-gray-400 dark:text-gray-500" title={submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : ''}>
+                                {submission.submittedAt ? `on ${new Date(submission.submittedAt).toLocaleDateString()}` : ''}
+                            </span>
+                        </div>
                     </div>
                     <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
