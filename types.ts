@@ -1,6 +1,6 @@
 
 
-export type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'profile' | 'members' | 'playground' | 'resources' | 'chat' | 'showcase' | 'suggestions' | 'challenges';
+export type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'profile' | 'members' | 'playground' | 'resources' | 'chat' | 'showcase' | 'suggestions' | 'challenges' | 'roadmap';
 
 export interface User {
   uid: string; // Changed from id: number
@@ -197,4 +197,27 @@ export interface Toast {
   id: string;
   message: string;
   type: ToastType;
+}
+
+// Roadmap Types
+export interface RoadmapResource {
+  title: string;
+  type: 'VIDEO' | 'ARTICLE' | 'DOCS' | 'PRACTICE';
+  url: string;
+}
+
+export interface Milestone {
+  id: string;
+  title: string;
+  description: string;
+  duration: string; // e.g., "1 Week"
+  resources: RoadmapResource[];
+}
+
+export interface Roadmap {
+  id?: string;
+  skillLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  topic: string; // e.g. "Python Basics" or "Data Structures"
+  milestones: Milestone[];
+  updatedAt?: string;
 }

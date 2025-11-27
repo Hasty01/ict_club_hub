@@ -1,5 +1,7 @@
 
+
 import { GoogleGenAI, Type } from "@google/genai";
+import { Roadmap } from "../types";
 
 // Robustly retrieve API Key checking all common build tool conventions
 const getApiKey = (): string => {
@@ -142,57 +144,4 @@ export const getAiTutorResponse = async (
                 ${clubContext}
                 
                 CRITICAL RULES:
-                1. DO NOT write complete, functional code solutions for the user's specific problem.
-                2. If the user asks for code (e.g., "Write a calculator"), refuse politely and offer to explain the *logic*, *algorithm*, or provide *pseudocode* or *flowchart descriptions*.
-                3. You MAY provide generic syntax examples (e.g., "Here is the syntax for a python function") but do not fill it with the user's specific logic.
-                4. Guide the user with hints, questions, and debugging tips. Ask them Socratic questions to lead them to the answer.
-                5. If the user presents code that is broken, explain *why* it is broken and hint at the fix, do not just rewrite it fixed.
-                6. Be encouraging and fun. Use emojis occasionally.
-                7. Keep responses concise and easy to read.
-                8. If asked about club activities, challenges, or news, use the REAL-TIME CLUB INFORMATION provided above.`
-            },
-            history: history
-        });
-
-        const response = await chat.sendMessage({ message });
-        return response.text;
-    } catch (error) {
-        console.error("Tutor Error:", error);
-        return "I'm having a bit of trouble thinking right now. Try again in a moment.";
-    }
-};
-
-export const analyzeChallengeSubmission = async (challengeTitle: string, submissionContent: string): Promise<string> => {
-  if (!ai) {
-      return "AI Analysis Unavailable: System configuration missing (API Key). Please check your Vercel Environment Variables.";
-  }
-
-  const model = "gemini-2.5-flash";
-  const prompt = `
-    You are an expert coding tutor for a high school ICT club.
-    A student has submitted a solution for the challenge: "${challengeTitle}".
-
-    Here is their submission:
-    """
-    ${submissionContent}
-    """
-
-    Please provide a short, constructive analysis.
-    1. Is it correct/does it solve the problem? (If you can't tell for sure, say so).
-    2. Code quality/Style feedback.
-    3. A clear recommendation: APPROVE or REJECT.
-    
-    Format the output clearly.
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-    });
-    return response.text || "No analysis generated.";
-  } catch (error: any) {
-    console.error("Gemini Analysis Error:", error);
-    return `Error generating analysis: ${error.message || "Unknown error"}.`;
-  }
-};
+                1. DO NOT write complete, functional code solutions
