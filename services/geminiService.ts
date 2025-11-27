@@ -1,32 +1,32 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Safely retrieve API Key, handling both standard process.env and Vite's import.meta.env
-const getApiKey = () => {
+// Robustly retrieve API Key checking all common build tool conventions
+const getApiKey = (): string => {
   let key = '';
-  
-  // Try standard Node/Webpack process.env
+
+  // 1. Try Vite's import.meta.env (Standard for Vercel + Vite)
   try {
     // @ts-ignore
-    if (typeof process !== 'undefined' && process.env) {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
       // @ts-ignore
-      key = process.env.API_KEY || '';
+      key = import.meta.env.VITE_API_KEY || import.meta.env.API_KEY || '';
     }
   } catch (e) {
     // Ignore reference errors
   }
 
-  // If not found, try Vite's import.meta.env (Standard for Vercel + React)
-  if (!key) {
-    try {
+  if (key) return key;
+
+  // 2. Try standard process.env (Node/Webpack/CRA/Next.js/Vercel System Env)
+  try {
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env) {
       // @ts-ignore
-      if (typeof import.meta !== 'undefined' && import.meta.env) {
-        // @ts-ignore
-        key = import.meta.env.VITE_API_KEY || '';
-      }
-    } catch (e) {
-      // Ignore errors
+      key = process.env.VITE_API_KEY || process.env.API_KEY || process.env.REACT_APP_API_KEY || '';
     }
+  } catch (e) {
+    // Ignore reference errors
   }
 
   return key;
@@ -35,10 +35,11 @@ const getApiKey = () => {
 const apiKey = getApiKey();
 
 if (!apiKey) {
-    console.warn("Gemini API Key is missing. Please check your environment variables (API_KEY or VITE_API_KEY).");
+    console.warn("Gemini API Key is missing. AI features will be disabled. Ensure VITE_API_KEY is set in your Vercel Environment Variables.");
 }
 
-const ai = new GoogleGenAI({ apiKey });
+// Initialize client only if key exists to prevent immediate instantiation errors
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export interface ActivityIdea {
   title: string;
@@ -47,6 +48,10 @@ export interface ActivityIdea {
 }
 
 export const generateClubActivityIdea = async (): Promise<ActivityIdea> => {
+  if (!ai) {
+      throw new Error("AI Service Unavailable: API Key not configured.");
+  }
+
   const model = "gemini-2.5-flash";
   const prompt = `
     You are an enthusiastic and creative patron for a high school ICT Club. 
@@ -91,24 +96,37 @@ export const generateClubActivityIdea = async (): Promise<ActivityIdea> => {
       return JSON.parse(text) as ActivityIdea;
   } catch (error) {
       console.error("Gemini API Error:", error);
-      throw new Error("Failed to generate activity idea. Please check your API key.");
+      throw new Error("Failed to generate activity idea.");
   }
 };
 
 export const getAIChatResponse = async (history: { role: 'user' | 'model', parts: [{ text: string }] }[], message: string) => {
-    const chat = ai.chats.create({
-        model: 'gemini-2.5-flash',
-        config: {
-            systemInstruction: "You are the helpful AI Assistant for the ICT Club. You help members with coding questions, project ideas, and club logistics. Be concise, encouraging, and tech-savvy."
-        },
-        history: history
-    });
+    if (!ai) {
+        return "I'm sorry, but I can't chat right now because my AI configuration is missing. Please contact the administrator to set the VITE_API_KEY.";
+    }
 
-    const response = await chat.sendMessage({ message });
-    return response.text;
+    try {
+        const chat = ai.chats.create({
+            model: 'gemini-2.5-flash',
+            config: {
+                systemInstruction: "You are the helpful AI Assistant for the ICT Club. You help members with coding questions, project ideas, and club logistics. Be concise, encouraging, and tech-savvy."
+            },
+            history: history
+        });
+
+        const response = await chat.sendMessage({ message });
+        return response.text;
+    } catch (error) {
+        console.error("Chat Error:", error);
+        return "I'm having trouble connecting to the server right now. Please try again later.";
+    }
 };
 
 export const analyzeChallengeSubmission = async (challengeTitle: string, submissionContent: string): Promise<string> => {
+  if (!ai) {
+      return "AI Analysis Unavailable: System configuration missing (API Key). Please check your Vercel Environment Variables.";
+  }
+
   const model = "gemini-2.5-flash";
   const prompt = `
     You are an expert coding tutor for a high school ICT club.
@@ -133,8 +151,8 @@ export const analyzeChallengeSubmission = async (challengeTitle: string, submiss
       contents: prompt,
     });
     return response.text || "No analysis generated.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Analysis Error:", error);
-    throw new Error("Failed to analyze submission.");
+    return `Error generating analysis: ${error.message || "Unknown error"}.`;
   }
 };
