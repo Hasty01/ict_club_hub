@@ -1,6 +1,7 @@
 
+
 import { supabase } from './supabaseClient';
-import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, Resource, Notification, Room, Message, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab, Roadmap, RoadmapProgress } from '../types';
+import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, Resource, AppNotification, Room, Message, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab, Roadmap, RoadmapProgress } from '../types';
 
 // --- Auth & User ---
 
@@ -741,7 +742,7 @@ export const deleteResource = async (resource: Resource) => {
 
 // --- Notifications ---
 
-export const getNotifications = async (userId: string): Promise<Notification[]> => {
+export const getNotifications = async (userId: string): Promise<AppNotification[]> => {
     const { data, error } = await supabase.from('notifications').select('*').eq('user_uid', userId).order('created_at', { ascending: false });
     if (error) throw error;
     return data.map((n: any) => ({

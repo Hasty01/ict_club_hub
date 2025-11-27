@@ -1,6 +1,7 @@
 
+
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
-import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, Notification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType, Roadmap } from './types';
+import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType, Roadmap } from './types';
 import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
 
@@ -15,7 +16,7 @@ interface IDataContext {
   allUsers: User[];
   onlineUsers: string[]; // List of UIDs of currently online users
   resources: Resource[];
-  notifications: Notification[];
+  notifications: AppNotification[];
   rooms: Room[];
   showcaseItems: ShowcaseItem[];
   suggestions: Suggestion[];
@@ -90,7 +91,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [rawResources, setRawResources] = useState<Omit<Resource, 'uploaderName' | 'uploaderAvatarUrl'>[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [showcaseItems, setShowcaseItems] = useState<ShowcaseItem[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -426,7 +427,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
             },
             (payload) => {
                 const newNotifRaw = payload.new as any;
-                const newNotif: Notification = {
+                const newNotif: AppNotification = {
                     id: newNotifRaw.id.toString(),
                     message: newNotifRaw.message,
                     isRead: newNotifRaw.is_read,

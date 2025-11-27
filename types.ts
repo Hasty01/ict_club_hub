@@ -108,7 +108,8 @@ export interface Resource {
   uploaderAvatarUrl?: string;
 }
 
-export interface Notification {
+// Renamed from Notification to avoid conflict with window.Notification
+export interface AppNotification {
   id: string;
   message: string;
   isRead: boolean;

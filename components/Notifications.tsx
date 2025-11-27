@@ -1,9 +1,10 @@
 
+
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useData } from '../DataContext';
 import * as api from '../services/apiService';
 import { BellIcon } from './icons/BellIcon';
-import { User, Notification, Tab } from '../types';
+import { User, AppNotification, Tab } from '../types';
 
 interface NotificationsProps {
   currentUser: User;
@@ -36,7 +37,7 @@ const Notifications: React.FC<NotificationsProps> = ({ currentUser, setActiveTab
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const handleNotificationClick = useCallback(async (notification: Notification) => {
+    const handleNotificationClick = useCallback(async (notification: AppNotification) => {
         if (!notification.isRead) {
             await api.markNotificationAsRead(notification.id);
         }
