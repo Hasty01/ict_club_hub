@@ -377,3 +377,53 @@ export const evaluateShortAnswer = async (question: string, userAnswer: string, 
         return { correct: true, feedback: "Good effort! (Auto-passed due to connection error)" };
     }
 };
+
+export const gradeProjectSubmission = async (taskDescription: string, code: string): Promise<{ grade: number, feedback: string }> => {
+    if (!ai) throw new Error("API Key Missing");
+
+    const prompt = `
+        You are an expert Computer Science teacher grading a student's code submission for a project task.
+        
+        Task Description: "${taskDescription}"
+        
+        Student's Python Code:
+        \`\`\`python
+        ${code}
+        \`\`\`
+        
+        Please evaluate the code based on:
+        1. Correctness (Does it solve the task?)
+        2. Code Style & Cleanliness
+        3. Efficiency
+        
+        Return a JSON object:
+        {
+            "grade": number, // An integer from 1 to 5 (1=Poor, 5=Excellent)
+            "feedback": "A short paragraph providing constructive feedback and encouraging the student."
+        }
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        grade: { type: Type.INTEGER },
+                        feedback: { type: Type.STRING }
+                    },
+                    required: ["grade", "feedback"]
+                }
+            }
+        });
+
+        const text = cleanJSON(response.text || "");
+        return JSON.parse(text);
+    } catch (error) {
+        console.error("Auto-grading error:", error);
+        throw new Error("Failed to auto-grade submission.");
+    }
+};

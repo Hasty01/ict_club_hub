@@ -1,9 +1,11 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ProjectData, User, ProjectTask } from '../types';
 import * as api from '../services/apiService';
 import StarRating from './StarRating';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
+import { SparklesIcon } from './icons/SparklesIcon';
+import AiGradingModal from './AiGradingModal';
 
 interface GradingViewProps {
     data: ProjectData | null;
@@ -12,6 +14,15 @@ interface GradingViewProps {
 }
 
 const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) => {
+    // State for AI Modal
+    const [aiModal, setAiModal] = useState<{ isOpen: boolean, taskContent: string, submissionCode: string, taskId: string, userId: string }>({
+        isOpen: false,
+        taskContent: '',
+        submissionCode: '',
+        taskId: '',
+        userId: ''
+    });
+
     // Defensive check: Ensure data and tasks exist before processing
     if (!data || !data.tasks) {
         return (
@@ -29,6 +40,37 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
     if (allUsers) {
         allUsers.forEach(user => userMap.set(user.uid, user));
     }
+
+    const handleAiGradeClick = async (task: ProjectTask, submission: any, userId: string) => {
+        if (!submission.filePath) return;
+        
+        try {
+            // Get public URL
+            const url = api.getSubmissionPublicUrl(submission.filePath);
+            
+            // Fetch content
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("Failed to fetch submission file.");
+            const code = await response.text();
+
+            setAiModal({
+                isOpen: true,
+                taskContent: task.content,
+                submissionCode: code,
+                taskId: task.id,
+                userId: userId
+            });
+
+        } catch (error) {
+            console.error("Error preparing AI grading:", error);
+            alert("Could not load submission file for AI analysis. Ensure it is a text/code file.");
+        }
+    };
+
+    const handleApplyAiGrade = (grade: number) => {
+        onGrade(aiModal.taskId, aiModal.userId, grade);
+        setAiModal(prev => ({ ...prev, isOpen: false }));
+    };
 
     if (tasksWithSubmissions.length === 0) {
         return (
@@ -57,6 +99,7 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
 
                             const submissionUrl = submission?.filePath ? api.getSubmissionPublicUrl(submission.filePath) : null;
                             const fileName = submission?.filePath ? submission.filePath.split('/').pop() : 'File';
+                            const isPythonFile = fileName.endsWith('.py');
                             
                             return (
                                 <div key={userId} className="p-4 flex flex-col md:flex-row items-center justify-between gap-4 hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
@@ -74,16 +117,27 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
 
                                     <div className="flex items-center gap-4 w-full md:w-auto">
                                         {submissionUrl ? (
-                                            <a
-                                                href={submissionUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                download={fileName}
-                                                className="flex items-center gap-2 text-sm font-medium text-purple-600 dark:text-purple-400 hover:underline"
-                                            >
-                                                <DocumentTextIcon className="w-5 h-5" />
-                                                <span className="truncate max-w-[150px]">{fileName}</span>
-                                            </a>
+                                            <div className="flex items-center gap-2">
+                                                <a
+                                                    href={submissionUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    download={fileName}
+                                                    className="flex items-center gap-2 text-sm font-medium text-purple-600 dark:text-purple-400 hover:underline"
+                                                >
+                                                    <DocumentTextIcon className="w-5 h-5" />
+                                                    <span className="truncate max-w-[150px]">{fileName}</span>
+                                                </a>
+                                                {isPythonFile && (
+                                                    <button 
+                                                        onClick={() => handleAiGradeClick(task, submission, userId)}
+                                                        className="p-1.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-full shadow-sm hover:shadow-md hover:scale-105 transition-all"
+                                                        title="Auto-Grade with AI"
+                                                    >
+                                                        <SparklesIcon className="w-3 h-3" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         ) : (
                                             <p className="text-sm text-gray-400 italic">No file attached</p>
                                         )}
@@ -101,6 +155,14 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
                     </div>
                 </div>
             ))}
+
+            <AiGradingModal 
+                isOpen={aiModal.isOpen}
+                onClose={() => setAiModal(prev => ({ ...prev, isOpen: false }))}
+                taskContent={aiModal.taskContent}
+                submissionCode={aiModal.submissionCode}
+                onApplyGrade={handleApplyAiGrade}
+            />
         </div>
     );
 };

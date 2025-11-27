@@ -12,7 +12,8 @@ export const login = async (email: string, password?: string) => {
 
 export const logout = async () => {
   const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+  // Suppress "Auth session missing!" error as it implies we are already logged out
+  if (error && error.message !== 'Auth session missing!') throw error;
 };
 
 export const signUp = async (userData: Omit<User, 'uid' | 'role' | 'status' | 'avatarUrl'> & {password: string}) => {
