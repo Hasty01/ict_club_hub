@@ -1,5 +1,3 @@
-
-
 import { supabase } from './supabaseClient';
 import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, Resource, AppNotification, Room, Message, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab, Roadmap, RoadmapProgress } from '../types';
 
@@ -201,6 +199,11 @@ export const addActivity = async (activity: Omit<Activity, 'id' | 'rsvpUserIds'>
         location: activity.location,
         category: activity.category
     });
+    if (error) throw error;
+};
+
+export const deleteActivity = async (activityId: string) => {
+    const { error } = await supabase.from('activities').delete().eq('id', activityId);
     if (error) throw error;
 };
 
