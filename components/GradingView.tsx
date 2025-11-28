@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect } from 'react';
 import { ProjectData, User, ProjectTask } from '../types';
 import * as api from '../services/apiService';
@@ -37,11 +39,12 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
     useEffect(() => {
         if (data && data.tasks) {
             const newInputs: Record<string, string> = {};
-            Object.values(data.tasks).forEach((task: ProjectTask) => {
-                if (task.submissions) {
-                    Object.entries(task.submissions).forEach(([userId, sub]) => {
+            Object.values(data.tasks).forEach((task: unknown) => {
+                const t = task as ProjectTask;
+                if (t.submissions) {
+                    Object.entries(t.submissions).forEach(([userId, sub]) => {
                         if (sub.feedback) {
-                            newInputs[`${task.id}-${userId}`] = sub.feedback;
+                            newInputs[`${t.id}-${userId}`] = sub.feedback;
                         }
                     });
                 }
