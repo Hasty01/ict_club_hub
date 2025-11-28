@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { XIcon } from './icons/XIcon';
 import { PlayIcon } from './icons/PlayIcon';
-import InputModal from './InputModal';
 
 interface CodeRunnerModalProps {
   isOpen: boolean;
@@ -41,10 +40,12 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
   const [isLoadingPyodide, setIsLoadingPyodide] = useState(false);
   const outputContainerRef = useRef<HTMLDivElement>(null);
   
-  // Input Modal State
-  const [inputModalOpen, setInputModalOpen] = useState(false);
+  // Inline Console Input State
+  const [isWaitingForInput, setIsWaitingForInput] = useState(false);
   const [inputPrompt, setInputPrompt] = useState('');
+  const [consoleInput, setConsoleInput] = useState('');
   const inputResolverRef = useRef<((value: string) => void) | null>(null);
+  const consoleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen && !pyodide) {
@@ -68,20 +69,36 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
     
     if (isOpen) {
         setOutput([]); // Clear output on open
+        setIsWaitingForInput(false);
+        setConsoleInput('');
     }
   }, [isOpen]);
 
-  useEffect(() => {
+  const scrollToBottom = () => {
       if (outputContainerRef.current) {
-          outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
+          setTimeout(() => {
+              outputContainerRef.current!.scrollTop = outputContainerRef.current!.scrollHeight;
+          }, 10);
       }
-  }, [output]);
+  };
 
-  const handleInputSubmit = (value: string) => {
-      setInputModalOpen(false);
-      if (inputResolverRef.current) {
-          inputResolverRef.current(value);
-          inputResolverRef.current = null;
+  const handleConsoleInputEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+          e.preventDefault();
+          const val = consoleInput;
+          
+          // Add the full line (prompt + input) to history so it looks like a real console session
+          const fullLine = `${inputPrompt}${val}\n`;
+          setOutput(prev => [...prev, { type: 'log', content: fullLine }]);
+          
+          setIsWaitingForInput(false);
+          setConsoleInput('');
+          setInputPrompt('');
+          
+          if (inputResolverRef.current) {
+              inputResolverRef.current(val);
+              inputResolverRef.current = null;
+          }
       }
   };
 
@@ -89,29 +106,37 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
       if (!pyodide) return;
       setIsExecuting(true);
       setOutput([]);
+      setIsWaitingForInput(false);
 
-      // Setup global function for Python to call to get input
-      (window as any).showcaseAskForInput = (prompt: string) => {
+      // Helper to communicate with React for Input
+      (window as any).runnerAskForInput = (prompt: string) => {
           return new Promise((resolve) => {
               setInputPrompt(prompt);
-              setInputModalOpen(true);
+              setIsWaitingForInput(true);
               inputResolverRef.current = resolve;
+              setTimeout(() => {
+                  consoleInputRef.current?.focus();
+                  scrollToBottom();
+              }, 50);
           });
       };
 
-      // Setup global function for Python to print to our state
-      (window as any).showcasePrint = (text: string, type: 'log' | 'error') => {
-          setOutput(prev => {
-              const lastOutput = prev[prev.length - 1];
-              // Append to last line if types match, otherwise new line
-              if (lastOutput && lastOutput.type === type) {
-                  const newOutput = [...prev];
-                  newOutput[newOutput.length - 1] = { ...lastOutput, content: lastOutput.content + text };
-                  return newOutput;
-              } else {
-                  return [...prev, { type, content: text }];
-              }
-          });
+      // Helper to communicate with React for Printing
+      (window as any).runnerPrint = (text: string, type: 'log' | 'error') => {
+          if (text) {
+              setOutput(prev => {
+                  const lastOutput = prev[prev.length - 1];
+                  // Append to last line if types match, otherwise new line (handles print(end=""))
+                  if (lastOutput && lastOutput.type === type) {
+                      const newOutput = [...prev];
+                      newOutput[newOutput.length - 1] = { ...lastOutput, content: lastOutput.content + text };
+                      return newOutput;
+                  } else {
+                      return [...prev, { type, content: text }];
+                  }
+              });
+              scrollToBottom();
+          }
       };
 
       const setupCode = `
@@ -123,20 +148,17 @@ class Writer:
     def __init__(self, stream_type):
         self.stream_type = stream_type
     def write(self, text):
-        js.showcasePrint(text, self.stream_type)
+        js.runnerPrint(text, self.stream_type)
     def flush(self):
         pass
 
 sys.stdout = Writer('log')
 sys.stderr = Writer('error')
 
-async def custom_input(prompt=""):
-    # Call JS function and await the promise
-    val = await js.showcaseAskForInput(prompt)
-    print(f"{prompt}{val}") # Echo output
+async def custom_input(prompt_text=""):
+    val = await js.runnerAskForInput(prompt_text)
     return val
 
-# Override builtins.input
 builtins.input = custom_input
       `;
 
@@ -148,11 +170,12 @@ builtins.input = custom_input
           const asyncCode = code.replace(/\binput\s*\(/g, 'await input(');
           
           await pyodide.runPythonAsync(asyncCode);
-          setOutput(prev => [...prev, { type: 'log', content: '\n=== Execution Finished ===' }]);
       } catch (error: any) {
           setOutput(prev => [...prev, { type: 'error', content: error.message }]);
       } finally {
           setIsExecuting(false);
+          setIsWaitingForInput(false);
+          scrollToBottom();
       }
   };
 
@@ -160,7 +183,7 @@ builtins.input = custom_input
 
   return (
     <>
-        {/* Z-index increased to 60 to appear above other modals (like Review modal which is 50) */}
+        {/* Z-index increased to 60 to appear above other modals */}
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full h-[80vh] relative border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden animate-fade-in-up">
             {/* Header */}
@@ -185,6 +208,11 @@ builtins.input = custom_input
                 <div 
                     ref={outputContainerRef}
                     className="flex-1 bg-gray-900 dark:bg-black text-gray-300 font-mono text-xs md:text-sm p-4 overflow-y-auto flex flex-col shadow-inner"
+                    onClick={() => {
+                        if (isWaitingForInput && consoleInputRef.current) {
+                            consoleInputRef.current.focus();
+                        }
+                    }}
                 >
                     <div className="flex-1">
                         {output.length === 0 && !isExecuting && (
@@ -199,7 +227,25 @@ builtins.input = custom_input
                                 )}
                             </div>
                         ))}
-                        {isExecuting && <div className="animate-pulse mt-2 text-green-500">_</div>}
+                        
+                        {/* Inline Console Input */}
+                        {isWaitingForInput && (
+                            <div className="flex items-center text-gray-300 leading-relaxed mt-1">
+                                <span className="whitespace-pre-wrap">{inputPrompt}</span>
+                                <input
+                                    ref={consoleInputRef}
+                                    value={consoleInput}
+                                    onChange={e => setConsoleInput(e.target.value)}
+                                    onKeyDown={handleConsoleInputEnter}
+                                    className="flex-1 bg-transparent border-none outline-none text-green-400 font-bold ml-1 min-w-[50px]"
+                                    autoFocus
+                                    autoComplete="off"
+                                    spellCheck="false"
+                                />
+                            </div>
+                        )}
+
+                        {isExecuting && !isWaitingForInput && <div className="animate-pulse mt-2 text-green-500">_</div>}
                     </div>
                 </div>
             </div>
@@ -220,12 +266,6 @@ builtins.input = custom_input
             </div>
         </div>
         </div>
-        
-        <InputModal 
-            isOpen={inputModalOpen} 
-            promptText={inputPrompt} 
-            onSubmit={handleInputSubmit} 
-        />
     </>
   );
 };

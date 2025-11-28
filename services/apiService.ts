@@ -208,6 +208,11 @@ export const addActivity = async (activity: Omit<Activity, 'id' | 'rsvpUserIds'>
     if (error) throw error;
 };
 
+export const deleteActivity = async (activityId: string) => {
+    const { error } = await supabase.from('activities').delete().eq('id', activityId);
+    if (error) throw error;
+};
+
 export const toggleRSVP = async (activityId: string, userId: string, isJoining: boolean) => {
     if (isJoining) {
         const { error } = await supabase.from('activity_rsvps').insert({
