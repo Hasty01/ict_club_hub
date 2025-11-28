@@ -20,12 +20,7 @@ const RoadmapQuizModal: React.FC<RoadmapQuizModalProps> = ({ isOpen, onClose, qu
     const [feedback, setFeedback] = useState<{ isCorrect: boolean; message: string } | null>(null);
     const [score, setScore] = useState(0);
     const [quizComplete, setQuizComplete] = useState(false);
-
-    useEffect(() => {
-        if (isOpen) {
-            resetQuiz();
-        }
-    }, [isOpen]);
+    const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
 
     const resetQuiz = () => {
         setCurrentIndex(0);
@@ -34,6 +29,36 @@ const RoadmapQuizModal: React.FC<RoadmapQuizModalProps> = ({ isOpen, onClose, qu
         setFeedback(null);
         setScore(0);
         setQuizComplete(false);
+        setTimeLeft(300);
+    };
+
+    useEffect(() => {
+        if (isOpen) {
+            resetQuiz();
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen && !quizComplete) {
+            const interval = setInterval(() => {
+                setTimeLeft(prev => {
+                    if (prev <= 1) {
+                        clearInterval(interval);
+                        setQuizComplete(true); // End quiz on timeout
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+
+            return () => clearInterval(interval);
+        }
+    }, [isOpen, quizComplete]);
+
+    const formatTime = (seconds: number) => {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     };
 
     if (!isOpen || !quizQuestions || quizQuestions.length === 0) return null;
@@ -152,6 +177,8 @@ const RoadmapQuizModal: React.FC<RoadmapQuizModalProps> = ({ isOpen, onClose, qu
 
     if (quizComplete) {
         const passed = score >= passingScore;
+        const timedOut = timeLeft <= 0 && !passed;
+
         return (
             <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
                 <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-sm w-full p-8 text-center relative border border-gray-200 dark:border-gray-700 animate-fade-in-up">
@@ -159,10 +186,10 @@ const RoadmapQuizModal: React.FC<RoadmapQuizModalProps> = ({ isOpen, onClose, qu
                         {passed ? <CheckCircleIcon className="w-10 h-10" /> : <XCircleIcon className="w-10 h-10" />}
                     </div>
                     <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-2">
-                        {passed ? 'Assessment Passed!' : 'Needs Improvement'}
+                        {timedOut ? "Time's Up!" : passed ? 'Assessment Passed!' : 'Needs Improvement'}
                     </h2>
                     <p className="text-gray-600 dark:text-gray-400 mb-6">
-                        You scored {score} out of {totalQuestions}. {passed ? 'You have mastered this milestone.' : 'Review the material and try again.'}
+                        You scored {score} out of {totalQuestions}. {passed ? 'You have mastered this milestone.' : timedOut ? 'Review the material and try the quiz again.' : 'Review the material and try again.'}
                     </p>
                     <button 
                         onClick={passed ? handleFinish : resetQuiz}
@@ -194,9 +221,14 @@ const RoadmapQuizModal: React.FC<RoadmapQuizModalProps> = ({ isOpen, onClose, qu
                             />
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-500 hover:text-gray-700 dark:hover:text-white transition-colors">
-                        <XIcon className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <div className={`text-lg font-bold font-mono px-3 py-1 rounded-lg transition-colors ${timeLeft <= 30 ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white'}`}>
+                            {formatTime(timeLeft)}
+                        </div>
+                        <button onClick={onClose} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-500 hover:text-gray-700 dark:hover:text-white transition-colors">
+                            <XIcon className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Question */}

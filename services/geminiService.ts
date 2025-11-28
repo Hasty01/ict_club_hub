@@ -209,7 +209,7 @@ export const analyzeChallengeSubmission = async (challengeTitle: string, code: s
     }
 };
 
-export const generateLearningRoadmap = async (topic: string, skillLevel: string) => {
+export const generateLearningRoadmap = async (topic: string, skillLevel: string, suggestedTopics?: string) => {
     if (!ai) throw new Error("API Key Missing");
 
     const model = "gemini-2.5-flash";
@@ -217,12 +217,15 @@ export const generateLearningRoadmap = async (topic: string, skillLevel: string)
         Create a short, modular 3-milestone learning roadmap for "${topic}" suitable for a "${skillLevel}" student in an ICT Club.
         Focus on specific, bite-sized concepts rather than broad overviews.
         The goal is practical, hands-on learning.
+
+        If provided, try to incorporate these suggested topics where they fit logically:
+        "${suggestedTopics || 'Not provided'}"
         
         For each milestone, provide:
         - title: A clear step name.
         - description: What they will learn (keep it concise).
         - duration: Estimated time (e.g., "3 days").
-        - resources: An array of 2-3 specific learning resources (Tutorials, Docs, or Video titles).
+        - resources: An array of 3-5 specific learning resources (Tutorials, Docs, or Video titles).
           - type: 'VIDEO' | 'ARTICLE' | 'DOCS' | 'PRACTICE'
           - title: Name of the resource.
           - url: A valid-looking URL (e.g. youtube.com/... or docs.python.org/...)

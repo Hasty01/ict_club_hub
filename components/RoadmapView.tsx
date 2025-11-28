@@ -38,6 +38,7 @@ const CreateRoadmapModal: React.FC<{
 }> = ({ isOpen, onClose, onSave, initialLevel = 'BEGINNER' }) => {
     const [topic, setTopic] = useState('');
     const [level, setLevel] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'>(initialLevel);
+    const [suggestedTopics, setSuggestedTopics] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [generatedMilestones, setGeneratedMilestones] = useState<Milestone[] | null>(null);
 
@@ -45,6 +46,7 @@ const CreateRoadmapModal: React.FC<{
         if (isOpen) {
             setLevel(initialLevel);
             setTopic('');
+            setSuggestedTopics('');
             setGeneratedMilestones(null);
         }
     }, [isOpen, initialLevel]);
@@ -53,7 +55,7 @@ const CreateRoadmapModal: React.FC<{
         if (!topic) return;
         setIsGenerating(true);
         try {
-            const milestones = await generateLearningRoadmap(topic, level);
+            const milestones = await generateLearningRoadmap(topic, level, suggestedTopics);
             // Add IDs to milestones for React keys
             const milestonesWithIds = milestones.map((m: any, idx: number) => ({
                 ...m,
@@ -77,6 +79,7 @@ const CreateRoadmapModal: React.FC<{
         });
         onClose();
         setTopic('');
+        setSuggestedTopics('');
         setGeneratedMilestones(null);
     };
 
@@ -98,6 +101,16 @@ const CreateRoadmapModal: React.FC<{
                                 onChange={e => setTopic(e.target.value)} 
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-pink-500"
                                 placeholder="e.g., Python Data Structures, Web Development Basics"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Suggested Topics (Optional)</label>
+                            <textarea
+                                value={suggestedTopics}
+                                onChange={e => setSuggestedTopics(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-pink-500"
+                                placeholder="e.g., list comprehensions, API fetching, async functions..."
+                                rows={2}
                             />
                         </div>
                         <div>
