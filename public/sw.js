@@ -1,14 +1,12 @@
 const CACHE_NAME = 'ict-club-hub-v1';
 const DATA_CACHE_NAME = 'ict-club-data-v1';
 
-// Assets to precache immediately
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
   '/favicon.svg'
 ];
 
-// Domains that serve static libraries (CDNs)
 const STATIC_DOMAINS = [
   'cdn.tailwindcss.com',
   'aistudiocdn.com',
@@ -18,24 +16,22 @@ const STATIC_DOMAINS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_ASSETS);
-    })
+    caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_ASSETS))
   );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && cacheName !== DATA_CACHE_NAME) {
-            return caches.delete(cacheName);
+    caches.keys().then(cacheNames =>
+      Promise.all(
+        cacheNames.map(name => {
+          if (name !== CACHE_NAME && name !== DATA_CACHE_NAME) {
+            return caches.delete(name);
           }
         })
-      );
-    })
+      )
+    )
   );
   self.clients.claim();
 });
@@ -43,20 +39,15 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // 1. Pyodide Assets (Large, versioned, immutable)
-  // Strategy: Cache First
+  // --- 1. Pyodide Assets (Cache First) ---
   if (url.href.includes('pyodide')) {
-     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        return fetch(event.request).then((networkResponse) => {
-          // Clone immediately before any async ops
+    event.respondWith(
+      caches.match(event.request).then(cachedResponse => {
+        if (cachedResponse) return cachedResponse;
+
+        return fetch(event.request).then(networkResponse => {
           const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseToCache));
           return networkResponse;
         });
       })
@@ -64,57 +55,39 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Supabase API Requests (Activities, Feed, etc.)
-  // Strategy: Network First, Fallback to Cache
+  // --- 2. Supabase API Requests (Network First, Fallback Cache) ---
   if (url.hostname.includes('supabase.co') && event.request.method === 'GET') {
     event.respondWith(
       fetch(event.request)
-        .then((response) => {
-          // If response is valid, clone and cache it
-          if (response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(DATA_CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone);
-            });
+        .then(networkResponse => {
+          if (networkResponse.ok) {
+            const responseClone = networkResponse.clone();
+            caches.open(DATA_CACHE_NAME).then(cache => cache.put(event.request, responseClone));
           }
-          return response;
+          return networkResponse;
         })
-        .catch(() => {
-          // Network failed, try to get from cache
-          return caches.match(event.request);
-        })
+        .catch(() => caches.match(event.request))
     );
     return;
   }
 
-  // 3. Static CDN Assets (React, Tailwind, etc.)
-  // Strategy: Stale While Revalidate (Return cache fast, update in background)
+  // --- 3. Static CDN Assets (Stale-While-Revalidate) ---
   if (STATIC_DOMAINS.some(domain => url.hostname.includes(domain))) {
     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
-        const fetchPromise = fetch(event.request).then((networkResponse) => {
-          // Fix: Clone immediately! 
-          // If we wait for caches.open() to resolve, the browser may have already
-          // started consuming networkResponse, making the body unusable for cloning.
-          const responseToCache = networkResponse.clone();
-          
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-          
+      caches.match(event.request).then(cachedResponse => {
+        const fetchAndCache = fetch(event.request).then(networkResponse => {
+          const responseClone = networkResponse.clone(); // clone immediately
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
           return networkResponse;
         });
-        return cachedResponse || fetchPromise;
+        return cachedResponse || fetchAndCache;
       })
     );
     return;
   }
 
-  // 4. App Shell / Local Assets
-  // Strategy: Cache First, Fallback to Network
+  // --- 4. App Shell / Local Assets (Cache First) ---
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    })
+    caches.match(event.request).then(response => response || fetch(event.request))
   );
 });

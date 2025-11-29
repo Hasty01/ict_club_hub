@@ -12,6 +12,7 @@ import { GlobeIcon } from './icons/GlobeIcon';
 import { IdentificationIcon } from './icons/IdentificationIcon';
 import { TrophyIcon } from './icons/TrophyIcon';
 import { ChevronRightIcon } from './icons/ChevronRightIcon';
+import { MapIcon } from './icons/MapIcon';
 
 interface FeatureTourModalProps {
   isOpen: boolean;
@@ -25,35 +26,34 @@ const FeatureTourModal: React.FC<FeatureTourModalProps> = ({ isOpen, onClose }) 
 
   const steps = [
     {
-      title: "Welcome to ICT Club Hub!",
-      description: "We're excited to have you! This is your central place to connect, learn, and build with fellow members. Let's take a tour of what you can do here.",
-      icon: <span className="text-6xl animate-icon-bounce-in">👋</span>,
+      title: "Welcome to ICT Club Hub 2.0!",
+      description: "We've upgraded your experience with powerful AI tools and community features. Let's take a tour of what's new!",
+      icon: <span className="text-6xl animate-icon-bounce-in">🚀</span>,
       gradient: "from-pink-500 to-purple-600"
     },
     {
-      title: "Feed & Announcements",
-      description: "Start your day with the **Feed**. Catch up on the latest club news, event announcements, and posts from other members.",
+      title: "AI Learning Roadmaps",
+      description: "Stuck on what to learn? Use the **Roadmap** tab to generate a personalized curriculum for ANY topic using Gemini AI. Complete milestones and take **AI-generated quizzes** to test your skills.",
       icon: (
         <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white animate-icon-bounce-in">
-           <HomeIcon />
+           <MapIcon />
         </div>
       ),
-      gradient: "from-blue-400 to-indigo-600"
+      gradient: "from-teal-400 to-emerald-600"
     },
     {
-      title: "Activities & Attendance",
-      description: "Check the **Activities** tab for upcoming workshops and events. Don't forget to RSVP! Your **Attendance** record tracks your participation stats automatically.",
+      title: "Advanced Code Playground",
+      description: "Our Python environment now supports **interactive input** (just like a real terminal!). You can also **save your scripts to the cloud** and access them anywhere.",
       icon: (
-        <div className="flex space-x-4 text-white animate-icon-bounce-in">
-           <div className="p-4 bg-white/20 rounded-full backdrop-blur-sm"><CalendarIcon /></div>
-           <div className="p-4 bg-white/20 rounded-full backdrop-blur-sm"><CheckCircleIcon /></div>
+         <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white animate-icon-bounce-in">
+           <CodeIcon />
         </div>
       ),
-      gradient: "from-green-400 to-emerald-600"
+      gradient: "from-yellow-400 to-orange-500"
     },
     {
-      title: "Project Management",
-      description: "Got a club project? Use the **Projects** Kanban board to create tasks, assign members, set deadlines, and track progress together.",
+      title: "Enhanced Projects & Grading",
+      description: "Submit your project tasks and receive **detailed written feedback** alongside your grade from patrons. The AI Auto-Grader is also there to give you instant preliminary reviews.",
       icon: (
         <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white animate-icon-bounce-in">
            <ClipboardListIcon />
@@ -62,60 +62,39 @@ const FeatureTourModal: React.FC<FeatureTourModalProps> = ({ isOpen, onClose }) 
       gradient: "from-purple-400 to-fuchsia-600"
     },
     {
-      title: "Learn & Code",
-      description: "Access tutorials in **Resources** or practice coding in the **Playground**—a full Python environment in your browser with cloud saving.",
-      icon: (
-         <div className="flex space-x-4 text-white animate-icon-bounce-in">
-           <div className="p-4 bg-white/20 rounded-full backdrop-blur-sm"><BookOpenIcon /></div>
-           <div className="p-4 bg-white/20 rounded-full backdrop-blur-sm"><CodeIcon /></div>
-        </div>
-      ),
-      gradient: "from-yellow-400 to-orange-500"
-    },
-    {
-      title: "Showcase & Share",
-      description: "Proud of your code? Publish it to the **Showcase**! You can browse, like, and clone snippets shared by other members.",
+      title: "Interactive Showcase",
+      description: "The Showcase isn't just for viewing anymore. **Comment** on code snippets, ask questions, and build a community around your creations.",
       icon: (
         <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white animate-icon-bounce-in">
            <GlobeIcon />
         </div>
       ),
-      gradient: "from-indigo-500 to-purple-600"
+      gradient: "from-indigo-500 to-blue-600"
     },
     {
-      title: "Compete in Challenges",
-      description: "Test your skills in **Challenges**. Solve problems, submit your code, and earn badges to climb the 'Hall of Fame' leaderboard.",
+      title: "Smart Activities",
+      description: "Manage club events with ease. Patrons can now **delete activities**, and everyone can track attendance stats in their profile.",
       icon: (
         <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white animate-icon-bounce-in">
-           <TrophyIcon />
+           <CalendarIcon />
         </div>
       ),
-      gradient: "from-orange-400 to-red-500"
+      gradient: "from-red-400 to-pink-600"
     },
     {
-      title: "Chat & Collaborate",
-      description: "Stay connected with **Messages**. Create group chats for projects, send direct messages, and share code snippets instantly.",
-      icon: (
-        <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white animate-icon-bounce-in">
-           <ChatBubbleIcon />
-        </div>
-      ),
-      gradient: "from-pink-500 to-rose-500"
-    },
-    {
-        title: "Your Profile",
-        description: "Customize your avatar, view your personal attendance statistics, and manage your account settings in the **Profile** section.",
+        title: "AI Tutor & Chat",
+        description: "Your **AI Tutor** is smarter than ever, aware of all club activities. Chat with peers or the bot for help at any time.",
         icon: (
           <div className="p-6 bg-white/20 rounded-full backdrop-blur-sm text-white animate-icon-bounce-in">
-             <IdentificationIcon />
+             <ChatBubbleIcon />
           </div>
         ),
-        gradient: "from-teal-400 to-cyan-600"
+        gradient: "from-cyan-400 to-blue-500"
     },
      {
       title: "Ready to Explore?",
       description: "That's the tour! Dive in, start building, and make the most of the ICT Club Hub.",
-      icon: <span className="text-6xl animate-icon-bounce-in">🚀</span>,
+      icon: <span className="text-6xl animate-icon-bounce-in">✨</span>,
       gradient: "from-gray-700 to-black"
     }
   ];
