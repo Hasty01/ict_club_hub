@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { XIcon } from './icons/XIcon';
 import { PlayIcon } from './icons/PlayIcon';
+import Editor from '@monaco-editor/react';
 
 interface CodeRunnerModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
   const [pyodide, setPyodide] = useState<any | null>(null);
   const [isLoadingPyodide, setIsLoadingPyodide] = useState(false);
   const outputContainerRef = useRef<HTMLDivElement>(null);
+  const [editorTheme, setEditorTheme] = useState('vs-dark');
   
   // Inline Console Input State
   const [isWaitingForInput, setIsWaitingForInput] = useState(false);
@@ -71,6 +73,10 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
         setOutput([]); // Clear output on open
         setIsWaitingForInput(false);
         setConsoleInput('');
+
+        // Detect theme
+        const isDark = document.documentElement.classList.contains('dark');
+        setEditorTheme(isDark ? 'vs-dark' : 'light');
     }
   }, [isOpen]);
 
@@ -185,7 +191,7 @@ builtins.input = custom_input
     <>
         {/* Z-index increased to 60 to appear above other modals */}
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full h-[80vh] relative border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden animate-fade-in-up">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-5xl w-full h-[80vh] relative border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden animate-fade-in-up">
             {/* Header */}
             <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -199,9 +205,25 @@ builtins.input = custom_input
 
             {/* Content Container */}
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-                {/* Code Preview (Read-only) */}
-                <div className="flex-1 bg-gray-50 dark:bg-gray-950 p-4 overflow-y-auto border-r border-gray-200 dark:border-gray-800 font-mono text-xs md:text-sm">
-                    <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{code}</pre>
+                {/* Code Preview (Read-only Monaco Editor) */}
+                <div className="flex-1 border-r border-gray-200 dark:border-gray-800 overflow-hidden relative">
+                    <Editor
+                        height="100%"
+                        defaultLanguage="python"
+                        theme={editorTheme}
+                        value={code}
+                        options={{
+                            readOnly: true,
+                            minimap: { enabled: false },
+                            fontSize: 14,
+                            padding: { top: 16 },
+                            scrollBeyondLastLine: false,
+                            automaticLayout: true,
+                            renderLineHighlight: 'none',
+                            contextmenu: false,
+                        }}
+                        loading={<div className="flex items-center justify-center h-full text-gray-500 text-sm">Loading code...</div>}
+                    />
                 </div>
 
                 {/* Output Terminal */}
