@@ -45,7 +45,6 @@ self.addEventListener('fetch', (event) => {
 
   // 1. Pyodide Assets (Large, versioned, immutable)
   // Strategy: Cache First
-  // We prioritize this for Pyodide to avoid downloading large WASM files on every load
   if (url.href.includes('pyodide')) {
      event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
@@ -53,10 +52,12 @@ self.addEventListener('fetch', (event) => {
           return cachedResponse;
         }
         return fetch(event.request).then((networkResponse) => {
-          return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, networkResponse.clone());
-            return networkResponse;
+          // Clone immediately before any async ops
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
           });
+          return networkResponse;
         });
       })
     );
@@ -92,9 +93,15 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
         const fetchPromise = fetch(event.request).then((networkResponse) => {
+          // Fix: Clone immediately! 
+          // If we wait for caches.open() to resolve, the browser may have already
+          // started consuming networkResponse, making the body unusable for cloning.
+          const responseToCache = networkResponse.clone();
+          
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, networkResponse.clone());
+            cache.put(event.request, responseToCache);
           });
+          
           return networkResponse;
         });
         return cachedResponse || fetchPromise;
