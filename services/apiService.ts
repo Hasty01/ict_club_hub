@@ -710,7 +710,6 @@ export const getResources = async (): Promise<Omit<Resource, 'uploaderName' | 'u
         category: r.category,
         url: r.url,
         filePath: r.file_path,
-        thumbnailUrl: r.thumbnail_url,
         uploaderUid: r.uploader_uid,
         topic: r.topic
     }));
@@ -727,19 +726,6 @@ export const uploadResourceFile = async (file: File, userId: string) => {
     return { url: data.publicUrl, path: fileName };
 };
 
-export const uploadThumbnail = async (thumbnailBlob: Blob, userId: string) => {
-    const fileName = `thumbnails/${userId}/${Date.now()}.svg`;
-    
-    const { error: uploadError } = await supabase.storage.from('resource_uploads').upload(fileName, thumbnailBlob, {
-        contentType: 'image/svg+xml',
-        upsert: false
-    });
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage.from('resource_uploads').getPublicUrl(fileName);
-    return { url: data.publicUrl, path: fileName };
-};
-
 export const addResource = async (resource: Omit<Resource, 'id' | 'createdAt' | 'uploaderName' | 'uploaderAvatarUrl'>) => {
     const { error } = await supabase.from('resources').insert({
         title: resource.title,
@@ -748,7 +734,6 @@ export const addResource = async (resource: Omit<Resource, 'id' | 'createdAt' | 
         category: resource.category,
         url: resource.url,
         file_path: resource.filePath,
-        thumbnail_url: resource.thumbnailUrl,
         uploader_uid: resource.uploaderUid,
         topic: resource.topic
     });
@@ -758,16 +743,6 @@ export const addResource = async (resource: Omit<Resource, 'id' | 'createdAt' | 
 export const deleteResource = async (resource: Resource) => {
     if (resource.filePath) {
         await supabase.storage.from('resource_uploads').remove([resource.filePath]);
-    }
-    if (resource.thumbnailUrl) {
-        try {
-            const path = new URL(resource.thumbnailUrl).pathname.split('/resource_uploads/')[1];
-            if (path) {
-                await supabase.storage.from('resource_uploads').remove([path]);
-            }
-        } catch (e) {
-            console.warn("Could not parse thumbnail URL to delete from storage:", e);
-        }
     }
     const { error } = await supabase.from('resources').delete().eq('id', resource.id);
     if (error) throw error;

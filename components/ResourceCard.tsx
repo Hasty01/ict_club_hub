@@ -35,7 +35,6 @@ const ResourceCard: React.FC<ResourceCardProps> = ({ resource, currentUser, onDe
     const isPatron = currentUser.role === 'PATRON';
     const [isLoading, setIsLoading] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
-    const hasThumbnail = resource.thumbnailUrl && (resource.type === 'DOCUMENT' || resource.type === 'PYTHON');
 
     useEffect(() => {
         const element = cardRef.current;
@@ -85,23 +84,25 @@ const ResourceCard: React.FC<ResourceCardProps> = ({ resource, currentUser, onDe
         return 'View Resource';
     };
     
+    const iconElement = getResourceIcon(resource.type);
+
     return (
         <div ref={cardRef} className="scroll-animate group bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm hover:shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row items-start gap-5 transition-all duration-300 transform hover:-translate-y-1 hover:border-pink-200 dark:hover:border-pink-900/50">
             <div className="flex-shrink-0 w-full sm:w-40">
-                {hasThumbnail ? (
-                    <a href={getActionLink()} target={resource.type === 'PYTHON' ? undefined : "_blank"} rel="noopener noreferrer" onClick={handleOpenAction} className="block group/thumb">
-                        <img 
-                          src={resource.thumbnailUrl} 
-                          alt={`${resource.title} thumbnail`} 
-                          className="w-full h-auto object-cover rounded-lg bg-gray-100 dark:bg-gray-700 aspect-video group-hover/thumb:ring-2 ring-pink-500 transition-all shadow-md"
-                        />
-                    </a>
-                ) : ( (resource.type === 'LINK' || resource.type === 'VIDEO') && resource.url ?
+                {(resource.type === 'LINK' || resource.type === 'VIDEO') && resource.url ? (
                     <LinkPreview url={resource.url} size="normal" />
-                   :
-                    <div className="w-14 h-14 rounded-2xl bg-gray-50 dark:bg-gray-700 flex items-center justify-center text-pink-500 dark:text-pink-400 group-hover:bg-pink-50 dark:group-hover:bg-pink-900/20 group-hover:scale-110 transition-all duration-300">
-                        {getResourceIcon(resource.type)}
-                    </div>
+                ) : (
+                    <a
+                        href={getActionLink()}
+                        target={resource.type === 'PYTHON' ? undefined : "_blank"}
+                        rel="noopener noreferrer"
+                        onClick={handleOpenAction}
+                        className="block w-full aspect-video bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center group/icon transition-all duration-300 hover:bg-gray-200 dark:hover:bg-gray-600 shadow-inner"
+                    >
+                        <div className="text-pink-500 dark:text-pink-400 group-hover/icon:scale-110 transition-transform">
+                            {iconElement && React.cloneElement(iconElement, { className: "w-12 h-12" })}
+                        </div>
+                    </a>
                 )}
             </div>
             <div className="flex-grow min-w-0 flex flex-col justify-between self-stretch w-full">

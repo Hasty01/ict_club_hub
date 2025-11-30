@@ -110,7 +110,6 @@ export interface Resource {
   topic?: string;
   url?: string; // For LINK and VIDEO types
   filePath?: string; // Path in storage bucket
-  thumbnailUrl?: string; // URL for the generated thumbnail
   uploaderUid: string;
   uploaderName: string;
   uploaderAvatarUrl?: string;

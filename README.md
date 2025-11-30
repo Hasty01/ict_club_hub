@@ -74,14 +74,11 @@ CREATE TABLE IF NOT EXISTS challenge_submissions (
 );
 ```
 
-### 4. Add Resource Thumbnails (Optional but Recommended)
-To enable thumbnails for uploaded documents and code files, add the `thumbnail_url` column to your resources table.
-
+### 4. Remove Unused Resource Thumbnail Column
+The app now uses icons instead of storing thumbnails. You can safely remove the old column.
 ```sql
-ALTER TABLE resources ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;
+ALTER TABLE resources DROP COLUMN IF EXISTS thumbnail_url;
 ```
-
-Also, ensure your storage policies for the `resource_uploads` bucket allow `image/svg+xml` content types. The provided policies are generally permissive and should work.
 
 
 ---
