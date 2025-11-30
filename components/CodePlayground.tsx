@@ -135,7 +135,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   
   const [output, setOutput] = useState<OutputLine[]>([{ type: 'log', content: 'Click "Run Code" to see the output here.' }]);
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
-  const [pyodide, setPyodide] = useState<any | null>(null);
+  const pyodideRef = useRef<any | null>(null);
   const [isPyodideReady, setIsPyodideReady] = useState(false);
   const [activeTab, setActiveTabState] = useState<'editor' | 'output'>('editor');
   const [isGettingHint, setIsGettingHint] = useState(false);
@@ -231,11 +231,11 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       // 2. Dynamic Jedi provider that activates when ready
       monaco.languages.registerCompletionItemProvider('python', {
           provideCompletionItems: async (model: any, position: any) => {
-              if (!pyodide) return { suggestions: [] };
+              if (!pyodideRef.current) return { suggestions: [] };
                
-               const py = pyodide;
-               const code = model.getValue();
-               py.globals.set("jedi_code", code);
+               const py = pyodideRef.current;
+               const currentCode = model.getValue();
+               py.globals.set("jedi_code", currentCode);
                py.globals.set("jedi_line", position.lineNumber);
                py.globals.set("jedi_column", position.column);
 
@@ -309,7 +309,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
         });
         await pyodideInstance.loadPackage("jedi");
         (window as any).pyodide = pyodideInstance; // Make it globally accessible for editor
-        setPyodide(pyodideInstance);
+        pyodideRef.current = pyodideInstance;
         setIsPyodideReady(true);
       } catch (error) {
         console.error("Failed to load Pyodide:", error);
@@ -501,7 +501,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
     setOutput([]);
     setIsWaitingForInput(false);
 
-    if (!pyodide) {
+    if (!pyodideRef.current) {
         setOutput([{ type: 'error', content: 'Error: Local interpreter (Pyodide) is not ready.' }]);
         setIsExecuting(false);
         return;
@@ -563,17 +563,17 @@ builtins.input = custom_input_async
     `;
 
     try {
-        await pyodide.loadPackagesFromImports(code);
-        await pyodide.runPythonAsync(setupCode);
+        await pyodideRef.current.loadPackagesFromImports(code);
+        await pyodideRef.current.runPythonAsync(setupCode);
         
         const asyncCode = code.replace(/\binput\s*\(/g, 'await input(');
         
-        const result = await pyodide.runPythonAsync(asyncCode);
+        const result = await pyodideRef.current.runPythonAsync(asyncCode);
 
         if (result !== undefined) {
-            pyodide.globals.set('last_result', result);
-            await pyodide.runPythonAsync(`print(repr(last_result))`);
-            pyodide.globals.delete('last_result');
+            pyodideRef.current.globals.set('last_result', result);
+            await pyodideRef.current.runPythonAsync(`print(repr(last_result))`);
+            pyodideRef.current.globals.delete('last_result');
             if (typeof result.destroy === 'function') {
                 result.destroy();
             }

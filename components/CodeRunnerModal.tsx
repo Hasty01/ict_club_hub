@@ -83,7 +83,7 @@ const PYTHON_METHODS = [
 const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code, title }) => {
   const [output, setOutput] = useState<OutputLine[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [pyodide, setPyodide] = useState<any | null>(null);
+  const pyodideRef = useRef<any | null>(null);
   const [isLoadingPyodide, setIsLoadingPyodide] = useState(false);
   const outputContainerRef = useRef<HTMLDivElement>(null);
   const [editorTheme, setEditorTheme] = useState('vs-dark');
@@ -97,7 +97,7 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
   const consoleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isOpen && !pyodide) {
+    if (isOpen && !pyodideRef.current) {
         const loadPyodide = async () => {
             setIsLoadingPyodide(true);
             try {
@@ -106,7 +106,7 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
                     indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/"
                 });
                 await pyodideInstance.loadPackage("jedi");
-                setPyodide(pyodideInstance);
+                pyodideRef.current = pyodideInstance;
             } catch (error) {
                 console.error("Failed to initialize Python environment:", error);
                 setOutput([{ type: 'error', content: "Failed to initialize Python environment." }]);
@@ -188,12 +188,12 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
       // Dynamic Jedi provider
       monaco.languages.registerCompletionItemProvider('python', {
           provideCompletionItems: async (model: any, position: any) => {
-              if (!pyodide) {
+              if (!pyodideRef.current) {
                   return { suggestions: [] };
               }
-              const py = pyodide;
-              const code = model.getValue();
-              py.globals.set("jedi_code", code);
+              const py = pyodideRef.current;
+              const currentCode = model.getValue();
+              py.globals.set("jedi_code", currentCode);
               py.globals.set("jedi_line", position.lineNumber);
               py.globals.set("jedi_column", position.column);
 
@@ -266,7 +266,7 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
   };
 
   const runCode = async () => {
-      if (!pyodide) return;
+      if (!pyodideRef.current) return;
       setIsExecuting(true);
       setOutput([]);
       setIsWaitingForInput(false);
@@ -323,12 +323,12 @@ builtins.input = custom_input
       `;
 
       try {
-          await pyodide.loadPackagesFromImports(activeCode);
-          await pyodide.runPythonAsync(setupCode);
+          await pyodideRef.current.loadPackagesFromImports(activeCode);
+          await pyodideRef.current.runPythonAsync(setupCode);
           
           const asyncCode = activeCode.replace(/\binput\s*\(/g, 'await input(');
           
-          await pyodide.runPythonAsync(asyncCode);
+          await pyodideRef.current.runPythonAsync(asyncCode);
       } catch (error: any) {
           setOutput(prev => [...prev, { type: 'error', content: error.message }]);
       } finally {
