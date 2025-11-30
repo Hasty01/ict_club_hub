@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { PlayIcon } from './icons/PlayIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -62,6 +61,26 @@ const SyntaxHighlightedText: React.FC<{ text: string }> = ({ text }) => {
         </>
     );
 };
+
+// Standard Python Keywords for Autocomplete
+const PYTHON_KEYWORDS = [
+    'False', 'None', 'True', 'and', 'as', 'assert', 'async', 'await', 'break', 
+    'class', 'continue', 'def', 'del', 'elif', 'else', 'except', 'finally', 
+    'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'nonlocal', 
+    'not', 'or', 'pass', 'raise', 'return', 'try', 'while', 'with', 'yield'
+];
+
+// Standard Python Built-ins for Autocomplete
+const PYTHON_BUILTINS = [
+    'abs', 'all', 'any', 'ascii', 'bin', 'bool', 'bytearray', 'bytes', 'callable', 
+    'chr', 'classmethod', 'compile', 'complex', 'delattr', 'dict', 'dir', 'divmod', 
+    'enumerate', 'eval', 'exec', 'filter', 'float', 'format', 'frozenset', 'getattr', 
+    'globals', 'hasattr', 'hash', 'help', 'hex', 'id', 'input', 'int', 'isinstance', 
+    'issubclass', 'iter', 'len', 'list', 'locals', 'map', 'max', 'memoryview', 
+    'min', 'next', 'object', 'oct', 'open', 'ord', 'pow', 'print', 'property', 
+    'range', 'repr', 'reversed', 'round', 'set', 'setattr', 'slice', 'sorted', 
+    'staticmethod', 'str', 'sum', 'super', 'tuple', 'type', 'vars', 'zip'
+];
 
 const PublishModal: React.FC<{ isOpen: boolean, onClose: () => void, onPublish: (title: string, desc: string) => Promise<void> }> = ({ isOpen, onClose, onPublish }) => {
     const [title, setTitle] = useState('');
@@ -176,6 +195,118 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       localStorage.setItem('playground_code', code);
       codeRef.current = code;
   }, [code]);
+
+  const handleEditorDidMount = (editor: any, monaco: any) => {
+    // 1. Configure Editor Behavior
+    editor.updateOptions({
+        minimap: { enabled: false },
+        fontSize: 14,
+        padding: { top: 16 },
+        scrollBeyondLastLine: false,
+        automaticLayout: true,
+        tabCompletion: "on",
+        wordBasedSuggestions: true,
+        suggestOnTriggerCharacters: true,
+        acceptSuggestionOnEnter: "on",
+        bracketPairColorization: { enabled: true },
+        guides: { bracketPairs: true, indentation: true },
+        formatOnType: true,
+        formatOnPaste: true,
+    });
+
+    // 2. Register Python IntelliSense (Completion Provider)
+    // Check global flag to prevent duplicate registration on re-renders
+    if (!(window as any).monacoPythonCompletionRegistered) {
+        (window as any).monacoPythonCompletionRegistered = true;
+
+        monaco.languages.registerCompletionItemProvider('python', {
+            provideCompletionItems: (model: any, position: any) => {
+                const word = model.getWordUntilPosition(position);
+                const range = {
+                    startLineNumber: position.lineNumber,
+                    endLineNumber: position.lineNumber,
+                    startColumn: word.startColumn,
+                    endColumn: word.endColumn
+                };
+
+                const suggestions = [
+                    // Keywords
+                    ...PYTHON_KEYWORDS.map(k => ({
+                        label: k,
+                        kind: monaco.languages.CompletionItemKind.Keyword,
+                        insertText: k,
+                        range: range,
+                        detail: 'Keyword'
+                    })),
+                    // Built-ins
+                    ...PYTHON_BUILTINS.map(b => ({
+                        label: b,
+                        kind: monaco.languages.CompletionItemKind.Function,
+                        insertText: b,
+                        range: range,
+                        detail: 'Built-in'
+                    })),
+                    // Snippets
+                    {
+                        label: 'def',
+                        kind: monaco.languages.CompletionItemKind.Snippet,
+                        insertText: 'def ${1:function_name}(${2:args}):\n\t${3:pass}',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'Define a function',
+                        range: range,
+                        detail: 'Snippet'
+                    },
+                    {
+                        label: 'if',
+                        kind: monaco.languages.CompletionItemKind.Snippet,
+                        insertText: 'if ${1:condition}:\n\t${2:pass}',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'If statement',
+                        range: range,
+                        detail: 'Snippet'
+                    },
+                    {
+                        label: 'for',
+                        kind: monaco.languages.CompletionItemKind.Snippet,
+                        insertText: 'for ${1:item} in ${2:iterable}:\n\t${3:pass}',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'For loop',
+                        range: range,
+                        detail: 'Snippet'
+                    },
+                    {
+                        label: 'try',
+                        kind: monaco.languages.CompletionItemKind.Snippet,
+                        insertText: 'try:\n\t${1:pass}\nexcept ${2:Exception} as ${3:e}:\n\t${4:print(e)}',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'Try/Except block',
+                        range: range,
+                        detail: 'Snippet'
+                    },
+                    {
+                        label: 'ifmain',
+                        kind: monaco.languages.CompletionItemKind.Snippet,
+                        insertText: 'if __name__ == "__main__":\n\t${1:main()}',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'Main guard',
+                        range: range,
+                        detail: 'Snippet'
+                    },
+                    {
+                        label: 'print',
+                        kind: monaco.languages.CompletionItemKind.Snippet,
+                        insertText: 'print(${1:object})',
+                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        documentation: 'Print to console',
+                        range: range,
+                        detail: 'Snippet'
+                    }
+                ];
+                return { suggestions: suggestions };
+            }
+        });
+    }
+  };
   
   const handleImportCode = (importedCode: string) => {
       const currentCode = codeRef.current;
@@ -599,18 +730,12 @@ builtins.input = custom_input_async
             <div className="flex-1 w-full h-full relative">
                 <Editor
                     height="100%"
+                    defaultLanguage="python"
                     language="python"
                     theme={editorTheme}
                     value={code}
                     onChange={(value) => setCode(value || '')}
-                    options={{
-                        minimap: { enabled: false },
-                        fontSize: 14,
-                        wordWrap: 'on',
-                        scrollBeyondLastLine: false,
-                        automaticLayout: true,
-                        padding: { top: 16 },
-                    }}
+                    onMount={handleEditorDidMount}
                     loading={<div className="text-center p-4">Loading editor...</div>}
                 />
             </div>
