@@ -2,8 +2,8 @@
 // Service Worker: sw.js
 // ============================
 
-const CACHE_NAME = 'ict-club-hub-v4';
-const DATA_CACHE_NAME = 'ict-club-data-v4';
+const CACHE_NAME = 'ict-club-hub-v5';
+const DATA_CACHE_NAME = 'ict-club-data-v5';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -53,8 +53,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // Only handle HTTP(S) requests for caching
+  const isHttp = url.protocol.startsWith('http');
+
   // --- 1. Pyodide Assets (Cache First) ---
-  if (url.href.includes('pyodide')) {
+  if (isHttp && url.href.includes('pyodide')) {
     event.respondWith(
       caches.match(event.request).then(cachedResponse => {
         if (cachedResponse) return cachedResponse;
@@ -72,7 +75,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // --- 2. Supabase API Requests (Network First, Fallback Cache) ---
-  if (url.hostname.includes('supabase.co') && event.request.method === 'GET') {
+  if (isHttp && url.hostname.includes('supabase.co') && event.request.method === 'GET') {
     event.respondWith(
       fetch(event.request)
         .then(networkResponse => {
@@ -88,7 +91,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // --- 3. Static CDN Assets (Stale-While-Revalidate) ---
-  if (STATIC_DOMAINS.some(domain => url.hostname.includes(domain))) {
+  if (isHttp && STATIC_DOMAINS.some(domain => url.hostname.includes(domain))) {
     event.respondWith(
       caches.match(event.request).then(cachedResponse => {
         const fetchAndCache = fetch(event.request)
@@ -105,7 +108,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // --- 4. Dynamic caching for build assets (/assets/) ---
-  if (url.pathname.startsWith('/assets/')) {
+  if (isHttp && url.pathname.startsWith('/assets/')) {
     event.respondWith(
       caches.match(event.request).then(cachedResponse => {
         if (cachedResponse) return cachedResponse;
@@ -118,7 +121,7 @@ self.addEventListener('fetch', (event) => {
           })
           .catch(() => {
             // Serve previously cached version if available
-            return caches.match(event.request) || 
+            return caches.match(event.request) ||
                    // fallback to index.html for SPA navigation
                    (event.request.mode === 'navigate' ? caches.match('/index.html') : new Response('', { status: 503, statusText: 'Offline' }));
           });
@@ -128,18 +131,20 @@ self.addEventListener('fetch', (event) => {
   }
 
   // --- 5. App Shell / Local Assets (Cache First with Offline Fallback) ---
-  event.respondWith(
-    caches.match(event.request).then(response => {
-      if (response) return response;
+  if (isHttp) {
+    event.respondWith(
+      caches.match(event.request).then(response => {
+        if (response) return response;
 
-      return fetch(event.request).catch(() => {
-        // Navigation fallback to index.html
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-        // Non-essential requests return empty response
-        return new Response('', { status: 503, statusText: 'Offline' });
-      });
-    })
-  );
+        return fetch(event.request).catch(() => {
+          // Navigation fallback to index.html
+          if (event.request.mode === 'navigate') {
+            return caches.match('/index.html');
+          }
+          // Non-essential requests return empty response
+          return new Response('', { status: 503, statusText: 'Offline' });
+        });
+      })
+    );
+  }
 });
