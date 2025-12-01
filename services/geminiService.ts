@@ -227,7 +227,7 @@ export const generateLearningRoadmap = async (topic: string, skillLevel: string,
 
     const model = "gemini-2.5-flash";
     const prompt = `
-        Create a short, modular 3-milestone learning roadmap for "${topic}" suitable for a "${skillLevel}" student in an ICT Club.
+        Create a comprehensive learning roadmap with at least 10 milestones for "${topic}" suitable for a "${skillLevel}" student in an ICT Club.
         Focus on specific, bite-sized concepts rather than broad overviews.
         The goal is practical, hands-on learning.
 

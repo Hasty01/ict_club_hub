@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, Roadmap, Milestone } from '../types';
 import { useData } from '../DataContext';
@@ -234,7 +235,7 @@ const MilestoneCard: React.FC<MilestoneCardProps> = ({ milestone, index, isLast,
                 </div>
 
                 {/* Expanded Details */}
-                <div className={`transition-all duration-500 ease-in-out ${!isLocked && isExpanded ? 'max-h-[1200px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                <div className={`transition-all duration-500 ease-in-out ${!isLocked && isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                     <div className="px-4 pb-4 border-t border-gray-100 dark:border-gray-700 pt-3">
                         <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">{milestone.description}</p>
                         
