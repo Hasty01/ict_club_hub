@@ -1,5 +1,3 @@
-
-
 import { supabase } from './supabaseClient';
 import { User, Activity, AttendanceRecord, FeedItem, ProjectData, ProjectTask, Resource, AppNotification, Room, Message, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab, Roadmap, RoadmapProgress, ShowcaseComment } from '../types';
 
@@ -1303,6 +1301,16 @@ export const addRoadmap = async (roadmap: Roadmap) => {
     });
     if (error) throw error;
     await notifyAllUsers(`New Roadmap: ${roadmap.topic}`, 'roadmap');
+};
+
+export const updateRoadmap = async (id: string, data: Partial<Roadmap>) => {
+    const updates: any = {};
+    if (data.skillLevel) updates.skill_level = data.skillLevel;
+    if (data.topic) updates.topic = data.topic;
+    if (data.milestones) updates.content = data.milestones;
+
+    const { error } = await supabase.from('roadmaps').update(updates).eq('id', id);
+    if (error) throw error;
 };
 
 export const deleteRoadmap = async (id: string) => {

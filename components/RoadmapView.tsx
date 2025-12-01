@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, Roadmap, Milestone } from '../types';
+import { User, Roadmap, Milestone, RoadmapResource } from '../types';
 import { useData } from '../DataContext';
 import * as api from '../services/apiService';
 import { generateLearningRoadmap, generateMilestoneQuiz, QuizQuestion } from '../services/geminiService';
@@ -14,6 +13,7 @@ import { CodeIcon } from './icons/CodeIcon';
 import { LockClosedIcon } from './icons/LockClosedIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { TrophyIcon } from './icons/TrophyIcon';
+import { PencilIcon } from './icons/PencilIcon';
 import ConfirmationModal from './ConfirmationModal';
 import RoadmapQuizModal from './RoadmapQuizModal';
 
@@ -179,6 +179,107 @@ const CreateRoadmapModal: React.FC<{
     );
 };
 
+const EditMilestoneResourcesModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    milestone: Milestone;
+    onSave: (resources: RoadmapResource[]) => void;
+}> = ({ isOpen, onClose, milestone, onSave }) => {
+    const [resources, setResources] = useState<RoadmapResource[]>([]);
+
+    useEffect(() => {
+        if (isOpen && milestone) {
+            setResources(milestone.resources || []);
+        }
+    }, [isOpen, milestone]);
+
+    const handleUpdateResource = (index: number, field: keyof RoadmapResource, value: string) => {
+        const updated = [...resources];
+        updated[index] = { ...updated[index], [field]: value };
+        setResources(updated);
+    };
+
+    const handleAddResource = () => {
+        setResources([...resources, { title: 'New Resource', type: 'ARTICLE', url: '' }]);
+    };
+
+    const handleDeleteResource = (index: number) => {
+        setResources(resources.filter((_, i) => i !== index));
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[85vh]">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400"><XIcon /></button>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Edit Resources</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Milestone: {milestone.title}</p>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1 mb-4">
+                    {resources.map((res, idx) => (
+                        <div key={idx} className="flex flex-col gap-2 p-3 bg-gray-50 dark:bg-gray-750 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    value={res.title}
+                                    onChange={(e) => handleUpdateResource(idx, 'title', e.target.value)}
+                                    placeholder="Resource Title"
+                                    className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-pink-500"
+                                />
+                                <select
+                                    value={res.type}
+                                    onChange={(e) => handleUpdateResource(idx, 'type', e.target.value as any)}
+                                    className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-pink-500"
+                                >
+                                    <option value="VIDEO">Video</option>
+                                    <option value="ARTICLE">Article</option>
+                                    <option value="DOCS">Docs</option>
+                                    <option value="PRACTICE">Practice</option>
+                                </select>
+                                <button 
+                                    onClick={() => handleDeleteResource(idx)}
+                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                                >
+                                    <TrashIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <input 
+                                type="text" 
+                                value={res.url}
+                                onChange={(e) => handleUpdateResource(idx, 'url', e.target.value)}
+                                placeholder="https://example.com"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-pink-500 font-mono"
+                            />
+                        </div>
+                    ))}
+                    <button 
+                        onClick={handleAddResource}
+                        className="w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:border-pink-500 hover:text-pink-500 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                    >
+                        <PlusCircleIcon className="w-4 h-4" /> Add Resource
+                    </button>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button 
+                        onClick={onClose}
+                        className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium text-sm hover:bg-gray-200 dark:hover:bg-gray-600"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={() => onSave(resources)}
+                        className="px-4 py-2 bg-pink-600 text-white rounded-lg font-medium text-sm hover:bg-pink-700"
+                    >
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 interface MilestoneCardProps {
     milestone: Milestone;
     index: number;
@@ -187,9 +288,10 @@ interface MilestoneCardProps {
     isCompleted: boolean;
     onTakeQuiz: () => void;
     isPatron: boolean;
+    onEditResources?: () => void;
 }
 
-const MilestoneCard: React.FC<MilestoneCardProps> = ({ milestone, index, isLast, isLocked, isCompleted, onTakeQuiz, isPatron }) => {
+const MilestoneCard: React.FC<MilestoneCardProps> = ({ milestone, index, isLast, isLocked, isCompleted, onTakeQuiz, isPatron, onEditResources }) => {
     const [isExpanded, setIsExpanded] = useState(!isLocked);
 
     return (
@@ -239,7 +341,14 @@ const MilestoneCard: React.FC<MilestoneCardProps> = ({ milestone, index, isLast,
                     <div className="px-4 pb-4 border-t border-gray-100 dark:border-gray-700 pt-3">
                         <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">{milestone.description}</p>
                         
-                        <h5 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Recommended Resources</h5>
+                        <h5 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                            Recommended Resources
+                            {isPatron && onEditResources && (
+                                <button onClick={(e) => { e.stopPropagation(); onEditResources(); }} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-400 hover:text-pink-600 transition-colors" title="Edit Resources">
+                                    <PencilIcon className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+                        </h5>
                         <div className="space-y-2 mb-4">
                             {milestone.resources.map((res, idx) => (
                                 <a 
@@ -285,6 +394,7 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
     const { roadmaps, isLoadingRoadmaps, roadmapsError, fetchRoadmaps, showToast, updateUserSkillLevel } = useData();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [editingMilestoneData, setEditingMilestoneData] = useState<{roadmapId: string, milestoneIndex: number, milestone: Milestone} | null>(null);
     
     // Patron View State
     const [activePatronTab, setActivePatronTab] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'>('BEGINNER');
@@ -407,6 +517,27 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
             }
         }
     };
+
+    const handleSaveResources = async (updatedResources: RoadmapResource[]) => {
+        if(!editingMilestoneData) return;
+        
+        const { roadmapId, milestoneIndex, milestone } = editingMilestoneData;
+        const roadmap = roadmaps.find(r => r.id === roadmapId);
+        if (!roadmap) return;
+
+        const newMilestones = [...roadmap.milestones];
+        newMilestones[milestoneIndex] = { ...milestone, resources: updatedResources };
+
+        try {
+            await api.updateRoadmap(roadmapId, { milestones: newMilestones });
+            await fetchRoadmaps();
+            showToast("Resources updated successfully!", "success");
+            setEditingMilestoneData(null);
+        } catch (error) {
+            console.error(error);
+            showToast("Failed to update resources.", "error");
+        }
+    }
 
     if (isLoadingRoadmaps) {
         return (
@@ -534,6 +665,11 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
                                                 isCompleted={isCompleted}
                                                 isPatron={isPatron}
                                                 onTakeQuiz={() => handleTakeQuiz(roadmap.id!, idx, ms)}
+                                                onEditResources={() => setEditingMilestoneData({
+                                                    roadmapId: roadmap.id!,
+                                                    milestoneIndex: idx,
+                                                    milestone: ms
+                                                })}
                                             />
                                         );
                                     })}
@@ -567,6 +703,15 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
                 quizQuestions={quizQuestions}
                 onPass={handleQuizPass}
             />
+
+            {editingMilestoneData && (
+                <EditMilestoneResourcesModal 
+                    isOpen={!!editingMilestoneData}
+                    onClose={() => setEditingMilestoneData(null)}
+                    milestone={editingMilestoneData.milestone}
+                    onSave={handleSaveResources}
+                />
+            )}
         </div>
     );
 };
