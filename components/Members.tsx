@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { User } from '../types';
 import * as api from '../services/apiService';
@@ -7,6 +6,7 @@ import { TrashIcon } from './icons/TrashIcon';
 import { ArrowUpCircleIcon } from './icons/ArrowUpCircleIcon';
 import { ArrowDownCircleIcon } from './icons/ArrowDownCircleIcon';
 import { CheckIcon } from './icons/CheckIcon';
+import { SearchIcon } from './icons/SearchIcon';
 import { useData } from '../DataContext';
 
 interface MembersProps {
@@ -16,6 +16,7 @@ interface MembersProps {
 const Members: React.FC<MembersProps> = ({ currentUser }) => {
     const { allUsers, isLoadingUsers, allUsersError, fetchUsers, onlineUsers } = useData();
     const [activeTab, setActiveTab] = useState<'active' | 'pending'>('active');
+    const [searchTerm, setSearchTerm] = useState('');
 
     const handleAction = async (action: () => Promise<any>) => {
         try {
@@ -42,12 +43,35 @@ const Members: React.FC<MembersProps> = ({ currentUser }) => {
     const activeMembers = allUsers.filter(u => u.status === 'APPROVED');
     const pendingMembers = allUsers.filter(u => u.status === 'PENDING');
     
-    const usersToDisplay = activeTab === 'active' ? activeMembers : pendingMembers;
+    let usersToDisplay = activeTab === 'active' ? activeMembers : pendingMembers;
+
+    if (searchTerm) {
+        const lowerTerm = searchTerm.toLowerCase();
+        usersToDisplay = usersToDisplay.filter(u => 
+            u.name.toLowerCase().includes(lowerTerm) || 
+            u.username.toLowerCase().includes(lowerTerm)
+        );
+    }
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="p-6 pb-0">
-                <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-6">Manage Club Members</h2>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Manage Club Members</h2>
+                    
+                    <div className="relative w-full md:w-64">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <SearchIcon className="h-5 w-5" />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search members..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                        />
+                    </div>
+                </div>
                 
                 {/* Tabs */}
                 <div className="flex border-b border-gray-200 dark:border-gray-700 space-x-1">
@@ -85,7 +109,14 @@ const Members: React.FC<MembersProps> = ({ currentUser }) => {
             <div className="p-6 overflow-x-auto">
                 {usersToDisplay.length === 0 ? (
                     <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                        <p>{activeTab === 'active' ? "No active members found." : "No pending requests."}</p>
+                        <p>
+                            {searchTerm 
+                                ? `No members found matching "${searchTerm}"` 
+                                : activeTab === 'active' 
+                                    ? "No active members found." 
+                                    : "No pending requests."
+                            }
+                        </p>
                     </div>
                 ) : (
                     <table className="w-full text-left">
