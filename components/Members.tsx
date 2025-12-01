@@ -131,7 +131,13 @@ const Members: React.FC<MembersProps> = ({ currentUser }) => {
                                     </td>
                                     {activeTab === 'active' && (
                                         <td className="py-4 px-4 text-sm text-gray-500 dark:text-gray-400">
-                                            {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Never'}
+                                            {user.lastLogin ? new Date(user.lastLogin).toLocaleString(undefined, { 
+                                                month: 'short', 
+                                                day: 'numeric', 
+                                                year: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            }) : 'Never'}
                                         </td>
                                     )}
                                     <td className="py-4 px-4 text-right">
