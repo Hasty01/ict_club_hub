@@ -2,149 +2,85 @@
 // Service Worker: sw.js
 // ============================
 
-const CACHE_NAME = 'ict-club-hub-v5';
-const DATA_CACHE_NAME = 'ict-club-data-v5';
+// Versioned cache names
+const CACHE_VERSION = 'v2'; // Increment this on each deploy
+const CACHE_NAME = `my-app-cache-${CACHE_VERSION}`;
+const DATA_CACHE_NAME = `my-app-data-${CACHE_VERSION}`;
 
-const PRECACHE_ASSETS = [
+// List of assets to pre-cache
+const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.json',
-  '/favicon.svg'
+  '/styles.css',
+  '/bundle.js',
+  '/favicon.ico',
+  // Add other static files here
 ];
 
-const STATIC_DOMAINS = [
-  'cdn.tailwindcss.com',
-  'aistudiocdn.com',
-  'esm.sh',
-  'cdn.jsdelivr.net'
-];
-
-// ----------------------------
-// Install: Precache assets
-// ----------------------------
-self.addEventListener('install', (event) => {
+// ============================
+// Install event: pre-cache static assets
+// ============================
+self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_ASSETS))
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS))
   );
   self.skipWaiting();
 });
 
-// ----------------------------
-// Activate: Cleanup old caches
-// ----------------------------
-self.addEventListener('activate', (event) => {
+// ============================
+// Activate event: remove old caches
+// ============================
+self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(cacheNames =>
-      Promise.all(
-        cacheNames.map(name => {
-          if (name !== CACHE_NAME && name !== DATA_CACHE_NAME) {
-            return caches.delete(name);
-          }
-        })
-      )
-    )
+    caches.keys().then(keys => {
+      return Promise.all(
+        keys
+          .filter(key => key !== CACHE_NAME && key !== DATA_CACHE_NAME)
+          .map(key => caches.delete(key))
+      );
+    })
   );
   self.clients.claim();
 });
 
-// ----------------------------
-// Fetch: Handle all requests
-// ----------------------------
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+// ============================
+// Fetch event: network-first for JS/CSS, cache-first for others
+// ============================
+self.addEventListener('fetch', event => {
+  const request = event.request;
 
-  // Only handle HTTP(S) requests for caching
-  const isHttp = url.protocol.startsWith('http');
-
-  // --- 1. Pyodide Assets (Cache First) ---
-  if (isHttp && url.href.includes('pyodide')) {
+  // Network-first for JS/CSS to ensure latest code
+  if (request.url.endsWith('.js') || request.url.endsWith('.css')) {
     event.respondWith(
-      caches.match(event.request).then(cachedResponse => {
-        if (cachedResponse) return cachedResponse;
-
-        return fetch(event.request)
-          .then(networkResponse => {
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
-            return networkResponse;
-          })
-          .catch(() => caches.match(event.request));
-      })
-    );
-    return;
-  }
-
-  // --- 2. Supabase API Requests (Network First, Fallback Cache) ---
-  if (isHttp && url.hostname.includes('supabase.co') && event.request.method === 'GET') {
-    event.respondWith(
-      fetch(event.request)
-        .then(networkResponse => {
-          if (networkResponse.ok) {
-            const responseClone = networkResponse.clone();
-            caches.open(DATA_CACHE_NAME).then(cache => cache.put(event.request, responseClone));
-          }
-          return networkResponse;
+      fetch(request)
+        .then(response => {
+          // Update cache with latest version
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, responseClone));
+          return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => caches.match(request))
     );
     return;
   }
 
-  // --- 3. Static CDN Assets (Stale-While-Revalidate) ---
-  if (isHttp && STATIC_DOMAINS.some(domain => url.hostname.includes(domain))) {
+  // Network-first for API/data requests
+  if (request.url.includes('/api/') || request.url.includes('/supabase/')) {
     event.respondWith(
-      caches.match(event.request).then(cachedResponse => {
-        const fetchAndCache = fetch(event.request)
-          .then(networkResponse => {
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
-            return networkResponse;
-          })
-          .catch(() => cachedResponse);
-        return cachedResponse || fetchAndCache;
-      })
+      fetch(request)
+        .then(response => {
+          const responseClone = response.clone();
+          caches.open(DATA_CACHE_NAME).then(cache => cache.put(request, responseClone));
+          return response;
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }
 
-  // --- 4. Dynamic caching for build assets (/assets/) ---
-  if (isHttp && url.pathname.startsWith('/assets/')) {
-    event.respondWith(
-      caches.match(event.request).then(cachedResponse => {
-        if (cachedResponse) return cachedResponse;
-
-        return fetch(event.request)
-          .then(networkResponse => {
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
-            return networkResponse;
-          })
-          .catch(() => {
-            // Serve previously cached version if available
-            return caches.match(event.request) ||
-                   // fallback to index.html for SPA navigation
-                   (event.request.mode === 'navigate' ? caches.match('/index.html') : new Response('', { status: 503, statusText: 'Offline' }));
-          });
-      })
-    );
-    return;
-  }
-
-  // --- 5. App Shell / Local Assets (Cache First with Offline Fallback) ---
-  if (isHttp) {
-    event.respondWith(
-      caches.match(event.request).then(response => {
-        if (response) return response;
-
-        return fetch(event.request).catch(() => {
-          // Navigation fallback to index.html
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
-          }
-          // Non-essential requests return empty response
-          return new Response('', { status: 503, statusText: 'Offline' });
-        });
-      })
-    );
-  }
+  // Default: cache-first for static assets
+  event.respondWith(
+    caches.match(request).then(cached => cached || fetch(request))
+  );
 });
