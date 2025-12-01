@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, AttendanceRecord, AttendanceStatus } from '../types';
 import * as api from '../services/apiService';
@@ -180,6 +181,7 @@ const ChangePasswordForm: React.FC<{ currentUser: User }> = ({ currentUser }) =>
 
 const AppearanceSettings: React.FC = () => {
     const [selectedCursor, setSelectedCursor] = useState<CursorVariant>('normal');
+    const [selectedFont, setSelectedFont] = useState('Inter, sans-serif');
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -196,8 +198,11 @@ const AppearanceSettings: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const saved = localStorage.getItem('app_cursor') as CursorVariant;
-        if (saved) setSelectedCursor(saved);
+        const savedCursor = localStorage.getItem('app_cursor') as CursorVariant;
+        if (savedCursor) setSelectedCursor(savedCursor);
+
+        const savedFont = localStorage.getItem('app_font');
+        if (savedFont) setSelectedFont(savedFont);
     }, []);
 
     const handleCursorSelect = (variant: CursorVariant) => {
@@ -205,6 +210,12 @@ const AppearanceSettings: React.FC = () => {
         localStorage.setItem('app_cursor', variant);
         // Dispatch event so CustomCursor updates immediately
         window.dispatchEvent(new CustomEvent('cursor-change', { detail: variant }));
+    };
+
+    const handleFontSelect = (font: string) => {
+        setSelectedFont(font);
+        localStorage.setItem('app_font', font);
+        window.dispatchEvent(new CustomEvent('font-change', { detail: font }));
     };
 
     const cursors: { id: CursorVariant, name: string, preview: React.ReactNode }[] = [
@@ -243,37 +254,79 @@ const AppearanceSettings: React.FC = () => {
         // ... other cursors would be here (truncated for brevity as they are unchanged)
     ];
 
+    const fontOptions = [
+        { name: 'Modern (Default)', value: 'Inter, sans-serif' },
+        { name: 'Professional', value: '"Lora", serif' },
+        { name: 'Coding', value: '"Roboto Mono", monospace' },
+        { name: 'Playful', value: '"Comic Neue", cursive' },
+    ];
+
     return (
-        <div ref={ref} className="scroll-animate mt-6">
-            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Cursor Customization</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                Personalize your experience by choosing a custom cursor style. 
-                (Only visible on desktop devices)
-            </p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {cursors.map((cursor) => (
-                    <button
-                        key={cursor.id}
-                        onClick={() => handleCursorSelect(cursor.id)}
-                        className={`relative flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all duration-200 group
-                        ${selectedCursor === cursor.id 
-                            ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/10' 
-                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-pink-300 dark:hover:border-pink-700'}`}
-                    >
-                        <div className="mb-4 transform group-hover:scale-110 transition-transform duration-200">
-                            {cursor.preview}
-                        </div>
-                        <span className={`font-medium text-sm ${selectedCursor === cursor.id ? 'text-pink-700 dark:text-pink-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                            {cursor.name}
-                        </span>
-                        {selectedCursor === cursor.id && (
-                            <div className="absolute top-3 right-3 text-pink-500">
-                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+        <div ref={ref} className="scroll-animate mt-6 space-y-10">
+            {/* Cursor Section */}
+            <div>
+                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Cursor Customization</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                    Personalize your experience by choosing a custom cursor style. 
+                    (Only visible on desktop devices)
+                </p>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {cursors.map((cursor) => (
+                        <button
+                            key={cursor.id}
+                            onClick={() => handleCursorSelect(cursor.id)}
+                            className={`relative flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all duration-200 group
+                            ${selectedCursor === cursor.id 
+                                ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/10' 
+                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-pink-300 dark:hover:border-pink-700'}`}
+                        >
+                            <div className="mb-4 transform group-hover:scale-110 transition-transform duration-200">
+                                {cursor.preview}
                             </div>
-                        )}
-                    </button>
-                ))}
+                            <span className={`font-medium text-sm ${selectedCursor === cursor.id ? 'text-pink-700 dark:text-pink-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                                {cursor.name}
+                            </span>
+                            {selectedCursor === cursor.id && (
+                                <div className="absolute top-3 right-3 text-pink-500">
+                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                </div>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Typography Section */}
+            <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Typography</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                    Choose a font style that suits your reading preference.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {fontOptions.map((font) => (
+                        <button
+                            key={font.value}
+                            onClick={() => handleFontSelect(font.value)}
+                            className={`relative flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all duration-200 group
+                            ${selectedFont === font.value 
+                                ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/10' 
+                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-pink-300 dark:hover:border-pink-700'}`}
+                        >
+                            <div className="mb-3 text-2xl" style={{ fontFamily: font.value }}>
+                                Aa
+                            </div>
+                            <span className={`font-medium text-sm ${selectedFont === font.value ? 'text-pink-700 dark:text-pink-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                                {font.name}
+                            </span>
+                            {selectedFont === font.value && (
+                                <div className="absolute top-3 right-3 text-pink-500">
+                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                </div>
+                            )}
+                        </button>
+                    ))}
+                </div>
             </div>
         </div>
     );

@@ -38,6 +38,13 @@ const App: React.FC = () => {
     return 'dark';
   });
 
+  const [font, setFont] = useState<string>(() => {
+      if (typeof window !== 'undefined') {
+          return localStorage.getItem('app_font') || 'Inter, sans-serif';
+      }
+      return 'Inter, sans-serif';
+  });
+
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<View>('welcome');
   const [isLoading, setIsLoading] = useState(true);
@@ -68,6 +75,15 @@ const App: React.FC = () => {
     // Save to local storage
     localStorage.setItem('app_theme', theme);
   }, [theme]);
+
+  // Listen for Font Changes
+  useEffect(() => {
+      const handleFontChange = (e: CustomEvent) => {
+          setFont(e.detail);
+      };
+      window.addEventListener('font-change' as any, handleFontChange);
+      return () => window.removeEventListener('font-change' as any, handleFontChange);
+  }, []);
 
   // Centralized session handler to avoid code duplication
   const processUserSession = async (userId: string) => {
@@ -232,7 +248,7 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
+      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900" style={{ fontFamily: font }}>
         <div className="flex flex-col items-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-pink-500 mb-4"></div>
             <p className="text-gray-500 dark:text-gray-400 font-medium">Loading Club Hub...</p>
@@ -344,7 +360,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-full font-sans text-gray-800 dark:text-gray-200 relative">
+    <div className="min-h-full text-gray-800 dark:text-gray-200 relative" style={{ fontFamily: font }}>
       <CustomCursor />
       <div className="relative z-10">
         {renderContent()}
