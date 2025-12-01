@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { FeedItem, FeedItemType, User, FeedComment, PollOption } from '../types';
 import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
@@ -7,6 +6,8 @@ import { SendIcon } from './icons/SendIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { ChartBarIcon } from './icons/ChartBarIcon';
 import { CheckIcon } from './icons/CheckIcon';
+import { BookmarkIcon } from './icons/BookmarkIcon';
+import { ShareIcon } from './icons/ShareIcon';
 import * as api from '../services/apiService';
 import LinkPreview from './LinkPreview';
 
@@ -37,6 +38,29 @@ const badgeConfig: { [key in FeedItemType]: {
   },
 };
 
+const getRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + "y ago";
+    
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + "mo ago";
+    
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + "d ago";
+    
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + "h ago";
+    
+    interval = seconds / 60;
+    if (interval > 1) return Math.floor(interval) + "m ago";
+    
+    return "Just now";
+};
+
 interface FeedItemCardProps {
   item: FeedItem;
   currentUser: User;
@@ -53,6 +77,10 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
   const [isPosting, setIsPosting] = useState(false);
   const [commentCount, setCommentCount] = useState(item.commentCount || 0);
   
+  // Interactions
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+
   // Poll State
   const [pollOptions, setPollOptions] = useState<PollOption[]>(item.pollOptions || []);
   const [isVoting, setIsVoting] = useState(false);
@@ -61,6 +89,12 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Check bookmark status from local storage
+    const bookmarks = JSON.parse(localStorage.getItem('bookmarked_posts') || '[]');
+    if (bookmarks.includes(item.id)) {
+        setIsBookmarked(true);
+    }
+
     const element = cardRef.current;
     if (!element) return;
     
@@ -78,7 +112,7 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
 
     observer.observe(element);
     return () => observer.disconnect();
-  }, [staggerDelay]);
+  }, [staggerDelay, item.id]);
 
   useEffect(() => {
       const handleClickOutside = () => setContextMenu(null);
@@ -127,6 +161,26 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
       }
   };
 
+  const handleBookmark = () => {
+      const bookmarks = JSON.parse(localStorage.getItem('bookmarked_posts') || '[]');
+      let newBookmarks;
+      if (isBookmarked) {
+          newBookmarks = bookmarks.filter((id: string) => id !== item.id);
+      } else {
+          newBookmarks = [...bookmarks, item.id];
+      }
+      localStorage.setItem('bookmarked_posts', JSON.stringify(newBookmarks));
+      setIsBookmarked(!isBookmarked);
+  };
+
+  const handleShare = () => {
+      const textToCopy = `${item.title ? item.title + '\n' : ''}${item.message}`;
+      navigator.clipboard.writeText(textToCopy).then(() => {
+          setIsCopied(true);
+          setTimeout(() => setIsCopied(false), 2000);
+      });
+  };
+
   const handleVote = async (optionId: string) => {
       if (isVoting) return;
       setIsVoting(true);
@@ -165,7 +219,7 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
       if (urlRegex.test(content)) {
           const parts = content.split(urlRegex);
           return (
-              <div className="whitespace-pre-wrap break-words w-full min-w-0 text-gray-600 dark:text-gray-300 leading-relaxed">
+              <div className="whitespace-pre-wrap break-words w-full min-w-0 text-gray-700 dark:text-gray-300 leading-relaxed text-[15px]">
                   {parts.map((part, i) => {
                       if (part.match(urlRegex)) {
                           return <LinkPreview key={i} url={part} />;
@@ -175,50 +229,49 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
               </div>
           );
       }
-      return <p className="text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{content}</p>;
+      return <p className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap text-[15px]">{content}</p>;
   };
   
   return (
     <div 
         ref={cardRef}
         onContextMenu={handleContextMenu}
-        className="scroll-animate group bg-white dark:bg-gray-800 rounded-3xl p-1 shadow-sm hover:shadow-xl border border-gray-100 dark:border-gray-700 transition-all duration-300"
+        className="scroll-animate group bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 overflow-hidden transform hover:-translate-y-0.5"
     >
-        <div className="bg-white dark:bg-gray-800 rounded-[1.4rem] p-5 sm:p-6 h-full relative overflow-hidden">
-             {/* Decorative gradient blur top right */}
-             <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-full opacity-50 blur-2xl group-hover:from-pink-100 group-hover:to-purple-100 dark:group-hover:from-pink-900/30 dark:group-hover:to-purple-900/30 transition-colors duration-500 pointer-events-none"></div>
-
+        <div className="p-5 sm:p-6">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4 relative z-10">
+            <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                     <div className="relative">
                         <img 
                             src={item.authorAvatarUrl} 
                             alt={item.author} 
-                            className="w-12 h-12 rounded-full object-cover ring-4 ring-gray-50 dark:ring-gray-750 shadow-sm" 
+                            className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-700" 
                         />
                     </div>
                     <div>
                         <p className="text-sm font-bold text-gray-900 dark:text-white leading-none">{item.author}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.timestamp}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1" title={item.timestamp}>
+                            {getRelativeTime(item.timestamp)}
+                        </p>
                     </div>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${config.bgClass} ${config.textClass} shadow-sm border border-transparent dark:border-white/5`}>
+                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${config.bgClass} ${config.textClass}`}>
                     {config.text}
                 </span>
             </div>
 
             {/* Content */}
-            <div className="mb-6 relative z-10">
+            <div className="mb-4">
                 {item.type === 'POLL' ? (
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight flex items-start gap-2">
-                        <ChartBarIcon className="w-6 h-6 text-yellow-500 flex-shrink-0 mt-0.5" />
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight flex items-start gap-2">
+                        <ChartBarIcon className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                         {item.message}
                     </h3>
                 ) : (
                     <>
                         {item.title && (
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3 leading-tight">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2 leading-tight">
                                 {item.title}
                             </h3>
                         )}
@@ -228,7 +281,7 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
                     </>
                 )}
 
-                {/* Poll Options (Discord Style) */}
+                {/* Poll Options */}
                 {item.type === 'POLL' && pollOptions.length > 0 && (
                     <div className="space-y-2 mt-4">
                         {pollOptions.map(option => {
@@ -260,7 +313,6 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
                                     {/* Content Layer */}
                                     <div className="relative z-10 flex items-center justify-between p-3">
                                         <div className="flex items-center gap-3 min-w-0">
-                                            {/* Check Circle */}
                                             <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                                                 option.isVoted
                                                 ? 'border-purple-500 bg-purple-500 text-white'
@@ -268,16 +320,12 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
                                             }`}>
                                                 {option.isVoted && <CheckIcon className="w-3 h-3" />}
                                             </div>
-                                            
-                                            {/* Text */}
                                             <span className={`text-sm font-medium truncate ${
                                                 option.isVoted ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'
                                             }`}>
                                                 {option.text}
                                             </span>
                                         </div>
-                                        
-                                        {/* Percentage */}
                                         <span className="text-xs font-bold text-gray-500 dark:text-gray-400 ml-3">
                                             {percent}%
                                         </span>
@@ -295,81 +343,83 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
             </div>
 
             {/* Footer / Interactive Area */}
-            <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700/50 relative z-10">
-                <div>
+            <div className="flex items-center justify-between pt-2">
+                <div className="flex gap-4">
                     <button 
                         onClick={handleToggleComments}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all group/btn ${showComments ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 dark:hover:text-purple-400'}`}
+                        className={`flex items-center gap-1.5 transition-colors ${showComments ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400'}`}
                     >
-                         <ChatBubbleIcon />
-                         <span className="text-xs font-medium">
-                             Comments
-                         </span>
-                         {commentCount > 0 && (
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm ${
-                                showComments 
-                                ? 'bg-white/30 text-purple-700 dark:text-purple-200' 
-                                : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200'
-                            }`}>
-                                {commentCount}
-                            </span>
-                         )}
+                         <ChatBubbleIcon className="w-5 h-5" />
+                         <span className="text-xs font-medium">{commentCount > 0 ? commentCount : 'Comment'}</span>
+                    </button>
+                    
+                    <button 
+                        onClick={handleBookmark}
+                        className={`flex items-center gap-1.5 transition-colors ${isBookmarked ? 'text-pink-600 dark:text-pink-400' : 'text-gray-500 dark:text-gray-400 hover:text-pink-600 dark:hover:text-pink-400'}`}
+                        title={isBookmarked ? "Remove Bookmark" : "Bookmark"}
+                    >
+                        <BookmarkIcon className="w-5 h-5" filled={isBookmarked} />
+                    </button>
+
+                    <button 
+                        onClick={handleShare}
+                        className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        title="Copy to clipboard"
+                    >
+                        <ShareIcon className="w-5 h-5" />
+                        {isCopied && <span className="text-xs text-blue-600 animate-fade-in">Copied!</span>}
                     </button>
                 </div>
-                
-                <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono opacity-0 group-hover:opacity-100 transition-opacity">
-                    #{String(item.id).slice(0,4)}
-                </div>
             </div>
-
-            {/* Comments Section */}
-            {showComments && (
-                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700/50 animate-fade-in-down relative z-10">
-                    {/* Comments List */}
-                    <div className="space-y-4 mb-4 max-h-60 overflow-y-auto custom-scrollbar pr-2">
-                        {isLoadingComments ? (
-                            <p className="text-center text-xs text-gray-500">Loading comments...</p>
-                        ) : comments.length === 0 ? (
-                            <p className="text-center text-xs text-gray-400 italic">No comments yet. Be the first!</p>
-                        ) : (
-                            comments.map(comment => (
-                                <div key={comment.id} className="flex gap-3">
-                                    <img src={comment.userAvatarUrl} alt={comment.userName} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-                                    <div className="bg-gray-50 dark:bg-gray-750 p-3 rounded-2xl rounded-tl-none text-sm flex-1">
-                                        <div className="flex justify-between items-baseline mb-1">
-                                            <span className="font-bold text-gray-900 dark:text-white text-xs">{comment.userName}</span>
-                                            <span className="text-[10px] text-gray-400">{comment.createdAt}</span>
-                                        </div>
-                                        <p className="text-gray-700 dark:text-gray-300">{comment.content}</p>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                    {/* Add Comment Form */}
-                    <form onSubmit={handlePostComment} className="flex gap-2 items-center">
-                        <img src={currentUser.avatarUrl || `https://i.pravatar.cc/40?u=${currentUser.username}`} className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-700" alt="My Avatar" />
-                        <div className="flex-1 relative">
-                            <input 
-                                type="text" 
-                                value={newComment}
-                                onChange={(e) => setNewComment(e.target.value)}
-                                placeholder="Write a comment..." 
-                                className="w-full pl-4 pr-10 py-2 bg-gray-100 dark:bg-gray-750 border-none rounded-full text-sm focus:ring-2 focus:ring-purple-500 dark:text-white placeholder-gray-500"
-                            />
-                            <button 
-                                type="submit"
-                                disabled={!newComment.trim() || isPosting}
-                                className="absolute right-1 top-1 p-1.5 bg-purple-600 text-white rounded-full hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                                <SendIcon className="w-3 h-3 transform rotate-90" />
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
         </div>
+
+        {/* Comments Section */}
+        {showComments && (
+            <div className="bg-gray-50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-700/50 p-5 animate-fade-in-down">
+                {/* Comments List */}
+                <div className="space-y-4 mb-4 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                    {isLoadingComments ? (
+                        <p className="text-center text-xs text-gray-500">Loading comments...</p>
+                    ) : comments.length === 0 ? (
+                        <p className="text-center text-xs text-gray-400 italic">No comments yet. Start the conversation!</p>
+                    ) : (
+                        comments.map(comment => (
+                            <div key={comment.id} className="flex gap-3 animate-fade-in">
+                                <img src={comment.userAvatarUrl} alt={comment.userName} className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-200 dark:border-gray-700" />
+                                <div className="bg-white dark:bg-gray-800 p-3 rounded-2xl rounded-tl-none text-sm flex-1 border border-gray-200 dark:border-gray-700 shadow-sm">
+                                    <div className="flex justify-between items-baseline mb-1">
+                                        <span className="font-bold text-gray-900 dark:text-white text-xs">{comment.userName}</span>
+                                        <span className="text-[10px] text-gray-400">{getRelativeTime(comment.createdAt)}</span>
+                                    </div>
+                                    <p className="text-gray-700 dark:text-gray-300 text-sm">{comment.content}</p>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                {/* Add Comment Form */}
+                <form onSubmit={handlePostComment} className="flex gap-3 items-center">
+                    <img src={currentUser.avatarUrl || `https://i.pravatar.cc/40?u=${currentUser.username}`} className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-700" alt="My Avatar" />
+                    <div className="flex-1 relative">
+                        <input 
+                            type="text" 
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            placeholder="Add a comment..." 
+                            className="w-full pl-4 pr-10 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full text-sm focus:ring-2 focus:ring-purple-500 dark:text-white placeholder-gray-500 transition-shadow shadow-sm"
+                        />
+                        <button 
+                            type="submit"
+                            disabled={!newComment.trim() || isPosting}
+                            className="absolute right-1.5 top-1.5 p-1.5 bg-purple-600 text-white rounded-full hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <SendIcon className="w-3.5 h-3.5 transform rotate-90" />
+                        </button>
+                    </div>
+                </form>
+            </div>
+        )}
 
         {/* Context Menu for Patrons */}
         {contextMenu && onDelete && (
@@ -382,7 +432,7 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
                     onClick={() => onDelete(item.id)}
                     className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center gap-2 transition-colors"
                 >
-                    <TrashIcon /> 
+                    <TrashIcon className="w-4 h-4" /> 
                     <span className="font-medium">Delete Post</span>
                 </button>
             </div>

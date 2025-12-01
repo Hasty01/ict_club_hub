@@ -1,26 +1,48 @@
 
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FeedItem, User, FeedItemType } from '../types';
 import * as api from '../services/apiService';
 import AddAnnouncement from './AddAnnouncement';
 import FeedItemCard from './FeedItemCard';
 import { useData } from '../DataContext';
 import ConfirmationModal from './ConfirmationModal';
+import { SearchIcon } from './icons/SearchIcon';
+import { FilterIcon } from './icons/FilterIcon';
+import { PlusCircleIcon } from './icons/PlusCircleIcon';
+import { NewspaperIcon } from './icons/NewspaperIcon';
 
 interface FeedProps {
   currentUser: User;
 }
 
+type FilterCategory = 'ALL' | 'NEWS' | 'EVENTS' | 'DISCUSSIONS' | 'POLLS' | 'BOOKMARKED';
+
 const Feed: React.FC<FeedProps> = ({ currentUser }) => {
   const { feedItems: items, isLoadingFeed, feedItemsError, fetchFeedItems, showToast } = useData();
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
-  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filter, setFilter] = useState<FilterCategory>('ALL');
+  const [isMobileComposeOpen, setIsMobileComposeOpen] = useState(false);
+  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
+
+  // Update bookmarked IDs on mount and when changed
+  useEffect(() => {
+      const updateBookmarks = () => {
+          const stored = JSON.parse(localStorage.getItem('bookmarked_posts') || '[]');
+          setBookmarkedIds(stored);
+      };
+      updateBookmarks();
+      // Listen for changes (hacky way to sync sibling components if needed, mostly for self-update)
+      window.addEventListener('storage', updateBookmarks);
+      return () => window.removeEventListener('storage', updateBookmarks);
+  }, [items]); // Re-check when items reload
+
   const handleAddAnnouncement = useCallback(async (data: { title: string, message: string, type: FeedItemType, pollOptions?: string[] }) => {
     try {
         await api.addFeedItem(data, currentUser.uid);
         await fetchFeedItems();
         showToast("Announcement posted successfully!", "success");
+        setIsMobileComposeOpen(false);
     } catch (error) {
         console.error("Failed to post announcement", error);
         showToast("Failed to create post.", "error");
@@ -40,6 +62,31 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
           setItemToDelete(null);
       }
   };
+
+  const filteredItems = useMemo(() => {
+      return items.filter(item => {
+          // Search Filter
+          const matchesSearch = 
+            item.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            item.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            item.author.toLowerCase().includes(searchTerm.toLowerCase());
+
+          if (!matchesSearch) return false;
+
+          // Category Filter
+          if (filter === 'ALL') return true;
+          if (filter === 'NEWS') return item.type === 'NEWS_UPDATE';
+          if (filter === 'EVENTS') return item.type === 'EVENT_ANNOUNCEMENT';
+          if (filter === 'DISCUSSIONS') return item.type === 'MEMBER_POST';
+          if (filter === 'POLLS') return item.type === 'POLL';
+          if (filter === 'BOOKMARKED') {
+              // Refresh bookmark list from local storage for accurate filtering
+              const currentBookmarks = JSON.parse(localStorage.getItem('bookmarked_posts') || '[]');
+              return currentBookmarks.includes(item.id);
+          }
+          return true;
+      });
+  }, [items, searchTerm, filter, bookmarkedIds]);
 
   if (isLoadingFeed) {
     return (
@@ -72,7 +119,7 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
 
   return (
     <div className="relative min-h-full pb-12 overflow-hidden">
-       {/* Animated Background Elements */}
+       {/* Background */}
        <style>{`
         @keyframes blob {
           0% { transform: translate(0px, 0px) scale(1); }
@@ -90,24 +137,73 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
           animation-delay: 4s;
         }
       `}</style>
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-300 dark:bg-purple-900/20 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-3xl opacity-30 animate-blob"></div>
-          <div className="absolute top-0 right-1/4 w-96 h-96 bg-pink-300 dark:bg-pink-900/20 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
-          <div className="absolute -bottom-32 left-1/3 w-96 h-96 bg-indigo-300 dark:bg-indigo-900/20 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0 fixed">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-300 dark:bg-purple-900/10 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-3xl opacity-30 animate-blob"></div>
+          <div className="absolute top-0 right-1/4 w-96 h-96 bg-pink-300 dark:bg-pink-900/10 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+          <div className="absolute -bottom-32 left-1/3 w-96 h-96 bg-indigo-300 dark:bg-indigo-900/10 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
       </div>
 
       <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6">
-        <header className="mb-8 pt-4">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-              Club Feed
-            </h2>
-            <p className="text-md text-gray-500 dark:text-gray-400 mt-1">
-              Latest announcements and community updates.
-            </p>
+        
+        {/* Sticky Header with Search & Filter */}
+        <header className="sticky top-0 z-30 pt-4 pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 bg-gray-100/90 dark:bg-gray-900/90 backdrop-blur-md mb-6">
+            <div className="flex items-center justify-between mb-4">
+                <div>
+                    <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Club Feed</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">Stay updated with the latest news.</p>
+                </div>
+                {currentUser.role === 'PATRON' && (
+                    <button 
+                        onClick={() => setIsMobileComposeOpen(!isMobileComposeOpen)}
+                        className="sm:hidden p-2 bg-pink-600 text-white rounded-full shadow-lg"
+                    >
+                        <PlusCircleIcon className="w-6 h-6" />
+                    </button>
+                )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-grow">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                        <SearchIcon className="h-5 w-5" />
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Search posts..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500 shadow-sm transition-all"
+                    />
+                </div>
+                
+                <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 custom-scrollbar">
+                    {[
+                        { id: 'ALL', label: 'All' },
+                        { id: 'NEWS', label: 'News' },
+                        { id: 'EVENTS', label: 'Events' },
+                        { id: 'DISCUSSIONS', label: 'Discuss' },
+                        { id: 'POLLS', label: 'Polls' },
+                        { id: 'BOOKMARKED', label: 'Saved' }
+                    ].map((pill) => (
+                        <button
+                            key={pill.id}
+                            onClick={() => setFilter(pill.id as FilterCategory)}
+                            className={`px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all shadow-sm ${
+                                filter === pill.id 
+                                ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' 
+                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
+                        >
+                            {pill.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
         </header>
         
+        {/* Desktop Composer */}
         {currentUser.role === 'PATRON' && (
-            <div className="mb-10 transform transition-all hover:-translate-y-1 duration-300 relative z-20">
+            <div className={`mb-10 transform transition-all duration-300 relative z-20 hidden sm:block`}>
                 <AddAnnouncement 
                     currentUser={currentUser}
                     onAddAnnouncement={handleAddAnnouncement}
@@ -115,34 +211,52 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
             </div>
         )}
 
-        <div className="space-y-8 relative">
-            {/* Timeline Line (Desktop only) */}
-            <div className="hidden md:block absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-transparent via-gray-200 dark:via-gray-700 to-transparent z-0"></div>
+        {/* Mobile Composer (Collapsible) */}
+        {currentUser.role === 'PATRON' && isMobileComposeOpen && (
+            <div className="sm:hidden mb-8 animate-fade-in-down">
+                 <AddAnnouncement 
+                    currentUser={currentUser}
+                    onAddAnnouncement={handleAddAnnouncement}
+                />
+            </div>
+        )}
 
-            {items.length === 0 ? (
-                 <div className="text-center py-20 backdrop-blur-md bg-white/50 dark:bg-gray-800/50 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
-                    <div className="text-gray-300 dark:text-gray-600 mb-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3h2m-4 3h2m-4 3h2m-4 3h2" />
-                        </svg>
+        <div className="space-y-6 relative">
+            {/* Timeline Line (Desktop only) - Made more subtle */}
+            <div className="hidden md:block absolute left-8 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-gray-300 dark:via-gray-700 to-transparent z-0"></div>
+
+            {filteredItems.length === 0 ? (
+                 <div className="text-center py-20 backdrop-blur-md bg-white/50 dark:bg-gray-800/50 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm mx-4 sm:mx-0">
+                    <div className="text-gray-300 dark:text-gray-600 mb-4 bg-gray-100 dark:bg-gray-700/50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
+                        <NewspaperIcon />
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">All Caught Up!</h3>
-                    <p className="text-gray-500 dark:text-gray-400 font-medium">No new announcements at the moment.</p>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Posts Found</h3>
+                    <p className="text-gray-500 dark:text-gray-400 font-medium">
+                        {filter === 'BOOKMARKED' ? "You haven't saved any posts yet." : "Try adjusting your search or filters."}
+                    </p>
+                    {filter !== 'ALL' && (
+                        <button 
+                            onClick={() => { setFilter('ALL'); setSearchTerm(''); }}
+                            className="mt-4 text-pink-600 dark:text-pink-400 font-semibold hover:underline"
+                        >
+                            Clear Filters
+                        </button>
+                    )}
                  </div>
             ) : (
-                items.map((item, index) => (
+                filteredItems.map((item, index) => (
                 <div
                     key={item.id}
                     className="pl-0 md:pl-20 relative"
                 >
                     {/* Timeline Dot (Desktop only) */}
-                    <div className="hidden md:flex absolute left-6 top-8 w-4 h-4 rounded-full border-4 border-white dark:border-gray-900 bg-gradient-to-r from-pink-500 to-purple-600 shadow-md z-10"></div>
+                    <div className="hidden md:flex absolute left-[30px] top-8 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 bg-pink-500 shadow-sm z-10"></div>
                     
                     <FeedItemCard 
                         item={item} 
                         currentUser={currentUser} 
                         onDelete={setItemToDelete}
-                        staggerDelay={index * 100}
+                        staggerDelay={index * 50}
                     />
                 </div>
                 ))
