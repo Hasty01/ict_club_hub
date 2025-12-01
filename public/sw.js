@@ -1,86 +1,142 @@
 // ============================
-// Service Worker: sw.js
+// Service Worker: sw.js (fixed)
 // ============================
 
-// Versioned cache names
-const CACHE_VERSION = 'v2'; // Increment this on each deploy
-const CACHE_NAME = `my-app-cache-${CACHE_VERSION}`;
-const DATA_CACHE_NAME = `my-app-data-${CACHE_VERSION}`;
+const CACHE_NAME = 'ict-club-hub-v6';
+const DATA_CACHE_NAME = 'ict-club-data-v6';
 
-// List of assets to pre-cache
-const STATIC_ASSETS = [
-  '/',
+const PRECACHE_ASSETS = [
+  '/', 
   '/index.html',
-  '/styles.css',
-  '/bundle.js',
-  '/favicon.ico',
-  // Add other static files here
+  '/manifest.json',
+  '/favicon.svg'
 ];
 
-// ============================
-// Install event: pre-cache static assets
-// ============================
-self.addEventListener('install', event => {
+const STATIC_DOMAINS = [
+  'cdn.tailwindcss.com',
+  'aistudiocdn.com',
+  'esm.sh',
+  'cdn.jsdelivr.net'
+];
+
+// ----------------------------
+// Install: Safe precache
+// ----------------------------
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_ASSETS))
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      for (const asset of PRECACHE_ASSETS) {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn('Failed to precache:', asset);
+        }
+      }
+    })()
   );
   self.skipWaiting();
 });
 
-// ============================
-// Activate event: remove old caches
-// ============================
-self.addEventListener('activate', event => {
+// ----------------------------
+// Activate: Cleanup old caches
+// ----------------------------
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME && key !== DATA_CACHE_NAME)
-          .map(key => caches.delete(key))
-      );
-    })
+    caches.keys().then(names =>
+      Promise.all(
+        names
+          .filter(name => name !== CACHE_NAME && name !== DATA_CACHE_NAME)
+          .map(name => caches.delete(name))
+      )
+    )
   );
   self.clients.claim();
 });
 
-// ============================
-// Fetch event: network-first for JS/CSS, cache-first for others
-// ============================
-self.addEventListener('fetch', event => {
-  const request = event.request;
+// ----------------------------
+// Fetch: Smart caching logic
+// ----------------------------
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  const isHttp = url.protocol.startsWith('http');
 
-  // Network-first for JS/CSS to ensure latest code
-  if (request.url.endsWith('.js') || request.url.endsWith('.css')) {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          // Update cache with latest version
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, responseClone));
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
+  // 1. Pyodide (cache-first)
+  if (isHttp && url.href.includes('pyodide')) {
+    event.respondWith(cacheFirst(event.request, CACHE_NAME));
     return;
   }
 
-  // Network-first for API/data requests
-  if (request.url.includes('/api/') || request.url.includes('/supabase/')) {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          const responseClone = response.clone();
-          caches.open(DATA_CACHE_NAME).then(cache => cache.put(request, responseClone));
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
+  // 2. Supabase GET (network-first)
+  if (isHttp && url.hostname.includes('supabase.co') && event.request.method === 'GET') {
+    event.respondWith(networkFirst(event.request, DATA_CACHE_NAME));
     return;
   }
 
-  // Default: cache-first for static assets
-  event.respondWith(
-    caches.match(request).then(cached => cached || fetch(request))
-  );
+  // 3. CDN static files (stale-while-revalidate)
+  if (isHttp && STATIC_DOMAINS.some(d => url.hostname.includes(d))) {
+    event.respondWith(staleWhileRevalidate(event.request, CACHE_NAME));
+    return;
+  }
+
+  // 4. Build assets (/assets/) use NETWORK-FIRST to fix update issues
+  if (isHttp && url.pathname.startsWith('/assets/')) {
+    event.respondWith(networkFirst(event.request, CACHE_NAME));
+    return;
+  }
+
+  // 5. Default (cache-first)
+  if (isHttp) {
+    event.respondWith(
+      caches.match(event.request).then(cached => {
+        if (cached) return cached;
+        return fetch(event.request).catch(() => {
+          if (event.request.mode === 'navigate') {
+            return caches.match('/index.html');
+          }
+          return new Response('', { status: 503, statusText: 'Offline' });
+        });
+      })
+    );
+  }
 });
+
+// ======================================================
+// CACHE HELPERS
+// ======================================================
+
+async function cacheFirst(req, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(req);
+  if (cached) return cached;
+
+  const res = await fetch(req);
+  cache.put(req, res.clone());
+  return res;
+}
+
+async function networkFirst(req, cacheName) {
+  try {
+    const res = await fetch(req);
+    const cache = await caches.open(cacheName);
+    cache.put(req, res.clone());
+    return res;
+  } catch {
+    const cache = await caches.open(cacheName);
+    return await cache.match(req);
+  }
+}
+
+async function staleWhileRevalidate(req, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(req);
+
+  const fetchPromise = fetch(req)
+    .then(res => {
+      cache.put(req, res.clone());
+      return res;
+    })
+    .catch(() => cached);
+
+  return cached || fetchPromise;
+}
