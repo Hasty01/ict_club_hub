@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { XIcon } from './icons/XIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
@@ -20,7 +19,7 @@ const RoadmapQuizModal: React.FC<RoadmapQuizModalProps> = ({ isOpen, onClose, qu
     const [feedback, setFeedback] = useState<{ isCorrect: boolean; message: string } | null>(null);
     const [score, setScore] = useState(0);
     const [quizComplete, setQuizComplete] = useState(false);
-    const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
+    const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
 
     const resetQuiz = () => {
         setCurrentIndex(0);
@@ -29,7 +28,7 @@ const RoadmapQuizModal: React.FC<RoadmapQuizModalProps> = ({ isOpen, onClose, qu
         setFeedback(null);
         setScore(0);
         setQuizComplete(false);
-        setTimeLeft(300);
+        setTimeLeft(600);
     };
 
     useEffect(() => {

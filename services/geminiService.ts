@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
 // Robustly retrieve API Key checking all common build tool conventions
@@ -339,16 +338,16 @@ export const generateMilestoneQuiz = async (milestoneTitle: string, milestoneDes
 
     const model = "gemini-2.5-flash";
     const prompt = `
-        Generate a short 3-question quiz to test a student's understanding of:
+        Generate a comprehensive 10-question quiz to test a student's understanding of:
         Topic: ${milestoneTitle}
         Details: ${milestoneDescription}
         
-        The quiz must contain exactly these 3 types of questions in this order:
+        The quiz should contain a balanced mix of the following question types:
         1. "MULTIPLE_CHOICE": A standard multiple choice question with 4 options.
         2. "TRUE_FALSE": A statement that is either True or False.
         3. "SHORT_ANSWER": A conceptual question requiring a brief explanation (1-2 sentences).
         
-        Return a JSON object with a 'questions' array.
+        Return a JSON object with a 'questions' array containing exactly 10 items.
         Each question object should have:
         - type: One of "MULTIPLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER"
         - question: The question text.
