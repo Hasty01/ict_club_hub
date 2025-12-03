@@ -1,17 +1,15 @@
 
-const CACHE_NAME = 'ict-club-hub-v7';
-const DATA_CACHE_NAME = 'ict-club-data-v7';
+const CACHE_NAME = 'ict-club-hub-v8';
+const DATA_CACHE_NAME = 'ict-club-data-v8';
 
-// Core assets to cache (app shell)
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/favicon.svg',
-  // Add other static assets if necessary, e.g. logos
 ];
 
-// Install: pre-cache app shell
+// Install: pre-cache the app shell
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_ASSETS))
@@ -19,74 +17,102 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// Activate: cleanup old caches and notify clients if new SW
+// Activate: delete old caches and notify clients
 self.addEventListener('activate', event => {
   event.waitUntil(
-    (async () => {
-      const keys = await caches.keys();
-      await Promise.all(
+    caches.keys().then(keys =>
+      Promise.all(
         keys.map(key => {
           if (key !== CACHE_NAME && key !== DATA_CACHE_NAME) {
             return caches.delete(key);
           }
         })
-      );
-
-      // Claim clients immediately
-      await self.clients.claim();
-
-      // Notify all clients about the new service worker
-      const allClients = await self.clients.matchAll();
-      for (const client of allClients) {
-        client.postMessage({ type: 'SW_UPDATED' });
-      }
-    })()
+      )
+    )
   );
+
+  // Tell the UI that a new SW is active
+  self.clients.matchAll().then(clients => {
+    clients.forEach(c => c.postMessage({ type: 'SW_UPDATED' }));
+  });
+
+  self.clients.claim();
 });
 
-// Fetch: handle navigation, API caching, and offline login persistence
+// Main fetch handler
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
+  const url = event.request.url;
+  const method = event.request.method;
 
-  // 1. Page navigation fallback (Network First -> Cache Fallback)
+  // 1. SPA NAVIGATION: Always try network first for index.html
+  // This ensures users get the latest version immediately upon refresh
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('/index.html'))
+      fetch(event.request)
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put('/index.html', copy));
+          return response;
+        })
+        .catch(() => caches.match('/index.html'))
     );
     return;
   }
 
-  // 2. API caching (user data, etc.) - Network First, then Cache
-  // We check for '/api/' OR 'supabase.co' to cover both local and Supabase requests
-  if (url.pathname.includes('/api/') || url.hostname.includes('supabase.co')) {
+  // 2. API ROUTES (only cache GET to avoid PATCH/POST errors)
+  // Checking both local /api/ and Supabase to ensure app data works
+  if (url.includes('/api/') || url.includes('supabase.co')) {
+    if (method !== 'GET') {
+      // Don't cache mutations (PATCH/POST/PUT/DELETE)
+      event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+      return;
+    }
+
+    // Network First for API data
     event.respondWith(
       caches.open(DATA_CACHE_NAME).then(cache =>
         fetch(event.request)
           .then(response => {
-            // Clone the response before reading it, as it can only be consumed once
+            // Clone and cache successful GET responses
             if (response.ok) {
               cache.put(event.request, response.clone());
             }
             return response;
           })
-          .catch(() => {
-            // If network fails, try to return the cached response
-            return caches.match(event.request);
-          })
+          .catch(() => caches.match(event.request))
       )
     );
     return;
   }
 
-  // 3. Static Assets / Fallback: Cache First, then Network
+  // 3. VITE FINGERPRINTED ASSETS & STATIC FILES
+  if (url.includes('/assets/') || PRECACHE_ASSETS.some(asset => url.endsWith(asset))) {
+    event.respondWith(
+      caches.match(event.request).then(cached => {
+        return (
+          cached ||
+          fetch(event.request).then(response => {
+            if (response.status === 200) {
+              const copy = response.clone();
+              caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+            }
+            return response;
+          })
+        );
+      })
+    );
+    return;
+  }
+
+  // 4. FALLBACK -> cache first, then network
   event.respondWith(
-    caches.match(event.request).then(response => response || fetch(event.request))
+    caches.match(event.request).then(cached => cached || fetch(event.request))
   );
 });
 
-// Optional: listen for messages from clients (frontend)
+// Allow the UI to request immediate activation
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting(); // allow frontend to trigger immediate activation
+    self.skipWaiting();
   }
 });
