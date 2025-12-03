@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, AttendanceRecord, AttendanceStatus } from '../types';
 import * as api from '../services/apiService';
@@ -359,7 +355,7 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
 
         elements.forEach(el => el && observer.observe(el));
         return () => observer.disconnect();
-    }, []);
+    }, [activeTab]);
 
     useEffect(() => {
         const fetchAttendance = async () => {
