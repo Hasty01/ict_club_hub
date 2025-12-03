@@ -27,6 +27,12 @@ const AiTutor: React.FC<AiTutorProps> = ({ currentUser }) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     
+    // Dragging State
+    const [offset, setOffset] = useState({ x: 0, y: 0 });
+    const isDragging = useRef(false);
+    const dragStartPos = useRef({ x: 0, y: 0 });
+    const dragStartOffset = useRef({ x: 0, y: 0 });
+
     // Get real-time club data
     const { activities, challenges, feedItems } = useData();
 
@@ -101,13 +107,64 @@ const AiTutor: React.FC<AiTutorProps> = ({ currentUser }) => {
         }
     };
 
+    // --- Drag Handlers ---
+
+    const handlePointerDown = (e: React.PointerEvent) => {
+        // Prevent default browser dragging of images/buttons
+        // e.preventDefault(); 
+        isDragging.current = false;
+        dragStartPos.current = { x: e.clientX, y: e.clientY };
+        dragStartOffset.current = { ...offset };
+
+        document.addEventListener('pointermove', handlePointerMove);
+        document.addEventListener('pointerup', handlePointerUp);
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+        const deltaX = e.clientX - dragStartPos.current.x;
+        const deltaY = e.clientY - dragStartPos.current.y;
+
+        // If moved more than 5 pixels, consider it a drag
+        if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+            isDragging.current = true;
+        }
+
+        if (isDragging.current) {
+            setOffset({
+                x: dragStartOffset.current.x + deltaX,
+                y: dragStartOffset.current.y + deltaY
+            });
+        }
+    };
+
+    const handlePointerUp = () => {
+        document.removeEventListener('pointermove', handlePointerMove);
+        document.removeEventListener('pointerup', handlePointerUp);
+
+        if (!isDragging.current) {
+            // If it wasn't a drag, toggle the chat
+            setIsOpen(prev => !prev);
+        }
+        // Reset drag flag for next interaction
+        isDragging.current = false;
+    };
+
     return (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+        <div 
+            className="fixed bottom-6 right-6 z-50 flex flex-col items-end touch-none"
+            style={{ 
+                transform: `translate(${offset.x}px, ${offset.y}px)`,
+                transition: isDragging.current ? 'none' : 'transform 0.1s ease-out' 
+            }}
+        >
             {/* Chat Window */}
             {isOpen && (
                 <div className="mb-4 w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden animate-fade-in-up origin-bottom-right h-[500px] max-h-[80vh]">
                     {/* Header */}
-                    <div className="bg-gradient-to-r from-teal-500 to-emerald-500 p-4 flex justify-between items-center text-white">
+                    <div 
+                        className="bg-gradient-to-r from-teal-500 to-emerald-500 p-4 flex justify-between items-center text-white cursor-move"
+                        // Allow dragging from the header too if needed, but let's keep it simple for now or bind same handlers
+                    >
                         <div className="flex items-center gap-2">
                             <div className="p-1.5 bg-white/20 rounded-full">
                                 <RobotIcon className="w-5 h-5 text-white" />
@@ -118,7 +175,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ currentUser }) => {
                             </div>
                         </div>
                         <button 
-                            onClick={() => setIsOpen(false)}
+                            onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}
                             className="p-1 hover:bg-white/20 rounded-full transition-colors"
                         >
                             <XIcon className="w-5 h-5" />
@@ -179,14 +236,15 @@ const AiTutor: React.FC<AiTutorProps> = ({ currentUser }) => {
                 </div>
             )}
 
-            {/* FAB Toggle Button */}
+            {/* FAB Toggle Button (Draggable) */}
             <button
-                onClick={() => setIsOpen(!isOpen)}
-                className={`p-4 rounded-full shadow-xl transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center ${
+                onPointerDown={handlePointerDown}
+                className={`p-4 rounded-full shadow-xl transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center cursor-move touch-none select-none ${
                     isOpen 
                     ? 'bg-gray-700 text-white rotate-90' 
                     : 'bg-teal-500 hover:bg-teal-600 text-white animate-bounce-subtle'
                 }`}
+                style={{ touchAction: 'none' }} // Critical for preventing scroll on mobile while dragging
                 aria-label="Toggle AI Tutor"
             >
                 {isOpen ? <XIcon className="w-6 h-6" /> : <RobotIcon className="w-8 h-8" />}
