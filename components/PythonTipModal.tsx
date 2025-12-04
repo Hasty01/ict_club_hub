@@ -11,6 +11,31 @@ interface PythonTipModalProps {
     onClose: () => void;
 }
 
+// Regex for Python Syntax Highlighting
+const SYNTAX_REGEX = /("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|#.*$|\b\d+(?:\.\d+)?\b|\b(?:True|False|None|and|or|not|def|class|return|import|from|if|else|elif|for|while|print|try|except|finally|with|as|in|is|lambda|pass|raise|global|nonlocal|assert|del|break|continue|yield|async|await)\b|[\[\]\{\}\(\),:])/gm;
+
+const SyntaxHighlightedText: React.FC<{ text: string }> = ({ text }) => {
+    const parts = text.split(SYNTAX_REGEX);
+    return (
+        <>
+            {parts.map((part, i) => {
+                if (!part) return null;
+                // Comments
+                if (part.startsWith('#')) return <span key={i} className="text-gray-500 italic">{part}</span>;
+                // Strings
+                if (part.startsWith('"') || part.startsWith("'")) return <span key={i} className="text-green-400">{part}</span>;
+                // Numbers
+                if (/^\d+(\.\d+)?$/.test(part)) return <span key={i} className="text-blue-400 font-semibold">{part}</span>;
+                // Keywords
+                if (/^(True|False|None|and|or|not|def|class|return|import|from|if|else|elif|for|while|print|try|except|finally|with|as|in|is|lambda|pass|raise|global|nonlocal|assert|del|break|continue|yield|async|await)$/.test(part)) return <span key={i} className="text-purple-400 font-bold">{part}</span>;
+                // Punctuation
+                if (/^[\[\]\{\}\(\),:]$/.test(part)) return <span key={i} className="text-yellow-500">{part}</span>;
+                return <span key={i}>{part}</span>;
+            })}
+        </>
+    );
+};
+
 const PythonTipModal: React.FC<PythonTipModalProps> = ({ isOpen, onClose }) => {
     const [tip, setTip] = useState<PythonTip | null>(null);
     const [loading, setLoading] = useState(true);
@@ -83,7 +108,7 @@ const PythonTipModal: React.FC<PythonTipModalProps> = ({ isOpen, onClose }) => {
                             </div>
 
                             <div className="relative group">
-                                <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                     <button 
                                         onClick={handleCopy}
                                         className="p-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-md shadow-sm transition-colors flex items-center gap-1 text-xs font-medium"
@@ -92,8 +117,8 @@ const PythonTipModal: React.FC<PythonTipModalProps> = ({ isOpen, onClose }) => {
                                         {copied ? 'Copied' : 'Copy'}
                                     </button>
                                 </div>
-                                <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm text-gray-300 border border-gray-700 shadow-inner overflow-x-auto custom-scrollbar">
-                                    <pre className="whitespace-pre-wrap">{tip.codeSnippet}</pre>
+                                <div className="bg-[#1e1e1e] rounded-xl p-4 font-mono text-sm text-[#d4d4d4] border border-gray-700 shadow-inner overflow-x-auto custom-scrollbar relative">
+                                    <pre className="whitespace-pre-wrap"><SyntaxHighlightedText text={tip.codeSnippet} /></pre>
                                 </div>
                             </div>
                         </div>
