@@ -1,70 +1,69 @@
-const CACHE_NAME = 'ict-club-hub-v10';
-const DATA_CACHE_NAME = 'ict-club-data-v10';
 
-// Install: Cache HTML and dynamic asset files
+const CACHE_NAME = 'ict-club-hub-v11';
+const DATA_CACHE_NAME = 'ict-club-data-v11';
+
+// App shell files to be pre-cached.
+const PRECACHE_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/favicon.svg'
+];
+
+// Domains for CDN assets to be cached with stale-while-revalidate
+const CDN_DOMAINS = [
+  'aistudiocdn.com',
+  'esm.sh',
+  'cdn.tailwindcss.com',
+  'fonts.googleapis.com',
+  'fonts.gstatic.com',
+  'api.dicebear.com' // for avatars
+];
+
+// Install: Pre-cache the app shell
 self.addEventListener('install', event => {
   event.waitUntil(
-    (async () => {
-      const cache = await caches.open(CACHE_NAME);
-
-      // Always cache the root page
-      await cache.add('/');
-
-      // Fetch and parse index.html to detect hashed assets
-      const resp = await fetch('/index.html');
-      const html = await resp.text();
-
-      // Match Vercel/Vite assets like /assets/index-xxxx.js
-      const assetRegex = /\/assets\/[a-zA-Z0-9_\-]+\.(?:js|css|png|svg|jpg|jpeg|webp)/g;
-      const assets = html.match(assetRegex) || [];
-
-      console.log('Dynamic assets cached:', assets);
-
-      // Cache all discovered assets
-      await cache.addAll(assets);
-    })()
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(PRECACHE_ASSETS);
+    })
   );
-
   self.skipWaiting();
 });
 
-// Activate: cleanup old caches + notify update
+// Activate: Clean up old caches and notify clients of the update
 self.addEventListener('activate', event => {
   event.waitUntil(
-    (async () => {
-      const keys = await caches.keys();
-      await Promise.all(
+    caches.keys().then(keys =>
+      Promise.all(
         keys.map(key => {
           if (key !== CACHE_NAME && key !== DATA_CACHE_NAME) {
             return caches.delete(key);
           }
         })
-      );
-    })()
+      )
+    ).then(() => {
+      // Notify clients that a new service worker is active
+      return self.clients.matchAll().then(clients => {
+        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
+      });
+    })
   );
-
-  // Let clients know a new SW is ready
-  self.clients.matchAll().then(clients => {
-    clients.forEach(client => {
-      client.postMessage({ type: 'SW_UPDATED' });
-    });
-  });
-
   self.clients.claim();
 });
 
-// Fetch handler
+// Fetch: Handle all network requests with different caching strategies
 self.addEventListener('fetch', event => {
   const req = event.request;
+  const url = new URL(req.url);
 
-  // Handle navigation: network first, fallback to cached HTML
+  // 1. Navigation: Network first, fallback to cached index.html
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
         .then(resp => {
-          // Cache fresh index.html for future offline loads
+          // Cache the fresh page for offline access
           const copy = resp.clone();
-          caches.open(CACHE_NAME).then(c => c.put('/index.html', copy));
+          caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
           return resp;
         })
         .catch(() => caches.match('/index.html'))
@@ -72,58 +71,72 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Handle API requests safely (only GET can be cached)
-  if (req.url.includes('/api/')) {
+  // 2. Supabase API calls (for auth and data): Network falling back to cache
+  if (url.hostname.includes('supabase.co')) {
+    // Only cache GET requests to avoid issues with mutations
     if (req.method !== 'GET') {
-      // Never cache POST, PUT, PATCH, DELETE
-      event.respondWith(fetch(req).catch(() => new Response(null)));
+      event.respondWith(fetch(req));
       return;
     }
 
     event.respondWith(
-      caches.open(DATA_CACHE_NAME).then(async cache => {
-        try {
-          const fresh = await fetch(req);
-          cache.put(req, fresh.clone());
-          return fresh;
-        } catch {
-          return cache.match(req);
-        }
-      })
+      fetch(req)
+        .then(networkResponse => {
+          // If successful, update the cache
+          if (networkResponse.ok) {
+            const responseClone = networkResponse.clone();
+            caches.open(DATA_CACHE_NAME).then(cache => {
+              cache.put(req, responseClone);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(async () => {
+          // If network fails, try to serve from cache
+          const cachedResponse = await caches.match(req);
+          return cachedResponse || new Response(null, { status: 503, statusText: 'Offline' });
+        })
     );
     return;
   }
 
-  // Cache assets under /assets/
-  if (req.url.includes('/assets/')) {
+  // 3. CDN Assets: Stale-While-Revalidate
+  if (CDN_DOMAINS.some(domain => url.hostname.includes(domain))) {
     event.respondWith(
-      caches.match(req).then(cached => {
-        return (
-          cached ||
-          fetch(req)
-            .then(resp => {
-              if (resp.status === 200) {
-                const copy = resp.clone();
-                caches.open(CACHE_NAME).then(c => c.put(req, copy));
-              }
-              return resp;
-            })
-            .catch(() => cached)
-        );
+      caches.open(CACHE_NAME).then(cache => {
+        return cache.match(req).then(cachedResponse => {
+          const fetchPromise = fetch(req).then(networkResponse => {
+            if (networkResponse.ok) {
+              cache.put(req, networkResponse.clone());
+            }
+            return networkResponse;
+          });
+          // Return cached response immediately, then fetch update in background
+          return cachedResponse || fetchPromise;
+        });
       })
     );
     return;
   }
-
-  // Default: cache-first fallback
+  
+  // 4. Default for other requests: Cache-first fallback
   event.respondWith(
-    caches.match(req).then(cached => cached || fetch(req))
+    caches.match(req).then(cached => {
+      return cached || fetch(req).then(networkResponse => {
+        // Dynamically cache other successful GET requests
+        if (req.method === 'GET' && networkResponse.ok) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
+        }
+        return networkResponse;
+      });
+    })
   );
 });
 
-// Listen for skip-waiting command
+// Listen for a command from the client to skip waiting
 self.addEventListener('message', event => {
-  if (event.data?.type === 'SKIP_WAITING') {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
