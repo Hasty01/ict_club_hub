@@ -552,6 +552,8 @@ export const generatePythonTip = async (): Promise<PythonTip> => {
     const prompt = `
         Generate an interesting, intermediate-level Python programming tip, idiom, or "cool trick".
         It should be something that helps write more "Pythonic" code (e.g., list comprehensions, zip, enumerate, collections module, context managers, unpacking).
+        it can also be on built-in syntax features and tricks that **do not require imports**.
+    Examples: List/Dict/Set comprehensions, advanced slicing, zip, enumerate, argument unpacking (*args/**kwargs), f-strings, lambda functions, any/all, walrus operator, or generator expressions.
         
         Return a JSON object with:
         - title: A short catchy title (e.g., "Mastering Enumerate").
