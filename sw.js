@@ -92,7 +92,7 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           // If network fails, return the cached index.html
-          return caches.match('/index.html');
+          return caches.match('/');
         })
     );
     return;
@@ -116,9 +116,10 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => {
+        .catch(async () => {
           // If network fails, serve from data cache
-          return caches.match(req, { cacheName: DATA_CACHE_NAME });
+          const cachedResponse = await caches.match(req, { cacheName: DATA_CACHE_NAME });
+          return cachedResponse;
         })
     );
     return;

@@ -248,7 +248,6 @@ const AppearanceSettings: React.FC = () => {
                 </div>
             )
         },
-        // ... other cursors would be here (truncated for brevity as they are unchanged)
     ];
 
     const fontOptions = [
@@ -268,7 +267,7 @@ const AppearanceSettings: React.FC = () => {
                     (Only visible on desktop devices)
                 </p>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {cursors.map((cursor) => (
                         <button
                             key={cursor.id}

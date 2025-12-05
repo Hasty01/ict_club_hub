@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { User, Challenge, ChallengeSubmission, SubmissionStatus } from '../types';
 import { useData } from '../DataContext';
@@ -14,7 +13,8 @@ import { CheckIcon } from './icons/CheckIcon';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { PlayIcon } from './icons/PlayIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
-import CodeRunnerModal from './CodeRunnerModal';
+// FIX: Changed to a named import to match the corrected export from CodeRunnerModal.
+import { CodeRunnerModal } from './CodeRunnerModal';
 import { FormattedMessage } from './FormattedMessage';
 
 interface ChallengesProps {

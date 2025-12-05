@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { XIcon } from './icons/XIcon';
 import { PlayIcon } from './icons/PlayIcon';
@@ -34,8 +33,6 @@ const SyntaxHighlightedText: React.FC<{ text: string }> = ({ text }) => {
     );
 };
 
-// --- IntelliSense Definitions ---
-
 const PYTHON_KEYWORDS = [
     'False', 'None', 'True', 'and', 'as', 'assert', 'async', 'await', 'break', 
     'class', 'continue', 'def', 'del', 'elif', 'else', 'except', 'finally', 
@@ -54,7 +51,57 @@ const PYTHON_BUILTINS = [
     'staticmethod', 'str', 'sum', 'super', 'tuple', 'type', 'vars', 'zip'
 ];
 
-const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code, title }) => {
+const wrapAsyncCalls = (code: string, functionNames: string[]): string => {
+    let newCode = code;
+    for (const funcName of functionNames) {
+        const regex = new RegExp(`\\b(${funcName.replace('.', '\\.')})\\s*\\(`, 'g');
+        let tempCode = '';
+        let lastIndex = 0;
+        let match;
+
+        while ((match = regex.exec(newCode)) !== null) {
+            tempCode += newCode.substring(lastIndex, match.index);
+            const startParenIndex = match.index + match[0].length - 1;
+            let parenCount = 1;
+            let endParenIndex = -1;
+            for (let i = startParenIndex + 1; i < newCode.length; i++) {
+                if (newCode[i] === '(') parenCount++;
+                else if (newCode[i] === ')') parenCount--;
+                if (parenCount === 0) {
+                    endParenIndex = i;
+                    break;
+                }
+            }
+            if (endParenIndex !== -1) {
+                const call = newCode.substring(match.index, endParenIndex + 1);
+                tempCode += `(await ${call})`;
+                lastIndex = endParenIndex + 1;
+            } else {
+                tempCode += newCode.substring(match.index, match.index + match[0].length);
+                lastIndex = match.index + match[0].length;
+            }
+        }
+        tempCode += newCode.substring(lastIndex);
+        newCode = tempCode;
+    }
+    return newCode;
+};
+
+const processCarriageReturns = (text: string) => {
+    const lines = text.split('\n');
+    return lines.map(line => {
+        const parts = line.split('\r');
+        if (parts.length === 1) return line;
+        let result = parts[0];
+        for (let i = 1; i < parts.length; i++) {
+            const part = parts[i];
+            result = part + result.substring(part.length);
+        }
+        return result;
+    }).join('\n');
+};
+
+export const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code, title }) => {
   const [output, setOutput] = useState<OutputLine[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const pyodideRef = useRef<any | null>(null);
@@ -105,10 +152,9 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
         completionProvidersRef.current.forEach(p => p.dispose());
         completionProvidersRef.current = [];
     };
-  }, [isOpen]);
+  }, [isOpen, code]);
 
   useEffect(() => {
-    // Separate effect for cleanup on final unmount if needed
     return () => {
         completionProvidersRef.current.forEach(p => p.dispose());
     };
@@ -134,7 +180,6 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
       completionProvidersRef.current.forEach(provider => provider.dispose());
       completionProvidersRef.current = [];
 
-      // Static provider
       completionProvidersRef.current.push(monaco.languages.registerCompletionItemProvider('python', {
           provideCompletionItems: (model: any, position: any) => {
               const word = model.getWordUntilPosition(position);
@@ -193,25 +238,38 @@ const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClose, code
       };
 
       (window as any).runnerPrint = (text: string, type: 'log' | 'error') => {
-          if (text) {
-              setOutput(prev => {
-                  const lastOutput = prev[prev.length - 1];
-                  if (lastOutput && lastOutput.type === type) {
-                      const newOutput = [...prev];
-                      newOutput[newOutput.length - 1] = { ...lastOutput, content: lastOutput.content + text };
-                      return newOutput;
-                  } else {
-                      return [...prev, { type, content: text }];
-                  }
-              });
-              scrollToBottom();
-          }
+        if (typeof text !== 'string') return;
+        if (type === 'error') {
+            setOutput(prev => [...prev, { type: 'error', content: text }]);
+            scrollToBottom();
+            return;
+        }
+        const parts = text.split('\n');
+        setOutput(prev => {
+            let newOutput = [...prev];
+            let lastLine = newOutput.length > 0 ? newOutput[newOutput.length-1] : null;
+            if (lastLine && lastLine.type === type) {
+                lastLine.content += parts[0];
+                newOutput[newOutput.length-1] = { ...lastLine, content: processCarriageReturns(lastLine.content) };
+            } else {
+                newOutput.push({ type, content: processCarriageReturns(parts[0]) });
+            }
+            if (parts.length > 1) {
+                for (let i = 1; i < parts.length; i++) {
+                    newOutput.push({ type, content: parts[i] });
+                }
+            }
+            return newOutput;
+        });
+        scrollToBottom();
       };
 
       const setupCode = `
 import sys
 import builtins
 import js
+import time
+import asyncio
 
 class Writer:
     def __init__(self, stream_type):
@@ -224,22 +282,36 @@ class Writer:
 sys.stdout = Writer('log')
 sys.stderr = Writer('error')
 
-async def custom_input(prompt_text=""):
-    val = await js.runnerAskForInput(prompt_text)
-    return val
+async def custom_input_async(prompt_text=""):
+    val_proxy = await js.runnerAskForInput(prompt_text)
+    return str(val_proxy)
 
-builtins.input = custom_input
+builtins.input = custom_input_async
+
+async def custom_sleep_async(seconds):
+    await js.Promise.new(lambda resolve, reject: js.setTimeout(resolve, seconds * 1000))
+
+time.sleep = custom_sleep_async
+asyncio.sleep = custom_sleep_async
       `;
 
       try {
           await pyodideRef.current.loadPackagesFromImports(activeCode);
           await pyodideRef.current.runPythonAsync(setupCode);
           
-          const asyncCode = activeCode.replace(/\binput\s*\(/g, 'await input(');
+          const asyncCode = wrapAsyncCalls(activeCode, ['input', 'time.sleep', 'asyncio.sleep']);
           
-          await pyodideRef.current.runPythonAsync(asyncCode);
+          const result = await pyodideRef.current.runPythonAsync(asyncCode);
+          if (result !== undefined) {
+              pyodideRef.current.globals.set('last_result', result);
+              await pyodideRef.current.runPythonAsync(`print(repr(last_result))`);
+              pyodideRef.current.globals.delete('last_result');
+              if (typeof result.destroy === 'function') {
+                  result.destroy();
+              }
+          }
       } catch (error: any) {
-          setOutput(prev => [...prev, { type: 'error', content: error.message }]);
+          (window as any).runnerPrint(error.message, 'error');
       } finally {
           setIsExecuting(false);
           setIsWaitingForInput(false);
@@ -348,5 +420,3 @@ builtins.input = custom_input
     </>
   );
 };
-
-export default CodeRunnerModal;

@@ -1,8 +1,3 @@
-
-
-
-
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { User, ShowcaseItem, Tab, ShowcaseComment } from '../types';
 import { useData } from '../DataContext';
@@ -13,7 +8,8 @@ import { CopyIcon } from './icons/CopyIcon';
 import { PlayIcon } from './icons/PlayIcon';
 import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
 import { SendIcon } from './icons/SendIcon';
-import CodeRunnerModal from './CodeRunnerModal';
+// FIX: Changed to a named import to match the corrected export from CodeRunnerModal.
+import { CodeRunnerModal } from './CodeRunnerModal';
 
 interface ShowcaseProps {
     currentUser: User;

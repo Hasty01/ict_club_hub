@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useEffect } from 'react';
 import { ProjectData, User, ProjectTask } from '../types';
 import * as api from '../services/apiService';
@@ -9,7 +6,8 @@ import { DocumentTextIcon } from './icons/DocumentTextIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { PlayIcon } from './icons/PlayIcon';
 import AiGradingModal from './AiGradingModal';
-import CodeRunnerModal from './CodeRunnerModal';
+// FIX: Changed to a named import to match the corrected export from CodeRunnerModal.
+import { CodeRunnerModal } from './CodeRunnerModal';
 
 interface GradingViewProps {
     data: ProjectData | null;

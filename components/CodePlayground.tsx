@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { PlayIcon } from './icons/PlayIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -135,57 +134,42 @@ const PYTHON_BUILTINS = [
     'staticmethod', 'str', 'sum', 'super', 'tuple', 'type', 'vars', 'zip'
 ];
 
-/**
- * A helper function to transform async Python function calls in a string of code.
- * It finds calls like `input(...)` or `time.sleep(...)` and wraps them in `(await ...)`
- * to allow for method chaining like `(await input()).strip()`.
- * This is more robust than a simple regex replace.
- */
 const wrapAsyncCalls = (code: string, functionNames: string[]): string => {
     let newCode = code;
     for (const funcName of functionNames) {
-        // This regex will find `funcName(` and we'll parse from there.
         const regex = new RegExp(`\\b(${funcName.replace('.', '\\.')})\\s*\\(`, 'g');
         let tempCode = '';
         let lastIndex = 0;
         let match;
 
         while ((match = regex.exec(newCode)) !== null) {
-            // Append the part of the code before the match
             tempCode += newCode.substring(lastIndex, match.index);
-
             const startParenIndex = match.index + match[0].length - 1;
             let parenCount = 1;
             let endParenIndex = -1;
-
             for (let i = startParenIndex + 1; i < newCode.length; i++) {
                 if (newCode[i] === '(') parenCount++;
                 else if (newCode[i] === ')') parenCount--;
-                
                 if (parenCount === 0) {
                     endParenIndex = i;
                     break;
                 }
             }
-
             if (endParenIndex !== -1) {
                 const call = newCode.substring(match.index, endParenIndex + 1);
                 tempCode += `(await ${call})`;
                 lastIndex = endParenIndex + 1;
             } else {
-                // Unmatched parenthesis, don't transform, just append the matched part
                 tempCode += newCode.substring(match.index, match.index + match[0].length);
                 lastIndex = match.index + match[0].length;
             }
         }
-        // Append the rest of the code
         tempCode += newCode.substring(lastIndex);
         newCode = tempCode;
     }
     return newCode;
 };
 
-// Helper to correctly process carriage returns for line overwrites
 const processCarriageReturns = (text: string) => {
     const lines = text.split('\n');
     return lines.map(line => {
@@ -265,7 +249,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           minimap: { enabled: false },
           fontSize: 14,
           padding: { top: 16 },
-          scrollBeyondLastLine: true, // Allow scrolling past the end
+          scrollBeyondLastLine: true,
           automaticLayout: true,
           tabCompletion: "on",
           wordBasedSuggestions: true,
@@ -276,18 +260,14 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           formatOnType: true,
           formatOnPaste: true,
           scrollbar: {
-            vertical: 'visible',
+            vertical: 'auto',
             horizontal: 'auto',
-            verticalScrollbarSize: 12,
-            horizontalScrollbarSize: 12,
-            useShadows: true,
           }
       });
 
       completionProvidersRef.current.forEach(provider => provider.dispose());
       completionProvidersRef.current = [];
 
-      // Static provider for keywords/snippets
       const staticProvider = {
           provideCompletionItems: (model: any, position: any) => {
               const word = model.getWordUntilPosition(position);
@@ -548,40 +528,28 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
 
     (window as any).playgroundPrint = (text: string, type: 'log' | 'error') => {
         if (typeof text !== 'string') return;
-
-        // Don't process special characters for errors.
         if (type === 'error') {
             setOutput(prev => [...prev, { type: 'error', content: text }]);
             scrollToBottom();
             return;
         }
-
         const parts = text.split('\n');
-        
         setOutput(prev => {
             let newOutput = [...prev];
-            
-            // Get the last line from state to append to, if it exists and isn't finished.
-            let lastLine = newOutput.length > 0 ? newOutput[newOutput.length-1] : null;
-
-            // The first part of the new text appends to the last existing line.
+            let lastLine = newOutput.length > 0 ? newOutput[newOutput.length - 1] : null;
             if (lastLine && lastLine.type === type) {
                 lastLine.content += parts[0];
                 newOutput[newOutput.length-1] = { ...lastLine, content: processCarriageReturns(lastLine.content) };
             } else {
                 newOutput.push({ type, content: processCarriageReturns(parts[0]) });
             }
-
-            // Any subsequent parts are entirely new lines.
             if (parts.length > 1) {
                 for (let i = 1; i < parts.length; i++) {
                     newOutput.push({ type, content: parts[i] });
                 }
             }
-            
             return newOutput;
         });
-
         scrollToBottom();
     };
 
@@ -603,23 +571,15 @@ class Writer:
 sys.stdout = Writer('log')
 sys.stderr = Writer('error')
 
-# --- Input handling ---
-# This async function awaits the JS Promise from playgroundAskForInput
-# and crucially converts the resulting PyProxy into a Python string.
 async def custom_input_async(prompt_text=""):
     val_proxy = await js.playgroundAskForInput(prompt_text)
     return str(val_proxy)
 
 builtins.input = custom_input_async
 
-# --- Sleep handling ---
-# This creates a JS Promise that resolves after a timeout,
-# allowing Python's await to pause execution without blocking the browser.
 async def custom_sleep_async(seconds):
     await js.Promise.new(lambda resolve, reject: js.setTimeout(resolve, seconds * 1000))
 
-# Monkey-patch standard sleep functions
-# Note: os.sleep() is not standard in Python, time.sleep() is.
 time.sleep = custom_sleep_async
 asyncio.sleep = custom_sleep_async
     `;
@@ -628,7 +588,6 @@ asyncio.sleep = custom_sleep_async
         await pyodideRef.current.loadPackagesFromImports(code);
         await pyodideRef.current.runPythonAsync(setupCode);
         
-        // Transform user code to handle async calls correctly
         const asyncCode = wrapAsyncCalls(code, ['input', 'time.sleep', 'asyncio.sleep']);
         
         const result = await pyodideRef.current.runPythonAsync(asyncCode);
@@ -729,7 +688,9 @@ asyncio.sleep = custom_sleep_async
       </div>
 
       <div className="flex-1 bg-white dark:bg-gray-800 shadow-md border-x border-b border-gray-200 dark:border-gray-700 rounded-b-lg relative overflow-hidden">
-        <div className={`w-full h-full flex flex-col ${activeTab === 'editor' ? '' : 'hidden'}`}>
+        <div 
+            className={`w-full h-full flex flex-col ${activeTab === 'editor' ? '' : 'hidden'}`}
+        >
             <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
                 <div className="flex gap-4">
                   <button onClick={triggerFileUpload} className="text-xs font-medium text-gray-500 hover:text-pink-600 flex items-center gap-1"><UploadIcon className="w-4 h-4" /> Upload</button>
@@ -756,7 +717,9 @@ asyncio.sleep = custom_sleep_async
             </div>
         </div>
 
-        <div className={`w-full h-full flex flex-col ${activeTab === 'output' ? '' : 'hidden'}`}>
+        <div 
+            className={`w-full h-full flex flex-col ${activeTab === 'output' ? '' : 'hidden'}`}
+        >
             <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
                 <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Console Output</span>
                 <div className="flex gap-2">

@@ -348,33 +348,31 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4 text-center">Summary</h2>
           <div className="relative w-full h-[300px]">
             {shouldRenderChart ? (
-                <div className="absolute inset-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie
-                            data={pieChartData}
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="value"
-                            label={({ name, percent }) => `${name} ${(Number(percent || 0) * 100).toFixed(0)}%`}
-                            >
-                            {pieChartData.map((entry) => (
-                                <Cell key={`cell-${entry.name}`} fill={chartColors[entry.name as AttendanceStatus]} />
-                            ))}
-                            </Pie>
-                            <Tooltip 
-                            contentStyle={{ 
-                                backgroundColor: 'rgba(31, 41, 55, 0.8)',
-                                borderColor: '#4B5563'
-                            }}
-                            itemStyle={{ color: '#D1D5DB' }}
-                            />
-                            <Legend wrapperStyle={{color: '#9CA3AF'}}/>
-                        </PieChart>
-                    </ResponsiveContainer>
-                </div>
+                <ResponsiveContainer width="99%" height="100%">
+                    <PieChart>
+                        <Pie
+                        data={pieChartData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(Number(percent || 0) * 100).toFixed(0)}%`}
+                        >
+                        {pieChartData.map((entry) => (
+                            <Cell key={`cell-${entry.name}`} fill={chartColors[entry.name as AttendanceStatus]} />
+                        ))}
+                        </Pie>
+                        <Tooltip 
+                        contentStyle={{ 
+                            backgroundColor: 'rgba(31, 41, 55, 0.8)',
+                            borderColor: '#4B5563'
+                        }}
+                        itemStyle={{ color: '#D1D5DB' }}
+                        />
+                        <Legend wrapperStyle={{color: '#9CA3AF'}}/>
+                    </PieChart>
+                </ResponsiveContainer>
             ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-gray-400">Loading chart...</div>
             )}
@@ -387,33 +385,31 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
            {lineChartData.length > 1 ? (
             <div className="relative w-full h-80">
                 {shouldRenderChart ? (
-                    <div className="absolute inset-0">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={lineChartData} margin={{ top: 5, right: 20, left: -10, bottom: 50 }}>
-                                    <defs>
-                                        <linearGradient id="line-color-gradient" x1="0" y1="0" x2="1" y2="0">
-                                            {lineChartData.map((entry, index) => {
-                                                const offsetDenominator = lineChartData.length > 1 ? lineChartData.length - 1 : 1;
-                                                const offset = (index / offsetDenominator) * 100;
-                                                return <stop key={index} offset={`${offset}%`} stopColor={chartColors[entry.status as AttendanceStatus]} />;
-                                            })}
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-                                    <XAxis dataKey="date" tickFormatter={(d) => formatDate(d).split(',')[0]} tick={{ fontSize: 12 }} angle={-35} textAnchor="end" height={70} interval={0} />
-                                    <YAxis domain={[0, 2]} ticks={[0, 1, 2]} tickFormatter={yAxisTickFormatter} tick={{ fontSize: 12 }} />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Line 
-                                    type="monotone" 
-                                    dataKey="value" 
-                                    stroke="url(#line-color-gradient)" 
-                                    strokeWidth={3} 
-                                    activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2 }} 
-                                    dot={{ r: 4, stroke: '#fff', strokeWidth: 1 }} 
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={lineChartData} margin={{ top: 5, right: 20, left: -10, bottom: 50 }}>
+                            <defs>
+                                <linearGradient id="line-color-gradient" x1="0" y1="0" x2="1" y2="0">
+                                    {lineChartData.map((entry, index) => {
+                                        const offsetDenominator = lineChartData.length > 1 ? lineChartData.length - 1 : 1;
+                                        const offset = (index / offsetDenominator) * 100;
+                                        return <stop key={index} offset={`${offset}%`} stopColor={chartColors[entry.status as AttendanceStatus]} />;
+                                    })}
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+                            <XAxis dataKey="date" tickFormatter={(d) => formatDate(d).split(',')[0]} tick={{ fontSize: 12 }} angle={-35} textAnchor="end" height={70} interval={0} />
+                            <YAxis domain={[0, 2]} ticks={[0, 1, 2]} tickFormatter={yAxisTickFormatter} tick={{ fontSize: 12 }} />
+                            <Tooltip content={<CustomTooltip />} />
+                            <Line 
+                            type="monotone" 
+                            dataKey="value" 
+                            stroke="url(#line-color-gradient)" 
+                            strokeWidth={3} 
+                            activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2 }} 
+                            dot={{ r: 4, stroke: '#fff', strokeWidth: 1 }} 
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
                 ) : (
                     <div className="absolute inset-0 flex items-center justify-center text-gray-400">Loading chart...</div>
                 )}

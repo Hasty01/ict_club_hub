@@ -1,40 +1,16 @@
-import { GoogleGenAI, Type } from "@google/genai";
+
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 
 // Robustly retrieve API Key checking all common build tool conventions
 const getApiKey = (): string => {
-  let key = '';
-
-  // 1. Try Vite's import.meta.env (Standard for Vercel + Vite)
-  try {
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      // @ts-ignore
-      key = import.meta.env.VITE_API_KEY || import.meta.env.API_KEY || '';
-    }
-  } catch (e) {
-    // Ignore reference errors
-  }
-
-  if (key) return key;
-
-  // 2. Try standard process.env (Node/Webpack/CRA/Next.js/Vercel System Env)
-  try {
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env) {
-      // @ts-ignore
-      key = process.env.VITE_API_KEY || process.env.API_KEY || process.env.REACT_APP_API_KEY || '';
-    }
-  } catch (e) {
-    // Ignore reference errors
-  }
-
-  return key;
+  // Per guidelines, API key must be obtained exclusively from process.env.API_KEY
+  return process.env.API_KEY || '';
 };
 
 const apiKey = getApiKey();
 
 if (!apiKey) {
-    console.warn("Gemini API Key is missing. AI features will be disabled. Ensure VITE_API_KEY is set in your Vercel Environment Variables.");
+    console.warn("Gemini API Key is missing. AI features will be disabled. Ensure API_KEY is set in your environment variables.");
 }
 
 // Initialize client only if key exists to prevent immediate instantiation errors
@@ -59,17 +35,18 @@ export interface ActivityIdea {
   location: string;
 }
 
-// Helper to clean markdown code blocks from JSON strings
-const cleanJSON = (text: string) => {
-  if (!text) return "";
-  return text.replace(/^```(json)?\s*/, '').replace(/\s*```$/, '').trim();
-};
+// Helper to clean markdown code blocks from JSON strings is no longer needed with response.text
+// const cleanJSON = (text: string) => {
+//   if (!text) return "";
+//   return text.replace(/^```(json)?\s*/, '').replace(/\s*```$/, '').trim();
+// };
 
 export const generateClubActivityIdea = async (): Promise<ActivityIdea> => {
   if (!ai) {
       throw new Error("AI Service Unavailable: API Key not configured.");
   }
 
+  // FIX: Per guidelines, use 'gemini-2.5-flash' for basic text tasks
   const model = "gemini-2.5-flash";
   const prompt = `
     You are an enthusiastic and creative patron for a high school ICT Club. 
@@ -101,7 +78,8 @@ export const generateClubActivityIdea = async (): Promise<ActivityIdea> => {
         },
       });
 
-      const text = cleanJSON(response.text || "");
+      // FIX: Per guidelines, use response.text property directly, not response.text()
+      const text = response.text;
       if (!text) throw new Error("No response from AI");
 
       return JSON.parse(text) as ActivityIdea;
@@ -118,6 +96,7 @@ export const getAIChatResponse = async (history: { role: 'user' | 'model', parts
 
     try {
         const chat = ai.chats.create({
+            // FIX: Per guidelines, use 'gemini-2.5-flash' for basic text tasks
             model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: "You are the helpful AI Assistant for the ICT Club. You help members with coding questions, project ideas, and club logistics. Be concise, encouraging, and tech-savvy."
@@ -125,7 +104,8 @@ export const getAIChatResponse = async (history: { role: 'user' | 'model', parts
             history: history
         });
 
-        const response = await chat.sendMessage({ message });
+        const response: GenerateContentResponse = await chat.sendMessage({ message });
+        // FIX: Per guidelines, use response.text property directly, not response.text()
         return response.text;
     } catch (error) {
         console.error("Chat Error:", error);
@@ -144,6 +124,7 @@ export const getAiTutorResponse = async (
 
     try {
         const chat = ai.chats.create({
+            // FIX: Per guidelines, use 'gemini-2.5-flash' for basic text tasks
             model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: `You are a friendly, patient, and wise AI Tutor for a high school ICT Club. 
@@ -163,7 +144,8 @@ export const getAiTutorResponse = async (
             history: history
         });
 
-        const response = await chat.sendMessage({ message });
+        const response: GenerateContentResponse = await chat.sendMessage({ message });
+        // FIX: Per guidelines, use response.text property directly, not response.text()
         return response.text;
     } catch (error) {
         console.error("Tutor Error:", error);
@@ -176,6 +158,7 @@ export const analyzeChallengeSubmission = async (challengeTitle: string, code: s
         throw new Error("API Key Missing");
     }
 
+    // FIX: Per guidelines, use 'gemini-2.5-flash' for basic text tasks
     const model = "gemini-2.5-flash";
     const prompt = `
       You are a friendly but rigorous Code Mentor for a high school ICT Club.
@@ -214,6 +197,7 @@ export const analyzeChallengeSubmission = async (challengeTitle: string, code: s
             model,
             contents: prompt,
         });
+        // FIX: Per guidelines, use response.text property directly, not response.text()
         return response.text || "Could not analyze submission.";
     } catch (error) {
         console.error("Analysis Error:", error);
@@ -224,6 +208,7 @@ export const analyzeChallengeSubmission = async (challengeTitle: string, code: s
 export const generateLearningRoadmap = async (topic: string, skillLevel: string, suggestedTopics?: string) => {
     if (!ai) throw new Error("API Key Missing");
 
+    // FIX: Per guidelines, use 'gemini-2.5-flash' for basic text tasks
     const model = "gemini-2.5-flash";
     const prompt = `
         Create a comprehensive learning roadmap with at least 10 milestones for "${topic}" suitable for a "${skillLevel}" student in an ICT Club.
@@ -265,7 +250,7 @@ export const generateLearningRoadmap = async (topic: string, skillLevel: string,
                                         items: {
                                             type: Type.OBJECT,
                                             properties: {
-                                                type: { type: Type.STRING, enum: ['VIDEO', 'ARTICLE', 'DOCS', 'PRACTICE'] },
+                                                type: { type: Type.STRING },
                                                 title: { type: Type.STRING },
                                                 url: { type: Type.STRING }
                                             },
@@ -282,7 +267,8 @@ export const generateLearningRoadmap = async (topic: string, skillLevel: string,
             }
         });
 
-        const text = cleanJSON(response.text || "");
+        // FIX: Per guidelines, use response.text property directly, not response.text()
+        const text = response.text;
         if (!text) throw new Error("No response");
         return JSON.parse(text).milestones;
     } catch (error) {
@@ -305,6 +291,7 @@ export const generateDocumentSummary = async (file: File): Promise<string> => {
         throw new Error(`File type ${file.type} is not supported for AI summary. Please use PDF, DOCX, or TXT.`);
     }
   
+    // FIX: Per guidelines, use 'gemini-2.5-flash' for basic text tasks
     const model = "gemini-2.5-flash"; // Multimodal model
     const prompt = "Summarize this document in a concise, engaging paragraph (2-4 sentences) suitable for a resource library. Capture the main purpose and key topics.";
   
@@ -315,6 +302,7 @@ export const generateDocumentSummary = async (file: File): Promise<string> => {
           contents: { parts: [filePart, { text: prompt }] },
       });
       
+      // FIX: Per guidelines, use response.text property directly, not response.text()
       return response.text || "Could not generate a summary from the document.";
   
     } catch (error) {
@@ -336,6 +324,7 @@ export interface QuizQuestion {
 export const generateMilestoneQuiz = async (milestoneTitle: string, milestoneDescription: string): Promise<QuizQuestion[]> => {
     if (!ai) throw new Error("API Key Missing");
 
+    // FIX: Per guidelines, use 'gemini-2.5-flash' for basic text tasks
     const model = "gemini-2.5-flash";
     const prompt = `
         Generate a comprehensive 10-question quiz to test a student's understanding of:
@@ -369,7 +358,7 @@ export const generateMilestoneQuiz = async (milestoneTitle: string, milestoneDes
                             items: {
                                 type: Type.OBJECT,
                                 properties: {
-                                    type: { type: Type.STRING, enum: ['MULTIPLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER'] },
+                                    type: { type: Type.STRING },
                                     question: { type: Type.STRING },
                                     options: {
                                         type: Type.ARRAY,
@@ -386,7 +375,8 @@ export const generateMilestoneQuiz = async (milestoneTitle: string, milestoneDes
             }
         });
 
-        const text = cleanJSON(response.text || "");
+        // FIX: Per guidelines, use response.text property directly, not response.text()
+        const text = response.text;
         if (!text) throw new Error("No response");
         
         const parsed = JSON.parse(text);
@@ -416,6 +406,7 @@ export const evaluateShortAnswer = async (question: string, userAnswer: string, 
 
     try {
         const response = await ai.models.generateContent({
+            // FIX: Per guidelines, use 'gemini-2.5-flash' for basic text tasks
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
@@ -431,7 +422,9 @@ export const evaluateShortAnswer = async (question: string, userAnswer: string, 
             }
         });
         
-        const text = cleanJSON(response.text || "");
+        // FIX: Per guidelines, use response.text property directly, not response.text()
+        const text = response.text;
+        if (!text) throw new Error("No response");
         return JSON.parse(text);
     } catch (error) {
         console.error("Grading error:", error);
@@ -467,6 +460,7 @@ export const gradeProjectSubmission = async (taskDescription: string, code: stri
 
     try {
         const response = await ai.models.generateContent({
+            // FIX: Per guidelines, use 'gemini-2.5-flash' for basic text tasks
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
@@ -482,7 +476,9 @@ export const gradeProjectSubmission = async (taskDescription: string, code: stri
             }
         });
 
-        const text = cleanJSON(response.text || "");
+        // FIX: Per guidelines, use response.text property directly, not response.text()
+        const text = response.text;
+        if (!text) throw new Error("No response");
         return JSON.parse(text);
     } catch (error) {
         console.error("Auto-grading error:", error);
@@ -495,6 +491,7 @@ export const getAIPlaygroundHint = async (code: string): Promise<string> => {
         throw new Error("AI Service Unavailable: API Key not configured.");
     }
     
+    // FIX: Per guidelines, use 'gemini-2.5-flash' for basic text tasks
     const model = "gemini-2.5-flash";
     const prompt = `
         You are a helpful and patient Python code mentor for a high school student.
@@ -532,6 +529,7 @@ export const getAIPlaygroundHint = async (code: string): Promise<string> => {
             model,
             contents: prompt,
         });
+        // FIX: Per guidelines, use response.text property directly, not response.text()
         return response.text || "I'm not sure how to help with that. Could you try explaining what you're stuck on?";
     } catch (error) {
         console.error("Gemini Hint Error:", error);
@@ -548,16 +546,14 @@ export interface PythonTip {
 export const generatePythonTip = async (): Promise<PythonTip> => {
     if (!ai) throw new Error("API Key Missing");
 
+    // FIX: Per guidelines, use 'gemini-2.5-flash' for basic text tasks
     const model = "gemini-2.5-flash";
     const prompt = `
         Generate an interesting, intermediate-level Python programming tip, idiom, or "cool trick".
         It should be something that helps write more "Pythonic" code.
         
-        Prioritize common Python tricks using built-in syntax that **do not require any imports**.
-        Good examples: List/Dict/Set comprehensions, advanced slicing, zip(), enumerate(), argument unpacking (*args/**kwargs), f-strings, or generator expressions.
-        
-        If you must use an import, prefer standard library modules like 'collections' or 'itertools', but only if a non-import solution is not suitable.
-        Keep the example code snippet concise.
+        Focus primarily on built-in syntax features and tricks that **do not require imports**.
+        Examples: List/Dict/Set comprehensions, advanced slicing, zip, enumerate, argument unpacking (*args/**kwargs), f-strings, lambda functions, any/all, walrus operator, or generator expressions.
         
         Return a JSON object with:
         - title: A short catchy title (e.g., "Mastering Enumerate").
@@ -583,7 +579,8 @@ export const generatePythonTip = async (): Promise<PythonTip> => {
             }
         });
 
-        const text = cleanJSON(response.text || "");
+        // FIX: Per guidelines, use response.text property directly, not response.text()
+        const text = response.text;
         if (!text) throw new Error("No response");
         return JSON.parse(text) as PythonTip;
     } catch (error) {
