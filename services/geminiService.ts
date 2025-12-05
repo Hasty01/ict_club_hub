@@ -551,9 +551,12 @@ export const generatePythonTip = async (): Promise<PythonTip> => {
     const model = "gemini-2.5-flash";
     const prompt = `
         Generate an interesting, intermediate-level Python programming tip, idiom, or "cool trick".
-        It should be something that helps write more "Pythonic" code (e.g., list comprehensions, zip, enumerate, collections module, context managers, unpacking, datastructures, standard library classes etc).
-        It can also be on built-in syntax features and tricks that **do not require imports**.
-        Examples: List/Dict/Set comprehensions, advanced slicing, zip, enumerate, argument unpacking (*args/**kwargs), f-strings, lambda functions, any/all, walrus operator, or generator expressions.
+        It should be something that helps write more "Pythonic" code.
+        
+        Prioritize common Python tricks using built-in syntax that **do not require any imports**.
+        Good examples: List/Dict/Set comprehensions, advanced slicing, zip(), enumerate(), argument unpacking (*args/**kwargs), f-strings, or generator expressions.
+        
+        If you must use an import, prefer standard library modules like 'collections' or 'itertools', but only if a non-import solution is not suitable.
         Keep the example code snippet concise.
         
         Return a JSON object with:

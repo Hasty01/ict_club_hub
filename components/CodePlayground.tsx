@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { PlayIcon } from './icons/PlayIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -39,10 +38,16 @@ interface ScriptFile {
     size: number;
 }
 
-const DEFAULT_CODE = `print("Hello from the ICT Club Hub Playground!")
+const DEFAULT_CODE = `import time
 
-name = input("What is your name? ")
+print("Hello from the ICT Club Hub Playground!")
+
+name = input("What is your name? ").strip()
 print(f"Nice to meet you, {name}!")
+
+print("I will now sleep for 2 seconds...")
+time.sleep(2)
+print("I'm awake!")
 
 # The return value of the last expression is also displayed
 import math
@@ -121,6 +126,56 @@ const PYTHON_BUILTINS = [
     'range', 'repr', 'reversed', 'round', 'set', 'setattr', 'slice', 'sorted', 
     'staticmethod', 'str', 'sum', 'super', 'tuple', 'type', 'vars', 'zip'
 ];
+
+/**
+ * A helper function to transform async Python function calls in a string of code.
+ * It finds calls like `input(...)` or `time.sleep(...)` and wraps them in `(await ...)`
+ * to allow for method chaining like `(await input()).strip()`.
+ * This is more robust than a simple regex replace.
+ */
+const wrapAsyncCalls = (code: string, functionNames: string[]): string => {
+    let newCode = code;
+    for (const funcName of functionNames) {
+        // This regex will find `funcName(` and we'll parse from there.
+        const regex = new RegExp(`\\b(${funcName.replace('.', '\\.')})\\s*\\(`, 'g');
+        let tempCode = '';
+        let lastIndex = 0;
+        let match;
+
+        while ((match = regex.exec(newCode)) !== null) {
+            // Append the part of the code before the match
+            tempCode += newCode.substring(lastIndex, match.index);
+
+            const startParenIndex = match.index + match[0].length - 1;
+            let parenCount = 1;
+            let endParenIndex = -1;
+
+            for (let i = startParenIndex + 1; i < newCode.length; i++) {
+                if (newCode[i] === '(') parenCount++;
+                else if (newCode[i] === ')') parenCount--;
+                
+                if (parenCount === 0) {
+                    endParenIndex = i;
+                    break;
+                }
+            }
+
+            if (endParenIndex !== -1) {
+                const call = newCode.substring(match.index, endParenIndex + 1);
+                tempCode += `(await ${call})`;
+                lastIndex = endParenIndex + 1;
+            } else {
+                // Unmatched parenthesis, don't transform, just append the matched part
+                tempCode += newCode.substring(match.index, match.index + match[0].length);
+                lastIndex = match.index + match[0].length;
+            }
+        }
+        // Append the rest of the code
+        tempCode += newCode.substring(lastIndex);
+        newCode = tempCode;
+    }
+    return newCode;
+};
 
 const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, setActiveTab }) => {
   const { fetchShowcaseItems, showToast } = useData();
@@ -487,6 +542,8 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
 import sys
 import builtins
 import js
+import time
+import asyncio
 
 class Writer:
     def __init__(self, stream_type):
@@ -499,18 +556,33 @@ class Writer:
 sys.stdout = Writer('log')
 sys.stderr = Writer('error')
 
+# --- Input handling ---
+# This async function awaits the JS Promise from playgroundAskForInput
+# and crucially converts the resulting PyProxy into a Python string.
 async def custom_input_async(prompt_text=""):
-    val = await js.playgroundAskForInput(prompt_text)
-    return val
+    val_proxy = await js.playgroundAskForInput(prompt_text)
+    return str(val_proxy)
 
 builtins.input = custom_input_async
+
+# --- Sleep handling ---
+# This creates a JS Promise that resolves after a timeout,
+# allowing Python's await to pause execution without blocking the browser.
+async def custom_sleep_async(seconds):
+    await js.Promise.new(lambda resolve, reject: js.setTimeout(resolve, seconds * 1000))
+
+# Monkey-patch standard sleep functions
+# Note: os.sleep() is not standard in Python, time.sleep() is.
+time.sleep = custom_sleep_async
+asyncio.sleep = custom_sleep_async
     `;
 
     try {
         await pyodideRef.current.loadPackagesFromImports(code);
         await pyodideRef.current.runPythonAsync(setupCode);
         
-        const asyncCode = code.replace(/\binput\s*\(/g, 'await input(');
+        // Transform user code to handle async calls correctly
+        const asyncCode = wrapAsyncCalls(code, ['input', 'time.sleep', 'asyncio.sleep']);
         
         const result = await pyodideRef.current.runPythonAsync(asyncCode);
 
@@ -577,7 +649,7 @@ builtins.input = custom_input_async
             <button
                 onClick={handleRunCode}
                 disabled={isExecuting || !isPyodideReady || isWaitingForInput || isGettingHint}
-                className="relative flex items-center space-x-2 px-5 py-3 font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg shadow-md hover:from-pink-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="relative flex items-center space-x-2 px-5 py-3 font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg shadow-md hover:from-pink-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 aria-label="Run Code"
                 title={!isPyodideReady ? 'Local interpreter is initializing...' : isWaitingForInput ? 'Waiting for input...' : 'Run code'}
             >

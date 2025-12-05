@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 
 // FIX: Replaced corrupted SVG content with a proper trophy icon.
