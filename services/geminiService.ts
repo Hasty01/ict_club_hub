@@ -1,12 +1,12 @@
 
-// Robustly retrieve API Key
+// Robustly retrieve API Key, prioritizing HF_TOKEN
 const getApiKey = (): string => {
   let key = '';
   try {
     // @ts-ignore
     if (typeof import.meta !== 'undefined' && import.meta.env) {
       // @ts-ignore
-      key = import.meta.env.VITE_API_KEY || import.meta.env.API_KEY || '';
+      key = import.meta.env.VITE_HF_TOKEN || import.meta.env.HF_TOKEN || import.meta.env.VITE_API_KEY || import.meta.env.API_KEY || '';
     }
   } catch (e) {}
 
@@ -16,7 +16,7 @@ const getApiKey = (): string => {
     // @ts-ignore
     if (typeof process !== 'undefined' && process.env) {
       // @ts-ignore
-      key = process.env.VITE_API_KEY || process.env.API_KEY || process.env.REACT_APP_API_KEY || '';
+      key = process.env.HF_TOKEN || process.env.VITE_HF_TOKEN || process.env.VITE_API_KEY || process.env.API_KEY || process.env.REACT_APP_API_KEY || '';
     }
   } catch (e) {}
 
@@ -26,33 +26,28 @@ const getApiKey = (): string => {
 const apiKey = getApiKey();
 
 if (!apiKey) {
-    console.warn("AI API Key is missing. Features will be disabled. Ensure VITE_API_KEY is set.");
+    console.warn("AI API Key is missing. AI features will be disabled. Ensure VITE_HF_TOKEN is set.");
 }
 
-// DeepSeek R1 model on HF Inference API
-const MODEL_NAME = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B";
-// Direct model endpoint is often more reliable for CORS than the generic v1 router
-const API_ENDPOINT = `https://api-inference.huggingface.co/models/${MODEL_NAME}/v1/chat/completions`;
+// New model and endpoint as requested
+const MODEL_NAME = "openai/gpt-oss-120b:novita";
+const API_ENDPOINT = `https://router.huggingface.co/v1/chat/completions`;
 
-// Helper: DeepSeek R1 often includes <think> tags. We need to strip them to get the clean response.
+// Helper to clean regular text responses
 const cleanResponse = (text: string): string => {
     if (!text) return "";
-    // Remove <think>...</think> blocks
-    let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, '');
-    // Remove markdown code blocks if present (often used for JSON outputs)
-    cleaned = cleaned.replace(/^```(json)?\s*/, '').replace(/\s*```$/, '');
-    return cleaned.trim();
+    return text.trim();
 };
 
-// Helper: Parse JSON from AI response, handling potential markdown wrapping
+// Helper to parse JSON from AI response, handling potential markdown wrapping
 const parseJSONResponse = (text: string) => {
-    const cleaned = cleanResponse(text);
+    const cleaned = text.replace(/^```(json)?\s*/, '').replace(/\s*```$/, '').trim();
     try {
         return JSON.parse(cleaned);
     } catch (e) {
         console.error("Failed to parse JSON from AI:", cleaned);
-        // Fallback: try to find JSON object if it's surrounded by other text
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        // Fallback for when AI wraps JSON in other text
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
         if (jsonMatch) {
             try { return JSON.parse(jsonMatch[0]); } catch(e2) {}
         }
@@ -71,7 +66,7 @@ const fileToText = async (file: File): Promise<string> => {
 };
 
 // --- Core API Call Helper ---
-const callDeepSeek = async (messages: any[], jsonMode = false): Promise<string> => {
+const callAI = async (messages: any[]): Promise<string> => {
     if (!apiKey) throw new Error("AI Service Unavailable: API Key not configured.");
 
     try {
@@ -84,26 +79,25 @@ const callDeepSeek = async (messages: any[], jsonMode = false): Promise<string> 
             body: JSON.stringify({
                 model: MODEL_NAME,
                 messages: messages,
-                temperature: 0.6,
-                max_tokens: 4000,
+                temperature: 0.7,
+                max_tokens: 4096,
                 stream: false,
-                // Some HF endpoints support response_format for JSON, but it's hit or miss.
-                // We rely on the system prompt for JSON structure.
             })
         });
 
         if (!response.ok) {
             const errorText = await response.text();
+            console.error("Hugging Face API Error Response:", errorText);
             if (response.status === 503) {
                 throw new Error("Model is loading (503). Please try again in a few seconds.");
             }
-            throw new Error(`DeepSeek API Error: ${response.status} - ${errorText}`);
+            throw new Error(`AI API Error: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
         return data.choices?.[0]?.message?.content || "";
     } catch (error: any) {
-        console.error("DeepSeek Call Failed:", error);
+        console.error("AI Call Failed:", error);
         throw new Error("Connection error.");
     }
 };
@@ -130,10 +124,10 @@ export const generateClubActivityIdea = async (): Promise<ActivityIdea> => {
   `;
 
   try {
-      const text = await callDeepSeek([
+      const text = await callAI([
           { role: "system", content: "You are a helpful assistant that outputs strict JSON." }, 
           { role: "user", content: prompt }
-      ], true);
+      ]);
       return parseJSONResponse(text) as ActivityIdea;
   } catch (error) {
       console.error("Activity Gen Error:", error);
@@ -157,7 +151,7 @@ export const getAIChatResponse = async (history: { role: 'user' | 'model', parts
             { role: "user", content: message }
         ];
 
-        const rawText = await callDeepSeek(messages);
+        const rawText = await callAI(messages);
         return cleanResponse(rawText);
     } catch (error) {
         console.error("Chat Error:", error);
@@ -197,7 +191,7 @@ export const getAiTutorResponse = async (
             { role: "user", content: message }
         ];
 
-        const rawText = await callDeepSeek(messages);
+        const rawText = await callAI(messages);
         return cleanResponse(rawText);
     } catch (error) {
         console.error("Tutor Error:", error);
@@ -222,7 +216,7 @@ export const analyzeChallengeSubmission = async (challengeTitle: string, code: s
     `;
 
     try {
-        const text = await callDeepSeek([{ role: "user", content: prompt }]);
+        const text = await callAI([{ role: "user", content: prompt }]);
         return cleanResponse(text);
     } catch (error) {
         console.error("Analysis Error:", error);
@@ -248,10 +242,10 @@ export const generateLearningRoadmap = async (topic: string, skillLevel: string,
     `;
 
     try {
-        const text = await callDeepSeek([
-            { role: "system", content: "You output strict JSON only. Do not include markdown formatting or <think> tags in the final output." }, 
+        const text = await callAI([
+            { role: "system", content: "You output strict JSON only. Do not include markdown formatting or other text." }, 
             { role: "user", content: prompt }
-        ], true);
+        ]);
         
         const parsed = parseJSONResponse(text);
         return parsed.milestones;
@@ -262,7 +256,6 @@ export const generateLearningRoadmap = async (topic: string, skillLevel: string,
 };
 
 export const generateDocumentSummary = async (file: File): Promise<string> => {
-    // DeepSeek R1 via HF Inference is text-only. We try to read the file as text.
     let fileContent = "";
     try {
         fileContent = await fileToText(file);
@@ -270,13 +263,12 @@ export const generateDocumentSummary = async (file: File): Promise<string> => {
         throw new Error("Could not read file. Please ensure it is a text-based file (code, txt, md).");
     }
 
-    // Truncate if too long (simple safety check)
     if (fileContent.length > 20000) fileContent = fileContent.substring(0, 20000) + "...[Truncated]";
 
     const prompt = `Summarize the following document content in a concise, engaging paragraph (2-4 sentences) for a resource library:\n\n${fileContent}`;
 
     try {
-        const text = await callDeepSeek([{ role: "user", content: prompt }]);
+        const text = await callAI([{ role: "user", content: prompt }]);
         return cleanResponse(text);
     } catch (error) {
         console.error("Summary Error:", error);
@@ -311,10 +303,10 @@ export const generateMilestoneQuiz = async (milestoneTitle: string, milestoneDes
     `;
 
     try {
-        const text = await callDeepSeek([
+        const text = await callAI([
             { role: "system", content: "You output strict JSON only." }, 
             { role: "user", content: prompt }
-        ], true);
+        ]);
 
         const parsed = parseJSONResponse(text);
         return parsed.questions.map((q: any, index: number) => ({...q, id: index}));
@@ -336,10 +328,10 @@ export const evaluateShortAnswer = async (question: string, userAnswer: string, 
     `;
 
     try {
-        const text = await callDeepSeek([
+        const text = await callAI([
             { role: "system", content: "Output strict JSON only." }, 
             { role: "user", content: prompt }
-        ], true);
+        ]);
         
         return parseJSONResponse(text);
     } catch (error) {
@@ -362,10 +354,10 @@ export const gradeProjectSubmission = async (taskDescription: string, code: stri
     `;
 
     try {
-        const text = await callDeepSeek([
+        const text = await callAI([
             { role: "system", content: "Output strict JSON only." }, 
             { role: "user", content: prompt }
-        ], true);
+        ]);
 
         return parseJSONResponse(text);
     } catch (error) {
@@ -389,7 +381,7 @@ export const getAIPlaygroundHint = async (code: string): Promise<string> => {
     `;
 
     try {
-        const text = await callDeepSeek([{ role: "user", content: prompt }]);
+        const text = await callAI([{ role: "user", content: prompt }]);
         return cleanResponse(text);
     } catch (error) {
         console.error("Hint Error:", error);
@@ -417,15 +409,14 @@ export const generatePythonTip = async (): Promise<PythonTip> => {
     `;
 
     try {
-        const text = await callDeepSeek([
+        const text = await callAI([
             { role: "system", content: "Output strict JSON only." }, 
             { role: "user", content: prompt }
-        ], true);
+        ]);
 
         return parseJSONResponse(text) as PythonTip;
-    } catch (error) {
+    } catch (error: any) {
         console.error("Tip Error:", error);
-        // Provide a fallback but also re-throw the original error for better debugging
         if (error instanceof Error && error.message === "Connection error.") {
              return {
                 title: "Pythonic Swapping",
