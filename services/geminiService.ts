@@ -1,11 +1,58 @@
-import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Robustly retrieve API Key, prioritizing HF_TOKEN
+const getApiKey = (): string => {
+  let key = '';
+  try {
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore
+      key = import.meta.env.VITE_HF_TOKEN || import.meta.env.HF_TOKEN || import.meta.env.VITE_API_KEY || import.meta.env.API_KEY || '';
+    }
+  } catch (e) {}
+
+  if (key) return key;
+
+  try {
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env) {
+      // @ts-ignore
+      key = process.env.HF_TOKEN || process.env.VITE_HF_TOKEN || process.env.VITE_API_KEY || process.env.API_KEY || process.env.REACT_APP_API_KEY || '';
+    }
+  } catch (e) {}
+
+  return key;
+};
+
+const apiKey = getApiKey();
+
+if (!apiKey) {
+    console.warn("AI API Key is missing. AI features will be disabled. Ensure VITE_HF_TOKEN is set.");
+}
+
+// New model and endpoint as requested
+const MODEL_NAME = "openai/gpt-oss-20b";
+const API_ENDPOINT = `https://router.huggingface.co/v1/chat/completions`;
 
 // Helper to clean regular text responses
-const cleanResponse = (text: string | undefined): string => {
+const cleanResponse = (text: string): string => {
     if (!text) return "";
     return text.trim();
+};
+
+// Helper to parse JSON from AI response, handling potential markdown wrapping
+const parseJSONResponse = (text: string) => {
+    const cleaned = text.replace(/^```(json)?\s*/, '').replace(/\s*```$/, '').trim();
+    try {
+        return JSON.parse(cleaned);
+    } catch (e) {
+        console.error("Failed to parse JSON from AI:", cleaned);
+        // Fallback for when AI wraps JSON in other text
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+        if (jsonMatch) {
+            try { return JSON.parse(jsonMatch[0]); } catch(e2) {}
+        }
+        throw new Error("AI returned invalid JSON format.");
+    }
 };
 
 // --- Helper to convert File to Text ---
@@ -18,6 +65,43 @@ const fileToText = async (file: File): Promise<string> => {
     });
 };
 
+// --- Core API Call Helper ---
+const callAI = async (messages: any[]): Promise<string> => {
+    if (!apiKey) throw new Error("AI Service Unavailable: API Key not configured.");
+
+    try {
+        const response = await fetch(API_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: MODEL_NAME,
+                messages: messages,
+                temperature: 0.7,
+                max_tokens: 4096,
+                stream: false,
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Hugging Face API Error Response:", errorText);
+            if (response.status === 503) {
+                throw new Error("Model is loading (503). Please try again in a few seconds.");
+            }
+            throw new Error(`AI API Error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || "";
+    } catch (error: any) {
+        console.error("AI Call Failed:", error);
+        throw new Error("Connection error.");
+    }
+};
+
 export interface ActivityIdea {
   title: string;
   description: string;
@@ -25,39 +109,50 @@ export interface ActivityIdea {
 }
 
 export const generateClubActivityIdea = async (): Promise<ActivityIdea> => {
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: `You are an enthusiastic and creative patron for a high school ICT Club. 
+  const prompt = `
+    You are an enthusiastic and creative patron for a high school ICT Club. 
     Generate ONE detailed and exciting activity idea for the club.
-    It should be feasible for a school setting, educational, and engaging.`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING },
-          description: { type: Type.STRING },
-          location: { type: Type.STRING }
-        },
-        required: ["title", "description", "location"]
-      }
-    }
-  });
+    It should be feasible for a school setting, educational, and engaging.
+    
+    Return a VALID JSON object with:
+    - title: A catchy name for the event.
+    - description: A short, persuasive description of what will happen (2-3 sentences).
+    - location: A suggested typical school location.
+    
+    Example output format:
+    { "title": "...", "description": "...", "location": "..." }
+  `;
 
-  return JSON.parse(response.text || '{}') as ActivityIdea;
+  try {
+      const text = await callAI([
+          { role: "system", content: "You are a helpful assistant that outputs strict JSON." }, 
+          { role: "user", content: prompt }
+      ]);
+      return parseJSONResponse(text) as ActivityIdea;
+  } catch (error) {
+      console.error("Activity Gen Error:", error);
+      throw error;
+  }
 };
 
 export const getAIChatResponse = async (history: { role: 'user' | 'model', parts: { text: string }[] }[], message: string) => {
+    if (!apiKey) return "I'm sorry, I can't chat right now because my AI configuration is missing.";
+
     try {
-        const chat = ai.chats.create({
-            model: 'gemini-2.5-flash',
-            history: history,
-            config: {
-                systemInstruction: "You are the helpful AI Assistant for the ICT Club. You help members with coding questions, project ideas, and club logistics. Be concise and clear, encouraging, and tech-savvy."
-            }
-        });
-        const result = await chat.sendMessage({ message });
-        return cleanResponse(result.text);
+        // Convert format
+        const chatMessages = history.map(h => ({
+            role: h.role === 'model' ? 'assistant' : 'user',
+            content: h.parts[0]?.text || ""
+        }));
+
+        const messages: any[] = [
+            { role: "system", content: "You are the helpful AI Assistant for the ICT Club. You help members with coding questions, project ideas, and club logistics. Be concise and clear, encouraging, and tech-savvy." },
+            ...chatMessages,
+            { role: "user", content: message }
+        ];
+
+        const rawText = await callAI(messages);
+        return cleanResponse(rawText);
     } catch (error) {
         console.error("Chat Error:", error);
         return "I'm having trouble connecting to the server right now. Please try again later.";
@@ -69,7 +164,14 @@ export const getAiTutorResponse = async (
     message: string,
     clubContext: string = ''
 ) => {
+    if (!apiKey) return "I'm offline right now (API Key Missing).";
+
     try {
+        const chatMessages = history.map(h => ({
+            role: h.role === 'model' ? 'assistant' : 'user',
+            content: h.parts[0]?.text || ""
+        }));
+
         const systemPrompt = `You are a friendly, patient, and wise AI Tutor for a high school ICT Club. 
         Your goal is to TEACH, not to do the work for the students. Keep your explanations concise and easy to understand.
         
@@ -83,16 +185,14 @@ export const getAiTutorResponse = async (
         4. If asked about club activities, use the provided context.
         `;
 
-        const chat = ai.chats.create({
-            model: 'gemini-2.5-flash',
-            history: history,
-            config: {
-                systemInstruction: systemPrompt
-            }
-        });
+        const messages: any[] = [
+            { role: "system", content: systemPrompt },
+            ...chatMessages,
+            { role: "user", content: message }
+        ];
 
-        const result = await chat.sendMessage({ message });
-        return cleanResponse(result.text);
+        const rawText = await callAI(messages);
+        return cleanResponse(rawText);
     } catch (error) {
         console.error("Tutor Error:", error);
         return "I'm having trouble thinking right now. Ask me again in a moment!";
@@ -116,11 +216,8 @@ export const analyzeChallengeSubmission = async (challengeTitle: string, code: s
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt
-        });
-        return cleanResponse(response.text);
+        const text = await callAI([{ role: "user", content: prompt }]);
+        return cleanResponse(text);
     } catch (error) {
         console.error("Analysis Error:", error);
         throw error;
@@ -130,50 +227,28 @@ export const analyzeChallengeSubmission = async (challengeTitle: string, code: s
 export const generateLearningRoadmap = async (topic: string, skillLevel: string, suggestedTopics?: string) => {
     const prompt = `
         Create a comprehensive learning roadmap with at least 10 milestones for "${topic}" suitable for a "${skillLevel}" student.
+        
         If provided, incorporate: "${suggestedTopics || 'Not provided'}".
+        
+        Return a VALID JSON object with a "milestones" array.
+        Each item must have:
+        - title: Step name.
+        - description: Concise learning goal.
+        - duration: e.g. "3 days".
+        - resources: Array of 3-5 items with { type: "VIDEO"|"ARTICLE"|"DOCS"|"PRACTICE", title: "...", url: "valid-looking url" }.
+        
+        JSON Format Example:
+        { "milestones": [ { "title": "...", "description": "...", "duration": "...", "resources": [...] } ] }
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        milestones: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    title: { type: Type.STRING },
-                                    description: { type: Type.STRING },
-                                    duration: { type: Type.STRING },
-                                    resources: {
-                                        type: Type.ARRAY,
-                                        items: {
-                                            type: Type.OBJECT,
-                                            properties: {
-                                                title: { type: Type.STRING },
-                                                type: { type: Type.STRING, enum: ["VIDEO", "ARTICLE", "DOCS", "PRACTICE"] },
-                                                url: { type: Type.STRING }
-                                            },
-                                            required: ["title", "type", "url"]
-                                        }
-                                    }
-                                },
-                                required: ["title", "description", "duration", "resources"]
-                            }
-                        }
-                    },
-                    required: ["milestones"]
-                }
-            }
-        });
+        const text = await callAI([
+            { role: "system", content: "You output strict JSON only. Do not include markdown formatting or other text." }, 
+            { role: "user", content: prompt }
+        ]);
         
-        const parsed = JSON.parse(response.text || '{}');
-        return parsed.milestones || [];
+        const parsed = parseJSONResponse(text);
+        return parsed.milestones;
     } catch (error) {
         console.error("Roadmap Error:", error);
         throw error;
@@ -193,11 +268,8 @@ export const generateDocumentSummary = async (file: File): Promise<string> => {
     const prompt = `Summarize the following document content in a concise, engaging paragraph (2-4 sentences) for a resource library:\n\n${fileContent}`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt
-        });
-        return cleanResponse(response.text);
+        const text = await callAI([{ role: "user", content: prompt }]);
+        return cleanResponse(text);
     } catch (error) {
         console.error("Summary Error:", error);
         throw error;
@@ -218,38 +290,26 @@ export const generateMilestoneQuiz = async (milestoneTitle: string, milestoneDes
     const prompt = `
         Generate a 10-question quiz on: ${milestoneTitle} - ${milestoneDescription}.
         Mix MULTIPLE_CHOICE, TRUE_FALSE, SHORT_ANSWER.
+        
+        Return VALID JSON with a 'questions' array.
+        Each question:
+        - type: "MULTIPLE_CHOICE" | "TRUE_FALSE" | "SHORT_ANSWER"
+        - question: text
+        - options: string array (for MC/TF)
+        - correctAnswer: string
+        
+        Example JSON:
+        { "questions": [ { "type": "TRUE_FALSE", "question": "...", "options": ["True", "False"], "correctAnswer": "True" } ] }
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        questions: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    type: { type: Type.STRING, enum: ["MULTIPLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER"] },
-                                    question: { type: Type.STRING },
-                                    options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                                    correctAnswer: { type: Type.STRING }
-                                },
-                                required: ["type", "question", "correctAnswer"]
-                            }
-                        }
-                    },
-                    required: ["questions"]
-                }
-            }
-        });
+        const text = await callAI([
+            { role: "system", content: "You output strict JSON only." }, 
+            { role: "user", content: prompt }
+        ]);
 
-        const parsed = JSON.parse(response.text || '{}');
-        return (parsed.questions || []).map((q: any, index: number) => ({...q, id: index}));
+        const parsed = parseJSONResponse(text);
+        return parsed.questions.map((q: any, index: number) => ({...q, id: index}));
     } catch (error) {
         console.error("Quiz Error:", error);
         throw error;
@@ -262,26 +322,18 @@ export const evaluateShortAnswer = async (question: string, userAnswer: string, 
         Question: "${question}"
         Context/Correct Answer: "${context}"
         Student Answer: "${userAnswer}"
+        
+        Return JSON:
+        { "correct": boolean, "feedback": "1 sentence explanation" }
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        correct: { type: Type.BOOLEAN },
-                        feedback: { type: Type.STRING }
-                    },
-                    required: ["correct", "feedback"]
-                }
-            }
-        });
+        const text = await callAI([
+            { role: "system", content: "Output strict JSON only." }, 
+            { role: "user", content: prompt }
+        ]);
         
-        return JSON.parse(response.text || '{}');
+        return parseJSONResponse(text);
     } catch (error) {
         console.error("Grading Error:", error);
         return { correct: true, feedback: "Good effort! (Auto-passed due to connection error)" };
@@ -297,26 +349,17 @@ export const gradeProjectSubmission = async (taskDescription: string, code: stri
         \`\`\`
         
         Criteria: Correctness, Style, Efficiency.
+        Return JSON:
+        { "grade": number (1-5), "feedback": "Short constructive paragraph." }
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        grade: { type: Type.INTEGER, description: "Grade from 1 to 5" },
-                        feedback: { type: Type.STRING, description: "Short constructive paragraph" }
-                    },
-                    required: ["grade", "feedback"]
-                }
-            }
-        });
+        const text = await callAI([
+            { role: "system", content: "Output strict JSON only." }, 
+            { role: "user", content: prompt }
+        ]);
 
-        return JSON.parse(response.text || '{}');
+        return parseJSONResponse(text);
     } catch (error) {
         console.error("Auto-grading Error:", error);
         throw error;
@@ -338,11 +381,8 @@ export const getAIPlaygroundHint = async (code: string): Promise<string> => {
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt
-        });
-        return cleanResponse(response.text);
+        const text = await callAI([{ role: "user", content: prompt }]);
+        return cleanResponse(text);
     } catch (error) {
         console.error("Hint Error:", error);
         throw error;
@@ -359,33 +399,31 @@ export const generatePythonTip = async (): Promise<PythonTip> => {
     const prompt = `
         Generate an intermediate Python tip using built-in features (no imports).
         Focus on: List/Dict comprehensions, slicing, unpacking, f-strings, etc.
+        
+        Return VALID JSON:
+        { 
+            "title": "Short Title", 
+            "explanation": "2-3 sentences why it's useful.", 
+            "codeSnippet": "Executable python example" 
+        }
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        title: { type: Type.STRING },
-                        explanation: { type: Type.STRING },
-                        codeSnippet: { type: Type.STRING }
-                    },
-                    required: ["title", "explanation", "codeSnippet"]
-                }
-            }
-        });
+        const text = await callAI([
+            { role: "system", content: "Output strict JSON only." }, 
+            { role: "user", content: prompt }
+        ]);
 
-        return JSON.parse(response.text || '{}') as PythonTip;
+        return parseJSONResponse(text) as PythonTip;
     } catch (error: any) {
         console.error("Tip Error:", error);
-        return {
-            title: "Pythonic Swapping",
-            explanation: "Did you know you can swap variables in Python without a temporary variable? It's readable and efficient!",
-            codeSnippet: "a = 5\nb = 10\n\n# The Pythonic Way\na, b = b, a\n\nprint(f'a: {a}, b: {b}')"
-        };
+        if (error instanceof Error && error.message === "Connection error.") {
+             return {
+                title: "Pythonic Swapping",
+                explanation: "Did you know you can swap variables in Python without a temporary variable? It's readable and efficient!",
+                codeSnippet: "a = 5\nb = 10\n\n# The Pythonic Way\na, b = b, a\n\nprint(f'a: {a}, b: {b}')"
+            };
+        }
+        throw error;
     }
 };
