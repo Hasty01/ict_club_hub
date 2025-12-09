@@ -108,6 +108,17 @@ const Welcome: React.FC<WelcomeProps> = ({ onNavigateToLogin, onNavigateToSignUp
             20% { left: 100%; }
             100% { left: 100%; }
         }
+        @keyframes pulse-heart {
+          0%, 100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.2);
+          }
+        }
+        .animate-pulse-heart {
+          animation: pulse-heart 1.5s ease-in-out infinite;
+        }
       `}</style>
       
       {/* Hero Section */}
@@ -241,6 +252,13 @@ const Welcome: React.FC<WelcomeProps> = ({ onNavigateToLogin, onNavigateToSignUp
       <footer className="bg-white dark:bg-gray-900 py-6 text-center border-t border-gray-200 dark:border-gray-700 relative z-10">
         <p className="text-sm text-gray-500 dark:text-gray-400">
             &copy; {new Date().getFullYear()} ICT Club Hub. Designed & Developed by HAKIM.
+        </p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 flex items-center justify-center gap-1.5">
+            Made with 
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-pink-500 animate-pulse-heart" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+            </svg> 
+            and code.
         </p>
       </footer>
     </div>
