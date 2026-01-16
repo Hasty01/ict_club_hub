@@ -38,27 +38,27 @@ interface ScriptFile {
     size: number;
 }
 
-const DEFAULT_CODE = `import time
+type Language = 'python' | 'javascript';
 
-print("Hello from the ICT Club Hub Playground!")
+const DEFAULT_PYTHON = `import time
+
+print("Hello from the ICT Club Hub Python Playground!")
 
 name = input("What is your name? ").strip()
 print(f"Nice to meet you, {name}!")
 
-print("\\nThis progress bar uses carriage return (\\r):")
-for i in range(21):
-    percent = i * 5
-    bar = '[' + '=' * i + '>' + ' ' * (20 - i) + ']'
-    print(f"\\rLoading: {bar} {percent}%", end='\\r')
-    time.sleep(0.1)
-
-print("\\n\\nI will now sleep for 2 seconds...")
-time.sleep(2)
-print("I'm awake!")
-
-# The return value of the last expression is also displayed
 import math
-math.pi`;
+print(f"PI is approximately {math.pi}")`;
+
+const DEFAULT_JS = `// Welcome to the JavaScript Playground!
+console.log("Hello from ICT Club Hub!");
+
+const members = ["Alice", "Bob", "Charlie"];
+console.log("Club Members:", members.join(", "));
+
+// You can use modern JS features
+const greet = (name) => \`Happy coding, \${name}!\`;
+console.log(greet("Developer"));`;
 
 const PublishModal: React.FC<{ isOpen: boolean, onClose: () => void, onPublish: (title: string, desc: string) => Promise<void> }> = ({ isOpen, onClose, onPublish }) => {
     const [title, setTitle] = useState('');
@@ -187,11 +187,14 @@ const processCarriageReturns = (text: string) => {
 
 const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, setActiveTab }) => {
   const { fetchShowcaseItems, showToast } = useData();
+  const [language, setLanguage] = useState<Language>(() => {
+      return (localStorage.getItem('playground_lang') as Language) || 'python';
+  });
+
   const [code, setCode] = useState<string>(() => {
-      if (typeof window !== 'undefined') {
-          return localStorage.getItem('playground_code') || DEFAULT_CODE;
-      }
-      return DEFAULT_CODE;
+      const saved = localStorage.getItem(`playground_code_${language}`);
+      if (saved) return saved;
+      return language === 'python' ? DEFAULT_PYTHON : DEFAULT_JS;
   });
   
   const [output, setOutput] = useState<OutputLine[]>([{ type: 'log', content: 'Click "Run Code" to see the output here.' }]);
@@ -212,13 +215,9 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   
   const [scriptToDelete, setScriptToDelete] = useState<string | null>(null);
-
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
-
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-
   const [isSubmitChallengeModalOpen, setIsSubmitChallengeModalOpen] = useState(false);
-
   const [copyFeedback, setCopyFeedback] = useState(false);
 
   const [isWaitingForInput, setIsWaitingForInput] = useState(false);
@@ -233,9 +232,19 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   const completionProvidersRef = useRef<any[]>([]);
 
   useEffect(() => {
-      localStorage.setItem('playground_code', code);
+      localStorage.setItem(`playground_code_${language}`, code);
       codeRef.current = code;
-  }, [code]);
+  }, [code, language]);
+
+  useEffect(() => {
+    localStorage.setItem('playground_lang', language);
+    const saved = localStorage.getItem(`playground_code_${language}`);
+    if (saved) {
+        setCode(saved);
+    } else {
+        setCode(language === 'python' ? DEFAULT_PYTHON : DEFAULT_JS);
+    }
+  }, [language]);
   
   useEffect(() => {
     return () => {
@@ -272,23 +281,28 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           provideCompletionItems: (model: any, position: any) => {
               const word = model.getWordUntilPosition(position);
               const range = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber, startColumn: word.startColumn, endColumn: word.endColumn };
-              const suggestions = [
-                  ...PYTHON_KEYWORDS.map(k => ({ label: k, kind: monaco.languages.CompletionItemKind.Keyword, insertText: k, range, detail: 'Keyword' })),
-                  ...PYTHON_BUILTINS.map(b => ({ label: b, kind: monaco.languages.CompletionItemKind.Function, insertText: b, range, detail: 'Built-in' })),
-                  { label: 'def', kind: monaco.languages.CompletionItemKind.Snippet, insertText: 'def ${1:name}(${2:args}):\n\t${3:pass}', insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet, range, detail: 'Snippet' },
-                  { label: 'if', kind: monaco.languages.CompletionItemKind.Snippet, insertText: 'if ${1:condition}:\n\t${2:pass}', insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet, range, detail: 'Snippet' },
-              ];
-              return { suggestions };
+              
+              if (language === 'python') {
+                const suggestions = [
+                    ...PYTHON_KEYWORDS.map(k => ({ label: k, kind: monaco.languages.CompletionItemKind.Keyword, insertText: k, range, detail: 'Keyword' })),
+                    ...PYTHON_BUILTINS.map(b => ({ label: b, kind: monaco.languages.CompletionItemKind.Function, insertText: b, range, detail: 'Built-in' })),
+                    { label: 'def', kind: monaco.languages.CompletionItemKind.Snippet, insertText: 'def ${1:name}(${2:args}):\n\t${3:pass}', insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet, range, detail: 'Snippet' },
+                    { label: 'if', kind: monaco.languages.CompletionItemKind.Snippet, insertText: 'if ${1:condition}:\n\t${2:pass}', insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet, range, detail: 'Snippet' },
+                ];
+                return { suggestions };
+              }
+              return { suggestions: [] };
           }
       };
-      completionProvidersRef.current.push(monaco.languages.registerCompletionItemProvider('python', staticProvider));
+      completionProvidersRef.current.push(monaco.languages.registerCompletionItemProvider(language, staticProvider));
   };
 
 
   const handleImportCode = (importedCode: string) => {
       const currentCode = codeRef.current;
+      const def = language === 'python' ? DEFAULT_PYTHON : DEFAULT_JS;
       
-      if (!currentCode || currentCode.trim() === '' || currentCode.trim() === DEFAULT_CODE.trim()) {
+      if (!currentCode || currentCode.trim() === '' || currentCode.trim() === def.trim()) {
            setCode(importedCode);
            setActiveTabState('editor');
            setOutput([{ type: 'log', content: 'Loaded code from external source.' }]);
@@ -379,11 +393,12 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   };
 
   const handleDownloadCode = () => {
-    const blob = new Blob([code], { type: 'text/x-python' });
+    const ext = language === 'python' ? 'py' : 'js';
+    const blob = new Blob([code], { type: language === 'python' ? 'text/x-python' : 'text/javascript' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'script.py';
+    a.download = `script.${ext}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -498,7 +513,42 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       }
   };
 
-  const handleRunCode = async () => {
+  const runJS = () => {
+      setIsExecuting(true);
+      setActiveTabState('output');
+      setOutput([]);
+      
+      const originalLog = console.log;
+      const originalError = console.error;
+
+      // Capture logs
+      console.log = (...args) => {
+          const content = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' ');
+          setOutput(prev => [...prev, { type: 'log', content }]);
+          scrollToBottom();
+      };
+      
+      console.error = (...args) => {
+          const content = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' ');
+          setOutput(prev => [...prev, { type: 'error', content }]);
+          scrollToBottom();
+      };
+
+      try {
+          // Standard JS execution
+          eval(code);
+      } catch (err: any) {
+          setOutput(prev => [...prev, { type: 'error', content: err.message }]);
+      } finally {
+          // Restore
+          console.log = originalLog;
+          console.error = originalError;
+          setIsExecuting(false);
+          scrollToBottom();
+      }
+  };
+
+  const runPython = async () => {
     setIsExecuting(true);
     setActiveTabState('output');
     setOutput([]);
@@ -609,6 +659,11 @@ asyncio.sleep = custom_sleep_async
         scrollToBottom();
     }
   };
+
+  const handleRunCode = () => {
+      if (language === 'python') runPython();
+      else runJS();
+  };
   
   const handleClearOutput = () => {
       setOutput([]);
@@ -632,34 +687,49 @@ asyncio.sleep = custom_sleep_async
         type="file"
         ref={fileInputRef}
         onChange={handleFileUpload}
-        accept=".py,.txt"
+        accept={language === 'python' ? ".py,.txt" : ".js,.txt"}
         className="hidden"
       />
 
-      <div className="flex-shrink-0 mb-4 flex flex-wrap justify-between items-center gap-4">
-        <div>
+      <div className="flex-shrink-0 mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col gap-1">
             <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Code Playground</h2>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">Execute Python code locally in your browser.</p>
+            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit mt-1">
+                <button 
+                    onClick={() => setLanguage('python')}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'python' ? 'bg-pink-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                >
+                    Python
+                </button>
+                <button 
+                    onClick={() => setLanguage('javascript')}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'javascript' ? 'bg-yellow-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                >
+                    JavaScript
+                </button>
+            </div>
         </div>
         <div className="flex items-center flex-wrap justify-end gap-2 sm:gap-4">
-            <button
-                onClick={handleGetHint}
-                disabled={isExecuting || !isPyodideReady || isWaitingForInput || isGettingHint}
-                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-yellow-700 bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700/50 rounded-lg hover:bg-yellow-200/60 dark:hover:bg-yellow-900/50 transition-colors shadow-sm disabled:opacity-50"
-                title="Get an AI Hint"
-            >
-                <LightBulbIcon />
-                <span className="hidden sm:inline">{isGettingHint ? 'Thinking...' : 'AI Hint'}</span>
-            </button>
+            {language === 'python' && (
+                <button
+                    onClick={handleGetHint}
+                    disabled={isExecuting || !isPyodideReady || isWaitingForInput || isGettingHint}
+                    className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-yellow-700 bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700/50 rounded-lg hover:bg-yellow-200/60 dark:hover:bg-yellow-900/50 transition-colors shadow-sm disabled:opacity-50"
+                    title="Get an AI Hint"
+                >
+                    <LightBulbIcon />
+                    <span className="hidden sm:inline">{isGettingHint ? 'Thinking...' : 'AI Hint'}</span>
+                </button>
+            )}
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2 hidden sm:block"></div>
             <button
                 onClick={handleRunCode}
-                disabled={isExecuting || !isPyodideReady || isWaitingForInput || isGettingHint}
+                disabled={isExecuting || (language === 'python' && !isPyodideReady) || isWaitingForInput || isGettingHint}
                 className="relative flex items-center space-x-2 px-5 py-3 font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg shadow-md hover:from-pink-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 aria-label="Run Code"
-                title={!isPyodideReady ? 'Local interpreter is initializing...' : isWaitingForInput ? 'Waiting for input...' : 'Run code'}
+                title={language === 'python' && !isPyodideReady ? 'Local interpreter is initializing...' : isWaitingForInput ? 'Waiting for input...' : 'Run code'}
             >
-                {!isPyodideReady && <div className="absolute -top-1 -right-1 h-3 w-3 flex items-center justify-center"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span></div>}
+                {language === 'python' && !isPyodideReady && <div className="absolute -top-1 -right-1 h-3 w-3 flex items-center justify-center"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span></div>}
                 <PlayIcon />
                 <span>{isExecuting ? (isWaitingForInput ? 'Waiting...' : 'Running...') : 'Run Code'}</span>
             </button>
@@ -706,8 +776,8 @@ asyncio.sleep = custom_sleep_async
             <div className="flex-1 w-full h-full relative">
                 <Editor
                     height="100%"
-                    defaultLanguage="python"
-                    language="python"
+                    defaultLanguage={language}
+                    language={language}
                     theme={editorTheme}
                     value={code}
                     onChange={(value) => setCode(value || '')}
@@ -818,7 +888,7 @@ asyncio.sleep = custom_sleep_async
                        <div className="flex gap-2">
                            <input 
                                 type="text" 
-                                placeholder="filename.py" 
+                                placeholder={`filename.${language === 'python' ? 'py' : 'js'}`} 
                                 value={saveFileName}
                                 onChange={(e) => setSaveFileName(e.target.value)}
                                 className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
