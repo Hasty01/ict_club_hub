@@ -168,8 +168,12 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
 
   useEffect(() => {
       const handleClickOutside = () => setContextMenu(null);
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
+      window.addEventListener('click', handleClickOutside);
+      window.addEventListener('contextmenu', handleClickOutside); // Close if right-click elsewhere
+      return () => {
+          window.removeEventListener('click', handleClickOutside);
+          window.removeEventListener('contextmenu', handleClickOutside);
+      };
   }, []);
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -497,7 +501,10 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
         {contextMenu && onDelete && (
             <div 
                 className="fixed z-[100] bg-white dark:bg-gray-800 shadow-xl rounded-lg py-1 border border-gray-200 dark:border-gray-700 min-w-[160px] animate-fade-in-up"
-                style={{ top: contextMenu.y, left: contextMenu.x }}
+                style={{ 
+                    top: contextMenu.y, 
+                    left: Math.min(contextMenu.x, window.innerWidth - 170) // Ensure it doesn't go off-screen
+                }}
                 onClick={(e) => e.stopPropagation()} 
             >
                 <button 
