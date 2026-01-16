@@ -14,6 +14,8 @@ import { LockClosedIcon } from './icons/LockClosedIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { TrophyIcon } from './icons/TrophyIcon';
 import { PencilIcon } from './icons/PencilIcon';
+// FIX: Added missing SparklesIcon import
+import { SparklesIcon } from './icons/SparklesIcon';
 import ConfirmationModal from './ConfirmationModal';
 import RoadmapQuizModal from './RoadmapQuizModal';
 

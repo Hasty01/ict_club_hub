@@ -17,6 +17,7 @@
     "@capacitor/haptics": "^6.0.0",
     "@capacitor/keyboard": "^6.0.0",
     "@capacitor/status-bar": "^6.0.0",
+    "@google/genai": "^1.37.0",
     "@monaco-editor/react": "^4.6.0",
     "@supabase/supabase-js": "^2.43.4",
     "emoji-picker-react": "^4.9.2",
