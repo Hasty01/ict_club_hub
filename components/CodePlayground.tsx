@@ -503,7 +503,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       setOutput(prev => [...prev, { type: 'log', content: '🤖 AI Tutor is thinking...' }]);
       scrollToBottom();
       try {
-          const hint = await geminiService.getAIPlaygroundHint(code);
+          const hint = await geminiService.getAIPlaygroundHint(code, language);
           setOutput(prev => [...prev.filter(l => l.content !== '🤖 AI Tutor is thinking...'), { type: 'hint', content: hint }]);
       } catch (err: any) {
           setOutput(prev => [...prev.filter(l => l.content !== '🤖 AI Tutor is thinking...'), { type: 'error', content: err.message || 'Failed to get hint.' }]);
@@ -710,17 +710,15 @@ asyncio.sleep = custom_sleep_async
             </div>
         </div>
         <div className="flex items-center flex-wrap justify-end gap-2 sm:gap-4">
-            {language === 'python' && (
-                <button
-                    onClick={handleGetHint}
-                    disabled={isExecuting || !isPyodideReady || isWaitingForInput || isGettingHint}
-                    className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-yellow-700 bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700/50 rounded-lg hover:bg-yellow-200/60 dark:hover:bg-yellow-900/50 transition-colors shadow-sm disabled:opacity-50"
-                    title="Get an AI Hint"
-                >
-                    <LightBulbIcon />
-                    <span className="hidden sm:inline">{isGettingHint ? 'Thinking...' : 'AI Hint'}</span>
-                </button>
-            )}
+            <button
+                onClick={handleGetHint}
+                disabled={isExecuting || (language === 'python' && !isPyodideReady) || isWaitingForInput || isGettingHint}
+                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-yellow-700 bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700/50 rounded-lg hover:bg-yellow-200/60 dark:hover:bg-yellow-900/50 transition-colors shadow-sm disabled:opacity-50"
+                title="Get an AI Hint"
+            >
+                <LightBulbIcon />
+                <span className="hidden sm:inline">{isGettingHint ? 'Thinking...' : 'AI Hint'}</span>
+            </button>
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2 hidden sm:block"></div>
             <button
                 onClick={handleRunCode}

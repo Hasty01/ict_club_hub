@@ -110,6 +110,7 @@ export const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClos
   const [editorTheme, setEditorTheme] = useState('vs-dark');
   
   const [activeCode, setActiveCode] = useState(code);
+  const [language, setLanguage] = useState<'python' | 'javascript'>('python');
   
   const [isWaitingForInput, setIsWaitingForInput] = useState(false);
   const [inputPrompt, setInputPrompt] = useState('');
@@ -120,7 +121,11 @@ export const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClos
 
   useEffect(() => {
     if (isOpen) {
-        if (!pyodideRef.current) {
+        // Basic detection: if it contains 'import ' or 'def ' it's likely python, else check for typical JS patterns
+        const isLikelyPython = /import\s+|def\s+|print\s*\(/.test(code);
+        setLanguage(isLikelyPython ? 'python' : 'javascript');
+
+        if (isLikelyPython && !pyodideRef.current) {
             const loadPyodide = async () => {
                 setIsLoadingPyodide(true);
                 try {
@@ -180,16 +185,18 @@ export const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClos
       completionProvidersRef.current.forEach(provider => provider.dispose());
       completionProvidersRef.current = [];
 
-      completionProvidersRef.current.push(monaco.languages.registerCompletionItemProvider('python', {
-          provideCompletionItems: (model: any, position: any) => {
-              const word = model.getWordUntilPosition(position);
-              const range = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber, startColumn: word.startColumn, endColumn: word.endColumn };
-              return { suggestions: [
-                  ...PYTHON_KEYWORDS.map(k => ({ label: k, kind: monaco.languages.CompletionItemKind.Keyword, insertText: k, range, detail: 'Keyword' })),
-                  ...PYTHON_BUILTINS.map(b => ({ label: b, kind: monaco.languages.CompletionItemKind.Function, insertText: b, range, detail: 'Built-in' })),
-              ]};
-          }
-      }));
+      if (language === 'python') {
+        completionProvidersRef.current.push(monaco.languages.registerCompletionItemProvider('python', {
+            provideCompletionItems: (model: any, position: any) => {
+                const word = model.getWordUntilPosition(position);
+                const range = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber, startColumn: word.startColumn, endColumn: word.endColumn };
+                return { suggestions: [
+                    ...PYTHON_KEYWORDS.map(k => ({ label: k, kind: monaco.languages.CompletionItemKind.Keyword, insertText: k, range, detail: 'Keyword' })),
+                    ...PYTHON_BUILTINS.map(b => ({ label: b, kind: monaco.languages.CompletionItemKind.Function, insertText: b, range, detail: 'Built-in' })),
+                ]};
+            }
+        }));
+      }
   };
 
   const scrollToBottom = () => {
@@ -219,23 +226,41 @@ export const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClos
       }
   };
 
-  const runCode = async () => {
+  const runJS = () => {
+      setIsExecuting(true);
+      setOutput([]);
+      const originalLog = console.log;
+      const originalError = console.error;
+
+      console.log = (...args) => {
+          const content = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' ');
+          setOutput(prev => [...prev, { type: 'log', content }]);
+          scrollToBottom();
+      };
+      
+      console.error = (...args) => {
+          const content = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' ');
+          setOutput(prev => [...prev, { type: 'error', content }]);
+          scrollToBottom();
+      };
+
+      try {
+          eval(activeCode);
+      } catch (err: any) {
+          setOutput(prev => [...prev, { type: 'error', content: err.message }]);
+      } finally {
+          console.log = originalLog;
+          console.error = originalError;
+          setIsExecuting(false);
+          scrollToBottom();
+      }
+  };
+
+  const runPython = async () => {
       if (!pyodideRef.current) return;
       setIsExecuting(true);
       setOutput([]);
       setIsWaitingForInput(false);
-
-      (window as any).runnerAskForInput = (prompt: string) => {
-          return new Promise((resolve) => {
-              setInputPrompt(prompt);
-              setIsWaitingForInput(true);
-              inputResolverRef.current = resolve;
-              setTimeout(() => {
-                  consoleInputRef.current?.focus();
-                  scrollToBottom();
-              }, 50);
-          });
-      };
 
       (window as any).runnerPrint = (text: string, type: 'log' | 'error') => {
         if (typeof text !== 'string') return;
@@ -262,6 +287,18 @@ export const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClos
             return newOutput;
         });
         scrollToBottom();
+      };
+
+      (window as any).runnerAskForInput = (prompt: string) => {
+          return new Promise((resolve) => {
+              setInputPrompt(prompt);
+              setIsWaitingForInput(true);
+              inputResolverRef.current = resolve;
+              setTimeout(() => {
+                  consoleInputRef.current?.focus();
+                  scrollToBottom();
+              }, 50);
+          });
       };
 
       const setupCode = `
@@ -298,9 +335,7 @@ asyncio.sleep = custom_sleep_async
       try {
           await pyodideRef.current.loadPackagesFromImports(activeCode);
           await pyodideRef.current.runPythonAsync(setupCode);
-          
           const asyncCode = wrapAsyncCalls(activeCode, ['input', 'time.sleep', 'asyncio.sleep']);
-          
           const result = await pyodideRef.current.runPythonAsync(asyncCode);
           if (result !== undefined) {
               pyodideRef.current.globals.set('last_result', result);
@@ -319,6 +354,11 @@ asyncio.sleep = custom_sleep_async
       }
   };
 
+  const handleRunCode = () => {
+      if (language === 'python') runPython();
+      else runJS();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -326,10 +366,15 @@ asyncio.sleep = custom_sleep_async
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-5xl w-full h-[80vh] relative border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden animate-fade-in-up">
             <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <span className="bg-gray-200 dark:bg-gray-700 p-1 rounded text-sm font-mono">.py</span>
-                    {title}
-                </h3>
+                <div className="flex items-center gap-3">
+                    <div className="flex bg-gray-200 dark:bg-gray-700 p-1 rounded-lg">
+                        <button onClick={() => setLanguage('python')} className={`px-2 py-0.5 text-xs font-bold rounded ${language === 'python' ? 'bg-pink-500 text-white' : 'text-gray-500'}`}>PY</button>
+                        <button onClick={() => setLanguage('javascript')} className={`px-2 py-0.5 text-xs font-bold rounded ${language === 'javascript' ? 'bg-yellow-500 text-white' : 'text-gray-500'}`}>JS</button>
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                        {title}
+                    </h3>
+                </div>
                 <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-1 transition-colors">
                     <XIcon />
                 </button>
@@ -339,7 +384,7 @@ asyncio.sleep = custom_sleep_async
                 <div className="flex-1 border-r border-gray-200 dark:border-gray-800 overflow-hidden relative">
                     <Editor
                         height="100%"
-                        defaultLanguage="python"
+                        language={language}
                         theme={editorTheme}
                         value={activeCode}
                         onChange={(value) => setActiveCode(value || '')}
@@ -404,11 +449,11 @@ asyncio.sleep = custom_sleep_async
 
             <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex justify-end">
                 <button 
-                    onClick={runCode}
-                    disabled={isExecuting || isLoadingPyodide}
+                    onClick={handleRunCode}
+                    disabled={isExecuting || (language === 'python' && isLoadingPyodide)}
                     className="flex items-center gap-2 px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-pink-500/20 transition-all"
                 >
-                    {isLoadingPyodide ? 'Loading Engine...' : isExecuting ? 'Running...' : (
+                    {language === 'python' && isLoadingPyodide ? 'Loading Engine...' : isExecuting ? 'Running...' : (
                         <>
                             <PlayIcon /> Run Code
                         </>

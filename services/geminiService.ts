@@ -366,18 +366,18 @@ export const gradeProjectSubmission = async (taskDescription: string, code: stri
     }
 };
 
-export const getAIPlaygroundHint = async (code: string): Promise<string> => {
+export const getAIPlaygroundHint = async (code: string, language: string = 'python'): Promise<string> => {
     const prompt = `
-        You are a Python code mentor. Analyze this code and identify ONE specific improvement (logic or pythonic style).
+        You are a ${language === 'python' ? 'Python' : 'JavaScript'} code mentor. Analyze this code and identify ONE specific improvement (logic, readability, or language-specific best practices).
         Student Code:
-        \`\`\`python
+        \`\`\`${language}
         ${code}
         \`\`\`
         
         Provide:
-        1. Short explanation.
-        2. A code snippet inside \`\`\`python ... \`\`\` showing the improvement.
-        Keep it encouraging.
+        1. Short explanation of the improvement.
+        2. A code snippet inside \`\`\`${language} ... \`\`\` showing the improvement.
+        Keep it encouraging and helpful.
     `;
 
     try {
