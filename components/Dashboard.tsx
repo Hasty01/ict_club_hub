@@ -1,8 +1,7 @@
-
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { User, Tab } from '../types';
 import AiTutor from './AiTutor';
-import DailyTipModal from './PythonTipModal';
+import PythonTipModal from './PythonTipModal';
 
 const Feed = lazy(() => import('./Feed'));
 const Activities = lazy(() => import('./Activities'));
@@ -48,14 +47,14 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
 
   useEffect(() => {
       // Check if we have shown the tip today
-      const lastTipDate = localStorage.getItem('last_daily_tip_date');
+      const lastTipDate = localStorage.getItem('last_python_tip_date');
       const today = new Date().toDateString();
 
       if (lastTipDate !== today) {
           // Add a small delay so it doesn't pop up instantly over the UI rendering
           const timer = setTimeout(() => {
               setShowTipModal(true);
-              localStorage.setItem('last_daily_tip_date', today);
+              localStorage.setItem('last_python_tip_date', today);
           }, 1500);
           return () => clearTimeout(timer);
       }
@@ -97,7 +96,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
         <TabPanel active={activeTab === 'challenges'}>
             <Challenges currentUser={currentUser} />
         </TabPanel>
-        {/* FIX: Removed invalid 'bottom_roadmap' comparison as it is not a valid member of the Tab type union. */}
         <TabPanel active={activeTab === 'roadmap'}>
             <RoadmapView currentUser={currentUser} />
         </TabPanel>
@@ -111,8 +109,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
       {/* Floating AI Tutor Widget */}
       <AiTutor currentUser={currentUser} />
 
-      {/* Daily Coding Tip Modal (Python/JS Alternating) */}
-      <DailyTipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} />
+      {/* Daily Python Tip Modal */}
+      <PythonTipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} />
     </div>
   );
 };
