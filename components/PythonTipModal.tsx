@@ -1,18 +1,19 @@
+
 import React, { useEffect, useState } from 'react';
-import { generatePythonTip, PythonTip } from '../services/geminiService';
+import { generateCodingTip, CodingTip } from '../services/geminiService';
 import { LightBulbIcon } from './icons/LightBulbIcon';
 import { XIcon } from './icons/XIcon';
 import { CodeIcon } from './icons/CodeIcon';
 import { CopyIcon } from './icons/CopyIcon';
 import { CheckIcon } from './icons/CheckIcon';
 
-interface PythonTipModalProps {
+interface DailyTipModalProps {
     isOpen: boolean;
     onClose: () => void;
 }
 
-// Regex for Python Syntax Highlighting
-const SYNTAX_REGEX = /("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|#.*$|\b\d+(?:\.\d+)?\b|\b(?:True|False|None|and|or|not|def|class|return|import|from|if|else|elif|for|while|print|try|except|finally|with|as|in|is|lambda|pass|raise|global|nonlocal|assert|del|break|continue|yield|async|await)\b|[\[\]\{\}\(\),:])/gm;
+// Regex for Python/JavaScript Syntax Highlighting
+const SYNTAX_REGEX = /("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|#.*$|\/\/.*$|\/\*[\s\S]*?\*\/|\b\d+(?:\.\d+)?\b|\b(?:True|False|None|and|or|not|def|class|return|import|from|if|else|elif|for|while|print|try|except|finally|with|as|in|is|lambda|pass|raise|global|nonlocal|assert|del|break|continue|yield|async|await|const|let|var|function|export|default|extends|super|this|new|typeof|instanceof|void|delete|of|switch|case|throw|debugger)\b|[\[\]\{\}\(\),:])/gm;
 
 const SyntaxHighlightedText: React.FC<{ text: string }> = ({ text }) => {
     const parts = text.split(SYNTAX_REGEX);
@@ -21,13 +22,13 @@ const SyntaxHighlightedText: React.FC<{ text: string }> = ({ text }) => {
             {parts.map((part, i) => {
                 if (!part) return null;
                 // Comments
-                if (part.startsWith('#')) return <span key={i} className="text-gray-500 italic">{part}</span>;
+                if (part.startsWith('#') || part.startsWith('//') || part.startsWith('/*')) return <span key={i} className="text-gray-500 italic">{part}</span>;
                 // Strings
                 if (part.startsWith('"') || part.startsWith("'")) return <span key={i} className="text-green-400">{part}</span>;
                 // Numbers
                 if (/^\d+(\.\d+)?$/.test(part)) return <span key={i} className="text-blue-400 font-semibold">{part}</span>;
-                // Keywords
-                if (/^(True|False|None|and|or|not|def|class|return|import|from|if|else|elif|for|while|print|try|except|finally|with|as|in|is|lambda|pass|raise|global|nonlocal|assert|del|break|continue|yield|async|await)$/.test(part)) return <span key={i} className="text-purple-400 font-bold">{part}</span>;
+                // Keywords (Python & JS merged)
+                if (/^(True|False|None|and|or|not|def|class|return|import|from|if|else|elif|for|while|print|try|except|finally|with|as|in|is|lambda|pass|raise|global|nonlocal|assert|del|break|continue|yield|async|await|const|let|var|function|export|default|extends|super|this|new|typeof|instanceof|void|delete|of|switch|case|throw|debugger)$/.test(part)) return <span key={i} className="text-purple-400 font-bold">{part}</span>;
                 // Punctuation
                 if (/^[\[\]\{\}\(\),:]$/.test(part)) return <span key={i} className="text-yellow-500">{part}</span>;
                 return <span key={i}>{part}</span>;
@@ -36,15 +37,22 @@ const SyntaxHighlightedText: React.FC<{ text: string }> = ({ text }) => {
     );
 };
 
-const PythonTipModal: React.FC<PythonTipModalProps> = ({ isOpen, onClose }) => {
-    const [tip, setTip] = useState<PythonTip | null>(null);
+const DailyTipModal: React.FC<DailyTipModalProps> = ({ isOpen, onClose }) => {
+    const [tip, setTip] = useState<CodingTip | null>(null);
     const [loading, setLoading] = useState(true);
     const [copied, setCopied] = useState(false);
 
     useEffect(() => {
         if (isOpen && !tip) {
             setLoading(true);
-            generatePythonTip()
+            
+            // Alternating logic based on date
+            // Odd day = Python, Even day = JavaScript
+            const today = new Date();
+            const dateNum = today.getDate();
+            const lang: 'python' | 'javascript' = (dateNum % 2 !== 0) ? 'python' : 'javascript';
+
+            generateCodingTip(lang)
                 .then(data => {
                     setTip(data);
                     setLoading(false);
@@ -66,12 +74,18 @@ const PythonTipModal: React.FC<PythonTipModalProps> = ({ isOpen, onClose }) => {
         }
     };
 
+    const isPython = tip?.language === 'python';
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm z-[80] flex items-center justify-center p-4 animate-fade-in">
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden relative border border-gray-200 dark:border-gray-700 flex flex-col">
                 
-                {/* Header */}
-                <div className="bg-gradient-to-r from-yellow-400 to-orange-500 p-6 flex justify-between items-start text-white">
+                {/* Dynamic Header */}
+                <div className={`p-6 flex justify-between items-start text-white transition-colors duration-500 shadow-lg ${
+                    isPython 
+                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600' 
+                    : 'bg-gradient-to-r from-yellow-400 to-amber-500'
+                }`}>
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm">
@@ -80,7 +94,7 @@ const PythonTipModal: React.FC<PythonTipModalProps> = ({ isOpen, onClose }) => {
                             <span className="text-xs font-bold uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">Daily Knowledge</span>
                         </div>
                         <h2 className="text-2xl font-black tracking-tight text-white drop-shadow-md">
-                            Python Tip 🐍
+                            {isPython ? 'Python Tip 🐍' : 'JavaScript Tip ⚡'}
                         </h2>
                     </div>
                     <button 
@@ -95,8 +109,12 @@ const PythonTipModal: React.FC<PythonTipModalProps> = ({ isOpen, onClose }) => {
                 <div className="p-6 bg-white dark:bg-gray-800">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                            <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 dark:border-gray-700 border-t-yellow-500"></div>
-                            <p className="text-gray-500 dark:text-gray-400 font-medium animate-pulse">Consulting the Python Oracles...</p>
+                            <div className={`animate-spin rounded-full h-10 w-10 border-4 border-gray-200 dark:border-gray-700 ${
+                                isPython ? 'border-t-blue-500' : 'border-t-yellow-500'
+                            }`}></div>
+                            <p className="text-gray-500 dark:text-gray-400 font-medium animate-pulse">
+                                Fetching your {isPython ? 'Python' : 'JavaScript'} wisdom...
+                            </p>
                         </div>
                     ) : tip ? (
                         <div className="space-y-4 animate-fade-in-up">
@@ -133,7 +151,9 @@ const PythonTipModal: React.FC<PythonTipModalProps> = ({ isOpen, onClose }) => {
                 <div className="p-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700 flex justify-end">
                     <button 
                         onClick={onClose}
-                        className="px-6 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+                        className={`px-6 py-2.5 text-white rounded-xl font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all ${
+                            isPython ? 'bg-blue-600 hover:bg-blue-700' : 'bg-amber-600 hover:bg-amber-700'
+                        }`}
                     >
                         Got it!
                     </button>
@@ -143,4 +163,4 @@ const PythonTipModal: React.FC<PythonTipModalProps> = ({ isOpen, onClose }) => {
     );
 };
 
-export default PythonTipModal;
+export default DailyTipModal;
