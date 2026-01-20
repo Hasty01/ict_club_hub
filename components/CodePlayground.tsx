@@ -51,15 +51,45 @@ print(f"Nice to meet you, {name}!")
 import math
 print(f"PI is approximately {math.pi}")`;
 
-const DEFAULT_JS = `// Welcome to the JavaScript Playground!
-console.log("Hello from ICT Club Hub!");
+const DEFAULT_JS = `// 🚀 Welcome to the JavaScript Playground!
 
-const members = ["Alice", "Bob", "Charlie"];
-console.log("Club Members:", members.join(", "));
+// 1. Variables & Template Literals
+const clubName = "ICT Club Hub";
+console.log(\`Hello from \${clubName}!\`);
 
-// You can use modern JS features
-const greet = (name) => \`Happy coding, \${name}!\`;
-console.log(greet("Developer"));`;
+// 2. Objects & Arrays
+const projects = [
+  { name: "Portfolio Website", status: "Completed", difficulty: 3 },
+  { name: "AI Chatbot", status: "In Progress", difficulty: 5 },
+  { name: "Snake Game", status: "Planned", difficulty: 4 }
+];
+
+// 3. Higher-Order Functions (Filter & Map)
+console.log("\\n--- Active & Difficult Projects ---");
+const difficultProjects = projects
+  .filter(p => p.difficulty > 3)
+  .map(p => \`- \${p.name} (\${p.status})\`);
+  
+console.log(difficultProjects.join("\\n"));
+
+// 4. Classes
+class Developer {
+  constructor(name, language) {
+    this.name = name;
+    this.language = language;
+  }
+  
+  code() {
+    return \`\${this.name} is coding in \${this.language}...\`;
+  }
+}
+
+const dev = new Developer("Alex", "JavaScript");
+console.log("\\n" + dev.code());
+
+// 5. Logic
+const isEven = (num) => num % 2 === 0;
+console.log(\`\\nIs 42 even? \${isEven(42)}\`);`;
 
 const PublishModal: React.FC<{ isOpen: boolean, onClose: () => void, onPublish: (title: string, desc: string) => Promise<void> }> = ({ isOpen, onClose, onPublish }) => {
     const [title, setTitle] = useState('');
