@@ -10,6 +10,7 @@ import { GlobeIcon } from './icons/GlobeIcon';
 import { ShareIcon } from './icons/ShareIcon';
 import { TrophyIcon } from './icons/TrophyIcon';
 import { LightBulbIcon } from './icons/LightBulbIcon';
+import { DotsVerticalIcon } from './icons/DotsVerticalIcon';
 import Editor from '@monaco-editor/react';
 import { User, Tab } from '../types';
 import * as api from '../services/apiService';
@@ -116,6 +117,13 @@ const PublishModal: React.FC<{ isOpen: boolean, onClose: () => void, onPublish: 
     );
 };
 
+const MenuItem: React.FC<{ onClick: () => void; icon: React.ReactNode; label: string }> = ({ onClick, icon, label }) => (
+    <button onClick={onClick} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors">
+        <span className="text-gray-500 dark:text-gray-400">{icon}</span>
+        {label}
+    </button>
+);
+
 const PYTHON_KEYWORDS = [
     'False', 'None', 'True', 'and', 'as', 'assert', 'async', 'await', 'break', 
     'class', 'continue', 'def', 'del', 'elif', 'else', 'except', 'finally', 
@@ -203,6 +211,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   const [isPyodideReady, setIsPyodideReady] = useState(false);
   const [activeTab, setActiveTabState] = useState<'editor' | 'output'>('editor');
   const [isGettingHint, setIsGettingHint] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
   const [cloudScripts, setCloudScripts] = useState<ScriptFile[]>([]);
@@ -228,6 +237,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   const consoleInputRef = useRef<HTMLInputElement>(null);
   const outputContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const codeRef = useRef(code);
   const completionProvidersRef = useRef<any[]>([]);
 
@@ -341,9 +351,19 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
         }
     };
     
+    // Close menu on outside click
+    const handleClickOutside = (event: MouseEvent) => {
+        if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+            setIsMenuOpen(false);
+        }
+    };
+
     window.addEventListener('open-in-playground' as any, handleOpenCode);
+    document.addEventListener('mousedown', handleClickOutside);
+    
     return () => {
         window.removeEventListener('open-in-playground' as any, handleOpenCode);
+        document.removeEventListener('mousedown', handleClickOutside);
     };
 
   }, []);
@@ -403,10 +423,12 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    setIsMenuOpen(false);
   };
 
   const triggerFileUpload = () => {
     fileInputRef.current?.click();
+    setIsMenuOpen(false);
   };
 
   const confirmReplace = () => {
@@ -435,6 +457,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   const handleOpenCloudModal = () => {
       setIsCloudModalOpen(true);
       fetchCloudScripts();
+      setIsMenuOpen(false);
   };
 
   const handleCloudSave = async () => {
@@ -679,10 +702,9 @@ asyncio.sleep = custom_sleep_async
   };
 
   const editorTheme = theme === 'dark' ? 'vs-dark' : 'light';
-  const hasContent = output.length > 0 && output[0].content !== 'Click "Run Code" to see the output here.';
-
+  
   return (
-    <div className="flex flex-col h-full relative p-4 sm:p-6">
+    <div className="flex flex-col h-full bg-white dark:bg-gray-900 overflow-hidden relative">
       <input
         type="file"
         ref={fileInputRef}
@@ -691,145 +713,121 @@ asyncio.sleep = custom_sleep_async
         className="hidden"
       />
 
-      <div className="flex-shrink-0 mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex flex-col gap-1">
-            <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Code Playground</h2>
-            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit mt-1">
-                <button 
-                    onClick={() => setLanguage('python')}
-                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'python' ? 'bg-pink-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                >
-                    Python
-                </button>
-                <button 
-                    onClick={() => setLanguage('javascript')}
-                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'javascript' ? 'bg-yellow-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                >
-                    JavaScript
-                </button>
-            </div>
+      {/* Compact Toolbar */}
+      <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
+        <div className="flex items-center gap-3">
+             <div className="flex bg-gray-200 dark:bg-gray-700 p-0.5 rounded-lg">
+                <button onClick={() => setLanguage('python')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'python' ? 'bg-white dark:bg-gray-600 shadow text-pink-600 dark:text-pink-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>PY</button>
+                <button onClick={() => setLanguage('javascript')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'javascript' ? 'bg-white dark:bg-gray-600 shadow text-yellow-600 dark:text-yellow-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>JS</button>
+             </div>
+             <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-1 hidden sm:block"></div>
+             {/* Tabs */}
+             <div className="flex bg-gray-200 dark:bg-gray-700 p-0.5 rounded-lg">
+                <button onClick={() => setActiveTabState('editor')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${activeTab === 'editor' ? 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>Code</button>
+                <button onClick={() => setActiveTabState('output')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${activeTab === 'output' ? 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>Output</button>
+             </div>
         </div>
-        <div className="flex items-center flex-wrap justify-end gap-2 sm:gap-4">
-            <button
-                onClick={handleGetHint}
+
+        <div className="flex items-center gap-2">
+             <button 
+                onClick={handleGetHint} 
                 disabled={isExecuting || (language === 'python' && !isPyodideReady) || isWaitingForInput || isGettingHint}
-                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-yellow-700 bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700/50 rounded-lg hover:bg-yellow-200/60 dark:hover:bg-yellow-900/50 transition-colors shadow-sm disabled:opacity-50"
-                title="Get an AI Hint"
-            >
-                <LightBulbIcon />
-                <span className="hidden sm:inline">{isGettingHint ? 'Thinking...' : 'AI Hint'}</span>
-            </button>
-            <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2 hidden sm:block"></div>
-            <button
-                onClick={handleRunCode}
-                disabled={isExecuting || (language === 'python' && !isPyodideReady) || isWaitingForInput || isGettingHint}
-                className="relative flex items-center space-x-2 px-5 py-3 font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg shadow-md hover:from-pink-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                aria-label="Run Code"
-                title={language === 'python' && !isPyodideReady ? 'Local interpreter is initializing...' : isWaitingForInput ? 'Waiting for input...' : 'Run code'}
-            >
-                {language === 'python' && !isPyodideReady && <div className="absolute -top-1 -right-1 h-3 w-3 flex items-center justify-center"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span></div>}
-                <PlayIcon />
-                <span>{isExecuting ? (isWaitingForInput ? 'Waiting...' : 'Running...') : 'Run Code'}</span>
-            </button>
+                className="p-1.5 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-md transition-colors disabled:opacity-50" 
+                title="AI Hint"
+             >
+                <LightBulbIcon className="w-5 h-5"/>
+             </button>
+             
+             <button 
+                onClick={handleRunCode} 
+                disabled={isExecuting || (language === 'python' && !isPyodideReady) || isWaitingForInput}
+                className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+             >
+                {language === 'python' && !isPyodideReady ? (
+                    <span className="animate-spin h-3 w-3 border-2 border-white/30 border-t-white rounded-full"></span>
+                ) : (
+                    <PlayIcon className="w-3.5 h-3.5"/>
+                )}
+                <span className="hidden sm:inline">{isExecuting ? 'Running...' : 'Run'}</span>
+             </button>
+             
+             {/* Dropdown Trigger */}
+             <div className="relative" ref={menuRef}>
+                <button 
+                    onClick={() => setIsMenuOpen(!isMenuOpen)} 
+                    className={`p-1.5 rounded-md transition-colors ${isMenuOpen ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white' : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-gray-400'}`}
+                >
+                    <DotsVerticalIcon />
+                </button>
+                {isMenuOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 py-1 animate-fade-in-up">
+                        <MenuItem onClick={triggerFileUpload} icon={<UploadIcon className="w-4 h-4"/>} label="Upload" />
+                        <MenuItem onClick={handleDownloadCode} icon={<DownloadIcon className="w-4 h-4"/>} label="Download" />
+                        <MenuItem onClick={handleOpenCloudModal} icon={<CloudIcon className="w-4 h-4"/>} label="Cloud Scripts" />
+                        <div className="h-px bg-gray-100 dark:bg-gray-700 my-1"></div>
+                        <MenuItem onClick={() => { setIsShareModalOpen(true); setIsMenuOpen(false); }} icon={<ShareIcon className="w-4 h-4"/>} label="Share" />
+                        <MenuItem onClick={() => { setIsPublishModalOpen(true); setIsMenuOpen(false); }} icon={<GlobeIcon className="w-4 h-4"/>} label="Publish" />
+                        <MenuItem onClick={() => { setIsSubmitChallengeModalOpen(true); setIsMenuOpen(false); }} icon={<TrophyIcon className="w-4 h-4"/>} label="Submit Challenge" />
+                    </div>
+                )}
+             </div>
         </div>
       </div>
 
-      <div className="flex border-b border-gray-200 dark:border-gray-700">
-        <button
-            onClick={() => setActiveTabState('editor')}
-            className={`flex-1 sm:flex-none text-center px-6 py-3 font-medium text-sm border-b-2 transition-colors focus:outline-none ${activeTab === 'editor' ? 'border-pink-500 text-pink-600 dark:text-pink-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
-        >
-            Code Editor
-        </button>
-        <button
-            onClick={() => setActiveTabState('output')}
-            className={`flex-1 sm:flex-none text-center px-6 py-3 font-medium text-sm border-b-2 transition-colors focus:outline-none flex justify-center items-center gap-2 ${activeTab === 'output' ? 'border-pink-500 text-pink-600 dark:text-pink-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
-        >
-            Output
-            {hasContent && (
-                <span className="flex h-2 w-2 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
-                </span>
-            )}
-        </button>
-      </div>
-
-      <div className="flex-1 bg-white dark:bg-gray-800 shadow-md border-x border-b border-gray-200 dark:border-gray-700 rounded-b-lg relative overflow-hidden">
-        <div 
-            className={`w-full h-full flex flex-col ${activeTab === 'editor' ? '' : 'hidden'}`}
-        >
-            <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
-                <div className="flex gap-4">
-                  <button onClick={triggerFileUpload} className="text-xs font-medium text-gray-500 hover:text-pink-600 flex items-center gap-1"><UploadIcon className="w-4 h-4" /> Upload</button>
-                  <button onClick={handleDownloadCode} className="text-xs font-medium text-gray-500 hover:text-pink-600 flex items-center gap-1"><DownloadIcon /> Download</button>
-                  <button onClick={handleOpenCloudModal} className="text-xs font-medium text-gray-500 hover:text-pink-600 flex items-center gap-1"><CloudIcon className="w-4 h-4" /> Cloud</button>
-                </div>
-                <div className="flex gap-4">
-                   <button onClick={() => setIsShareModalOpen(true)} className="text-xs font-medium text-gray-500 hover:text-pink-600 flex items-center gap-1"><ShareIcon className="w-4 h-4" /> Share</button>
-                   <button onClick={() => setIsPublishModalOpen(true)} className="text-xs font-medium text-gray-500 hover:text-pink-600 flex items-center gap-1"><GlobeIcon className="w-4 h-4" /> Publish</button>
-                   <button onClick={() => setIsSubmitChallengeModalOpen(true)} className="text-xs font-medium text-gray-500 hover:text-pink-600 flex items-center gap-1"><TrophyIcon className="w-4 h-4" /> Submit</button>
-                </div>
-            </div>
-            <div className="flex-1 w-full h-full relative">
-                <Editor
-                    height="100%"
-                    defaultLanguage={language}
-                    language={language}
-                    theme={editorTheme}
-                    value={code}
-                    onChange={(value) => setCode(value || '')}
-                    onMount={handleEditorDidMount}
-                    loading={<div className="text-center p-4">Loading editor...</div>}
-                />
-            </div>
+      {/* Main Area */}
+      <div className="flex-1 relative w-full h-full overflow-hidden">
+        {/* Editor */}
+        <div className={`absolute inset-0 w-full h-full ${activeTab === 'editor' ? 'z-10 opacity-100' : 'z-0 opacity-0 pointer-events-none'}`}>
+             <Editor
+                height="100%"
+                defaultLanguage={language}
+                language={language}
+                theme={editorTheme}
+                value={code}
+                onChange={(value) => setCode(value || '')}
+                onMount={handleEditorDidMount}
+                loading={<div className="flex items-center justify-center h-full text-gray-500">Loading editor...</div>}
+                options={{
+                    padding: { top: 16, bottom: 16 },
+                }}
+            />
         </div>
-
-        <div 
-            className={`w-full h-full flex flex-col ${activeTab === 'output' ? '' : 'hidden'}`}
-        >
-            <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
-                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Console Output</span>
-                <div className="flex gap-2">
-                    <button
-                        onClick={handleCopyOutput}
-                        className="p-1 text-gray-500 hover:text-blue-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors relative group"
-                        title="Copy Output"
-                    >
-                        {copyFeedback && <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs py-1 px-2 rounded shadow-lg animate-fade-in-up">Copied!</span>}
-                        <CopyIcon />
+        
+        {/* Output */}
+        <div className={`absolute inset-0 w-full h-full bg-gray-900 dark:bg-black text-gray-300 font-mono text-sm overflow-hidden flex flex-col ${activeTab === 'output' ? 'z-10 opacity-100' : 'z-0 opacity-0 pointer-events-none'}`}>
+             <div className="flex justify-between items-center p-2 bg-gray-800 dark:bg-gray-900 border-b border-gray-700">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider pl-2">Console</span>
+                <div className="flex gap-1">
+                    <button onClick={handleCopyOutput} className="p-1.5 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors" title="Copy Output">
+                        <CopyIcon className="w-4 h-4" />
                     </button>
-                    <button 
-                        onClick={handleClearOutput}
-                        className="p-1 text-gray-500 hover:text-red-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                        title="Clear Output"
-                    >
-                        <TrashIcon />
+                    <button onClick={handleClearOutput} className="p-1.5 text-gray-400 hover:text-red-400 rounded hover:bg-gray-700 transition-colors" title="Clear Console">
+                        <TrashIcon className="w-4 h-4" />
                     </button>
                 </div>
-            </div>
-            <div 
+             </div>
+             <div 
                 ref={outputContainerRef}
-                className="flex-1 w-full p-4 bg-gray-900 dark:bg-black text-gray-300 font-mono text-sm whitespace-pre-wrap break-words overflow-y-auto custom-scrollbar shadow-inner"
+                className="flex-1 p-4 overflow-y-auto custom-scrollbar break-all"
                 onClick={() => {
                     if (isWaitingForInput && consoleInputRef.current) {
                         consoleInputRef.current.focus();
                     }
                 }}
-            >
+             >
                 {output.length === 0 && !isWaitingForInput ? (
-                    <span className="text-gray-500 italic select-none">No output</span>
+                    <span className="text-gray-600 italic select-none">Run code to see output...</span>
                 ) : (
                     output.map((line, index) => (
-                       <div key={index} className="leading-relaxed">
+                       <div key={index} className="leading-relaxed mb-0.5">
                             {line.type === 'log' ? (
                                 <span className="text-gray-300">{line.content}</span>
                             ) : line.type === 'hint' ? (
-                                <div className="leading-relaxed bg-yellow-900/10 p-3 rounded-lg border border-yellow-800/30 my-2 flex gap-3 font-sans">
-                                    <div className="text-yellow-500 mt-1 flex-shrink-0">
-                                        <LightBulbIcon />
+                                <div className="bg-yellow-900/20 p-3 rounded border-l-2 border-yellow-600 my-2 flex gap-3 font-sans text-gray-200">
+                                    <div className="text-yellow-500 mt-0.5 flex-shrink-0">
+                                        <LightBulbIcon className="w-4 h-4"/>
                                     </div>
-                                    <div className="flex-1">
+                                    <div className="flex-1 text-sm">
                                         <FormattedMessage text={line.content} isUser={false} />
                                     </div>
                                 </div>
@@ -857,7 +855,7 @@ asyncio.sleep = custom_sleep_async
                 )}
                 
                 {isExecuting && !isWaitingForInput && <div className="animate-pulse mt-1 text-green-500">_</div>}
-            </div>
+             </div>
         </div>
       </div>
 
