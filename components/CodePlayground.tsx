@@ -41,89 +41,45 @@ interface ScriptFile {
 
 type Language = 'python' | 'javascript';
 
-const DEFAULT_PYTHON = `import time
-import random
+const DEFAULT_PYTHON = `# 🐍 Simple Python Example
+name = "ICT Club Member"
+print(f"Hello, {name}!")
 
-# 🚀 Welcome to the Python Playground!
+# Lists and Loops
+languages = ["Python", "JavaScript", "HTML", "CSS"]
+print("We learn these languages:")
 
-# 1. Variables & f-strings
-club_name = "ICT Club Hub"
-print(f"Hello from {club_name}!")
+for lang in languages:
+    print(f"- {lang}")
 
-# 2. Lists & Dictionaries
-members = [
-    {"name": "Alice", "role": "Member", "xp": 120},
-    {"name": "Bob", "role": "Patron", "xp": 500},
-    {"name": "Charlie", "role": "Member", "xp": 300}
-]
+# Simple Function
+def add_numbers(a, b):
+    return a + b
 
-# 3. Loops & Conditionals
-print("\\n--- High XP Members ---")
-for m in members:
-    if m["xp"] > 200:
-        print(f"- {m['name']} ({m['role']})")
+result = add_numbers(5, 10)
+print(f"5 + 10 = {result}")`;
 
-# 4. Functions
-def generate_greeting(name):
-    greetings = ["Hello", "Hi", "Greetings", "Welcome"]
-    return f"{random.choice(greetings)}, {name}!"
+const DEFAULT_JS = `// 🚀 Simple JavaScript Example
+const clubName = "ICT Club Naggalama";
+console.log("Welcome to " + clubName);
 
-print(f"\\n{generate_greeting('Future Developer')}")
+// Objects and Arrays
+const member = {
+  name: "Alex",
+  xp: 150,
+  skills: ["Coding", "Design"]
+};
 
-# 5. Classes
-class Robot:
-    def __init__(self, name):
-        self.name = name
-    
-    def beep(self):
-        return f"🤖 {self.name} says: Beep Boop!"
+console.log("Member Info:", member);
 
-my_bot = Robot("ClubBot")
-print("\\n" + my_bot.beep())
+// Array Methods
+const scores = [85, 92, 78, 95];
+const highScores = scores.filter(s => s > 90);
+console.log("High Scores:", highScores);
 
-# 6. Interactive Input (Uncomment to try!)
-# name = input("\\nWhat is your name? ")
-# print(f"Nice to meet you, {name}!")`;
-
-const DEFAULT_JS = `// 🚀 Welcome to the JavaScript Playground!
-
-// 1. Variables & Template Literals
-const clubName = "ICT Club Hub";
-console.log(\`Hello from \${clubName}!\`);
-
-// 2. Objects & Arrays
-const projects = [
-  { name: "Portfolio Website", status: "Completed", difficulty: 3 },
-  { name: "AI Chatbot", status: "In Progress", difficulty: 5 },
-  { name: "Snake Game", status: "Planned", difficulty: 4 }
-];
-
-// 3. Higher-Order Functions (Filter & Map)
-console.log("\\n--- Active & Difficult Projects ---");
-const difficultProjects = projects
-  .filter(p => p.difficulty > 3)
-  .map(p => \`- \${p.name} (\${p.status})\`);
-  
-console.log(difficultProjects.join("\\n"));
-
-// 4. Classes
-class Developer {
-  constructor(name, language) {
-    this.name = name;
-    this.language = language;
-  }
-  
-  code() {
-    return \`\${this.name} is coding in \${this.language}...\`;
-  }
-}
-
-const dev = new Developer("Alex", "JavaScript");
-console.log("\\n" + dev.code());
-
-// 5. Logic
-const isEven = (num) => num % 2 === 0;
-console.log(\`\\nIs 42 even? \${isEven(42)}\`);`;
+// Arrow Functions
+const greet = (user) => \`Happy coding, \${user}!\`;
+console.log(greet(member.name));`;
 
 const PublishModal: React.FC<{ isOpen: boolean, onClose: () => void, onPublish: (title: string, desc: string) => Promise<void> }> = ({ isOpen, onClose, onPublish }) => {
     const [title, setTitle] = useState('');
@@ -310,15 +266,26 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       codeRef.current = code;
   }, [code, language]);
 
-  useEffect(() => {
-    localStorage.setItem('playground_lang', language);
-    const saved = localStorage.getItem(`playground_code_${language}`);
+  const handleLanguageChange = (newLang: Language) => {
+    if (newLang === language) return;
+    
+    const currentCode = code.trim();
+    // Check if current code is one of the defaults
+    const isDefault = currentCode === DEFAULT_PYTHON.trim() || 
+                      currentCode === DEFAULT_JS.trim() || 
+                      currentCode === '';
+
+    setLanguage(newLang);
+    localStorage.setItem('playground_lang', newLang);
+
+    const saved = localStorage.getItem(`playground_code_${newLang}`);
     if (saved) {
         setCode(saved);
-    } else {
-        setCode(language === 'python' ? DEFAULT_PYTHON : DEFAULT_JS);
+    } else if (isDefault) {
+        // If it was default/empty, load the new language's default
+        setCode(newLang === 'python' ? DEFAULT_PYTHON : DEFAULT_JS);
     }
-  }, [language]);
+  };
   
   useEffect(() => {
     return () => {
@@ -781,8 +748,8 @@ asyncio.sleep = custom_sleep_async
       <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
         <div className="flex items-center gap-3">
              <div className="flex bg-gray-200 dark:bg-gray-700 p-0.5 rounded-lg">
-                <button onClick={() => setLanguage('python')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'python' ? 'bg-white dark:bg-gray-600 shadow text-pink-600 dark:text-pink-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>PY</button>
-                <button onClick={() => setLanguage('javascript')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'javascript' ? 'bg-white dark:bg-gray-600 shadow text-yellow-600 dark:text-yellow-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>JS</button>
+                <button onClick={() => handleLanguageChange('python')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'python' ? 'bg-white dark:bg-gray-600 shadow text-pink-600 dark:text-pink-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>PY</button>
+                <button onClick={() => handleLanguageChange('javascript')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'javascript' ? 'bg-white dark:bg-gray-600 shadow text-yellow-600 dark:text-yellow-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>JS</button>
              </div>
              <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-1 hidden sm:block"></div>
              {/* Tabs */}
