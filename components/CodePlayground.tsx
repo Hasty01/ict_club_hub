@@ -42,14 +42,48 @@ interface ScriptFile {
 type Language = 'python' | 'javascript';
 
 const DEFAULT_PYTHON = `import time
+import random
 
-print("Hello from the ICT Club Hub Python Playground!")
+# 🚀 Welcome to the Python Playground!
 
-name = input("What is your name? ").strip()
-print(f"Nice to meet you, {name}!")
+# 1. Variables & f-strings
+club_name = "ICT Club Hub"
+print(f"Hello from {club_name}!")
 
-import math
-print(f"PI is approximately {math.pi}")`;
+# 2. Lists & Dictionaries
+members = [
+    {"name": "Alice", "role": "Member", "xp": 120},
+    {"name": "Bob", "role": "Patron", "xp": 500},
+    {"name": "Charlie", "role": "Member", "xp": 300}
+]
+
+# 3. Loops & Conditionals
+print("\\n--- High XP Members ---")
+for m in members:
+    if m["xp"] > 200:
+        print(f"- {m['name']} ({m['role']})")
+
+# 4. Functions
+def generate_greeting(name):
+    greetings = ["Hello", "Hi", "Greetings", "Welcome"]
+    return f"{random.choice(greetings)}, {name}!"
+
+print(f"\\n{generate_greeting('Future Developer')}")
+
+# 5. Classes
+class Robot:
+    def __init__(self, name):
+        self.name = name
+    
+    def beep(self):
+        return f"🤖 {self.name} says: Beep Boop!"
+
+my_bot = Robot("ClubBot")
+print("\\n" + my_bot.beep())
+
+# 6. Interactive Input (Uncomment to try!)
+# name = input("\\nWhat is your name? ")
+# print(f"Nice to meet you, {name}!")`;
 
 const DEFAULT_JS = `// 🚀 Welcome to the JavaScript Playground!
 
