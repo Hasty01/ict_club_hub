@@ -2,7 +2,7 @@
 // Service Worker: sw.js (Auth-safe, React-optimized)
 // ============================
 
-const CACHE_VERSION = "v16";
+const CACHE_VERSION = "v17";
 const APP_CACHE = `ict-app-${CACHE_VERSION}`;
 const DATA_CACHE = `ict-data-${CACHE_VERSION}`;
 const FONT_CACHE = `ict-fonts-${CACHE_VERSION}`;
@@ -55,7 +55,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
 
   // Ignore non-http & non-GET
-  if (!url.protocol.startsWith("http") || req.method !== "GET") return;
+  if (url.protocol === "chrome-extension:" || !url.protocol.startsWith("http") || req.method !== "GET") return;
 
   // ----------------------------
   // 🚨 SUPABASE AUTH — NEVER CACHE

@@ -94,6 +94,10 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
   const [isQuickCreating, setIsQuickCreating] = useState(false);
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
 
+  const memberUsers = useMemo(() => 
+    allUsers.filter(user => user.role === 'MEMBER' && user.status === 'APPROVED'),
+  [allUsers]);
+
   // Animation Refs
   const formRef = useScrollAnimation();
   const logRef = useScrollAnimation(100);
@@ -127,10 +131,6 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
     activities.filter(activity => 
       !attendanceRecords.some(record => record.activityId === activity.id)
     ), [activities, attendanceRecords]);
-
-  const memberUsers = useMemo(() => 
-    allUsers.filter(user => user.role === 'MEMBER' && user.status === 'APPROVED'),
-  [allUsers]);
 
   const attendanceSummary = useMemo(() => attendanceRecords.reduce(
     (acc, record) => {
