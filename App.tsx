@@ -23,6 +23,7 @@ import OfflineIndicator from './components/OfflineIndicator';
 
 type View = 'welcome' | 'login' | 'signup' | 'dashboard' | 'patronLogin' | 'patronSignUp';
 type Theme = 'light' | 'dark';
+const CACHED_USER_KEY = 'cached_user_profile';
 
 // Helper component to render toasts inside the provider context
 const ToastRenderer = () => {
@@ -106,15 +107,49 @@ const App: React.FC = () => {
     };
   }, []);
 
+  const loadCachedUser = () => {
+      if (typeof window === 'undefined') return null;
+      try {
+          const raw = localStorage.getItem(CACHED_USER_KEY);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw) as User;
+          if (parsed?.status !== 'APPROVED') return null;
+          return parsed;
+      } catch {
+          return null;
+      }
+  };
+
+  const cacheUserProfile = (profile: User | null) => {
+      if (typeof window === 'undefined') return;
+      if (!profile) {
+          localStorage.removeItem(CACHED_USER_KEY);
+          return;
+      }
+      localStorage.setItem(CACHED_USER_KEY, JSON.stringify(profile));
+  };
+
   // Centralized session handler to avoid code duplication
   const processUserSession = async (userId: string) => {
       try {
+          if (typeof window !== 'undefined' && !navigator.onLine) {
+              const cached = loadCachedUser();
+              if (cached && cached.uid === userId) {
+                  setUser(cached);
+                  setView('dashboard');
+                  return;
+              }
+              setUser(null);
+              setView('welcome');
+              return;
+          }
           const userProfile = await api.getUserProfile(userId);
           
           if (userProfile) {
               if (userProfile.status === 'APPROVED') {
                   setUser(userProfile);
                   setView('dashboard');
+                  cacheUserProfile(userProfile);
                   
                   // Check if user has seen the feature tour
                   const hasSeenTour = localStorage.getItem(`has_seen_tour_${userProfile.uid}`);
@@ -135,22 +170,26 @@ const App: React.FC = () => {
                   await api.logout();
                   setUser(null);
                   setView('welcome');
+                  cacheUserProfile(null);
               } else {
                  // Unknown status or other issue
                  await api.logout();
                  setUser(null);
                  setView('welcome');
+                 cacheUserProfile(null);
               }
           } else {
               // No profile found for this user
               await api.logout();
               setUser(null);
               setView('welcome');
+              cacheUserProfile(null);
           }
       } catch (error) {
           console.error("Error processing session:", error);
           setUser(null);
           setView('welcome');
+          cacheUserProfile(null);
       }
   };
 
@@ -159,6 +198,18 @@ const App: React.FC = () => {
 
     const initAuth = async () => {
         try {
+            // If offline, fall back to cached profile to allow offline usage.
+            if (typeof window !== 'undefined' && !navigator.onLine) {
+                const cached = loadCachedUser();
+                if (cached) {
+                    setUser(cached);
+                    setView('dashboard');
+                } else {
+                    setUser(null);
+                    setView('welcome');
+                }
+                return;
+            }
             // 1. Get initial session
             const { data: { session } } = await supabase.auth.getSession();
             
@@ -167,6 +218,7 @@ const App: React.FC = () => {
             } else {
                 setUser(null);
                 setView('welcome');
+                cacheUserProfile(null);
             }
         } catch (error) {
             console.error("Auth init failed:", error);
@@ -201,6 +253,7 @@ const App: React.FC = () => {
         } else if (event === 'SIGNED_OUT') {
             setUser(null);
             setView('welcome');
+            cacheUserProfile(null);
         }
     });
 
@@ -226,6 +279,7 @@ const App: React.FC = () => {
         setUser(null);
         setView('welcome');
         setActiveTab('feed');
+        cacheUserProfile(null);
     }
   }, []);
 
