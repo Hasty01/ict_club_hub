@@ -425,27 +425,39 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
                 </div>
               </div>
               <div className="max-h-96 overflow-y-auto custom-scrollbar divide-y divide-gray-100 dark:divide-gray-700">
-                {filteredMembers.map(user => (
-                  <label key={user.uid} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`}
-                        alt={user.name}
-                        className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700 object-cover"
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{user.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">@{user.username}</p>
+                {filteredMembers.map(user => {
+                  const isPresent = attendanceChecklist[user.uid] || false;
+                  return (
+                    <label key={user.uid} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`}
+                          alt={user.name}
+                          className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700 object-cover"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{user.name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">@{user.username}</p>
+                        </div>
                       </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={attendanceChecklist[user.uid] || false}
-                      onChange={() => handleToggleChecklist(user.uid)}
-                      className="h-4 w-4 text-pink-600 border-gray-300 dark:border-gray-600 rounded focus:ring-pink-500"
-                    />
-                  </label>
-                ))}
+                      <div className="flex items-center gap-3">
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${isPresent ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}`}>
+                          {isPresent ? 'Present' : 'Absent'}
+                        </span>
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={isPresent}
+                            onChange={() => handleToggleChecklist(user.uid)}
+                            className="peer sr-only"
+                          />
+                          <div className="h-5 w-10 rounded-full bg-gray-200 dark:bg-gray-700 transition-colors peer-checked:bg-emerald-500"></div>
+                          <div className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"></div>
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
                 {filteredMembers.length === 0 && (
                   <p className="text-center text-gray-500 dark:text-gray-400 py-6">No members found.</p>
                 )}
