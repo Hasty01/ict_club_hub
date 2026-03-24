@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { FeedItem, User, FeedItemType } from '../types';
 import * as api from '../services/apiService';
 import AddAnnouncement from './AddAnnouncement';
@@ -16,6 +16,37 @@ interface FeedProps {
 }
 
 type FilterCategory = 'ALL' | 'NEWS' | 'EVENTS' | 'DISCUSSIONS' | 'POLLS' | 'BOOKMARKED';
+
+const TimelineItem: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          element.classList.add('is-active');
+        } else {
+          element.classList.remove('is-active');
+        }
+      },
+      { threshold: 0.25 }
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="relative timeline-item">
+      <div className="hidden md:block timeline-line" />
+      <div className="hidden md:block timeline-dot" />
+      {children}
+    </div>
+  );
+};
 
 const Feed: React.FC<FeedProps> = ({ currentUser }) => {
   const { 
@@ -393,17 +424,14 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
                         </div>
                     ) : (
                         filteredItems.map((item, index) => (
-                        <div
-                            key={item.id}
-                            className="relative"
-                        >
+                        <TimelineItem key={item.id}>
                             <FeedItemCard 
                                 item={item} 
                                 currentUser={currentUser} 
                                 onDelete={setItemToDelete}
                                 staggerDelay={index * 50}
                             />
-                        </div>
+                        </TimelineItem>
                         ))
                     )}
                 </div>

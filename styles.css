@@ -116,6 +116,10 @@
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-4px); }
   }
+  @keyframes timeline-glow {
+    0%, 100% { box-shadow: 0 0 8px rgba(236, 72, 153, 0.35); }
+    50% { box-shadow: 0 0 18px rgba(236, 72, 153, 0.75); }
+  }
 
   .animate-fade-in {
     animation: fade-in 0.2s ease-out;
@@ -179,5 +183,44 @@
     background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3), transparent);
     animation: shine 3s infinite;
     pointer-events: none;
+  }
+
+  .timeline-item {
+    --timeline-x: -24px;
+  }
+  .timeline-line {
+    position: absolute;
+    left: var(--timeline-x);
+    top: -28px;
+    bottom: -28px;
+    width: 2px;
+    background: linear-gradient(to bottom, transparent, rgba(236, 72, 153, 0.35), transparent);
+    opacity: 0.35;
+    transition: opacity 0.3s ease, box-shadow 0.3s ease;
+    pointer-events: none;
+  }
+  .timeline-dot {
+    position: absolute;
+    left: calc(var(--timeline-x) - 5px);
+    top: 28px;
+    width: 12px;
+    height: 12px;
+    border-radius: 9999px;
+    background: rgba(236, 72, 153, 0.9);
+    box-shadow: 0 0 6px rgba(236, 72, 153, 0.35);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+  }
+  .dark .timeline-dot {
+    border-color: rgba(15, 23, 42, 0.8);
+  }
+  .timeline-item.is-active .timeline-dot {
+    animation: timeline-glow 1.6s ease-in-out infinite;
+    transform: scale(1.05);
+  }
+  .timeline-item.is-active .timeline-line {
+    opacity: 0.8;
+    box-shadow: 0 0 12px rgba(236, 72, 153, 0.35);
   }
 }
