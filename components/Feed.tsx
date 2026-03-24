@@ -225,7 +225,7 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
 
       const updateTop = () => {
           const rect = header.getBoundingClientRect();
-          const next = Math.max(0, Math.round(rect.bottom + 12));
+          const next = Math.max(0, Math.round(rect.bottom + 20));
           setPanelTop(next);
       };
 
