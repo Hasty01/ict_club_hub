@@ -40,8 +40,10 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
   const [isMobileComposeOpen, setIsMobileComposeOpen] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
   const scrollRootRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
   const timelineRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const rafRef = useRef<number | null>(null);
+  const [panelTop, setPanelTop] = useState(96);
 
   // Update bookmarked IDs on mount and when changed
   useEffect(() => {
@@ -218,6 +220,29 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
   };
 
   useEffect(() => {
+      const header = headerRef.current;
+      if (!header) return;
+
+      const updateTop = () => {
+          const rect = header.getBoundingClientRect();
+          const next = Math.max(0, Math.round(rect.bottom + 12));
+          setPanelTop(next);
+      };
+
+      updateTop();
+      let observer: ResizeObserver | null = null;
+      if (typeof ResizeObserver !== 'undefined') {
+          observer = new ResizeObserver(updateTop);
+          observer.observe(header);
+      }
+      window.addEventListener('resize', updateTop);
+      return () => {
+          observer?.disconnect();
+          window.removeEventListener('resize', updateTop);
+      };
+  }, []);
+
+  useEffect(() => {
       const root = scrollRootRef.current;
       if (!root) return;
 
@@ -312,7 +337,7 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
 
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8">
         {/* Sticky Header with Search & Filter */}
-        <header className="sticky top-0 z-30 pt-0 pb-3 bg-gray-100/90 dark:bg-gray-900/90 backdrop-blur-md">
+        <header ref={headerRef} className="sticky top-0 z-30 pt-0 pb-3 bg-gray-100/90 dark:bg-gray-900/90 backdrop-blur-md">
             <div className="mx-auto w-full">
                 <div className="flex items-center justify-between mb-4">
                     <div>
@@ -370,55 +395,133 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
             </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,280px)_minmax(0,1fr)_minmax(220px,280px)] gap-6 mt-0 items-start">
-            {/* Left Panel: Recent Activities */}
-            <aside className="hidden lg:block">
-                <div className="sticky top-24 space-y-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300">Recent Activity</h3>
-                            <span className="text-xs text-gray-400">{recentInteractions.length}</span>
-                        </div>
-                        {isLoadingActivityFeed ? (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Loading activity...</p>
-                        ) : recentInteractions.length === 0 ? (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">No activity yet.</p>
-                        ) : (
-                            <ul className="space-y-3">
-                                {recentInteractions.map(activity => (
-                                    <li key={activity.id} className="flex items-start gap-3">
-                                        <div className="relative mt-0.5">
-                                            <img
-                                                src={activity.userAvatarUrl || `https://i.pravatar.cc/40?u=${activity.userName}`}
-                                                alt={activity.userName}
-                                                className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700 object-cover"
-                                            />
-                                            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-pink-500 border-2 border-white dark:border-gray-800"></span>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                                                {activity.userName}
-                                            </p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                {activity.action}
-                                            </p>
-                                            <p className="text-xs text-gray-400 dark:text-gray-500 line-clamp-1">
-                                                {activity.meta}
-                                            </p>
-                                            <p className="text-[11px] text-gray-400 dark:text-gray-500">
-                                                {formatInteractionTime(activity.time)}
-                                            </p>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
+        <div className="relative mt-0 feed-layout">
+            {/* Left Panel: Recent Activity */}
+            <aside
+                className="hidden lg:block fixed w-64 space-y-4"
+                style={{ top: panelTop, left: 'var(--feed-panel-left)' }}
+            >
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300">Recent Activity</h3>
+                        <span className="text-xs text-gray-400">{recentInteractions.length}</span>
                     </div>
+                    {isLoadingActivityFeed ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Loading activity...</p>
+                    ) : recentInteractions.length === 0 ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No activity yet.</p>
+                    ) : (
+                        <ul className="space-y-3">
+                            {recentInteractions.map(activity => (
+                                <li key={activity.id} className="flex items-start gap-3">
+                                    <div className="relative mt-0.5">
+                                        <img
+                                            src={activity.userAvatarUrl || `https://i.pravatar.cc/40?u=${activity.userName}`}
+                                            alt={activity.userName}
+                                            className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700 object-cover"
+                                        />
+                                        <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-pink-500 border-2 border-white dark:border-gray-800"></span>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                                            {activity.userName}
+                                        </p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            {activity.action}
+                                        </p>
+                                        <p className="text-xs text-gray-400 dark:text-gray-500 line-clamp-1">
+                                            {activity.meta}
+                                        </p>
+                                        <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                                            {formatInteractionTime(activity.time)}
+                                        </p>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </aside>
+
+            {/* Right Panel: Online Users */}
+            <aside
+                className="hidden lg:block fixed w-64 space-y-4"
+                style={{ top: panelTop, right: 'var(--feed-panel-right)' }}
+            >
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300">Online Now</h3>
+                        <span className="text-xs font-semibold text-emerald-500">{onlineUserList.length}</span>
+                    </div>
+                    {isLoadingUsers ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Loading users...</p>
+                    ) : onlineUserList.length === 0 ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No users online.</p>
+                    ) : (
+                        <ul className="space-y-3">
+                            {onlineUserList.slice(0, 6).map(user => (
+                                <li key={user.uid} className="flex items-center gap-3">
+                                    <div className="relative">
+                                        <img
+                                            src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`}
+                                            alt={user.name}
+                                            className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700 object-cover"
+                                        />
+                                        <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 border-2 border-white dark:border-gray-800"></span>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{user.name}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{user.username}</p>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    {onlineUserList.length > 6 && (
+                        <p className="text-xs text-gray-400 mt-3">+{onlineUserList.length - 6} more online</p>
+                    )}
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300">Challenges Leaderboard</h3>
+                        <span className="text-xs text-gray-400">Top 5</span>
+                    </div>
+                    {isLoadingUsers ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Loading leaderboard...</p>
+                    ) : challengeLeaders.length === 0 ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No leaderboard data yet.</p>
+                    ) : (
+                        <ul className="space-y-3">
+                            {challengeLeaders.map((user, index) => (
+                                <li key={user.uid} className="flex items-center gap-3">
+                                    <div className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                                        {index + 1}
+                                    </div>
+                                    <img
+                                        src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`}
+                                        alt={user.name}
+                                        className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700 object-cover"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{user.name}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{user.username}</p>
+                                    </div>
+                                    <span className="text-xs font-semibold px-2 py-1 rounded-full bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-200">
+                                        {user.badgeCount} wins
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
             </aside>
 
             {/* Center Column: Feed */}
-            <div className="min-w-0">
+            <div
+                className="min-w-0"
+                style={{ paddingLeft: 'var(--feed-side-offset)', paddingRight: 'var(--feed-side-offset-right)' }}
+            >
                 {/* Desktop Composer */}
                 {/* Admin Composer (Hidden by default, revealed by + button) */}
                 {currentUser.role === 'PATRON' && isMobileComposeOpen && (
@@ -479,79 +582,6 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
                     isDangerous
                 />
             </div>
-
-            {/* Right Panel: Online Users */}
-            <aside className="hidden lg:block">
-                <div className="sticky top-24 space-y-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300">Online Now</h3>
-                            <span className="text-xs font-semibold text-emerald-500">{onlineUserList.length}</span>
-                        </div>
-                        {isLoadingUsers ? (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Loading users...</p>
-                        ) : onlineUserList.length === 0 ? (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">No users online.</p>
-                        ) : (
-                            <ul className="space-y-3">
-                                {onlineUserList.slice(0, 6).map(user => (
-                                    <li key={user.uid} className="flex items-center gap-3">
-                                        <div className="relative">
-                                            <img
-                                                src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`}
-                                                alt={user.name}
-                                                className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700 object-cover"
-                                            />
-                                            <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 border-2 border-white dark:border-gray-800"></span>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{user.name}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{user.username}</p>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                        {onlineUserList.length > 6 && (
-                            <p className="text-xs text-gray-400 mt-3">+{onlineUserList.length - 6} more online</p>
-                        )}
-                    </div>
-
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300">Challenges Leaderboard</h3>
-                            <span className="text-xs text-gray-400">Top 5</span>
-                        </div>
-                        {isLoadingUsers ? (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Loading leaderboard...</p>
-                        ) : challengeLeaders.length === 0 ? (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">No leaderboard data yet.</p>
-                        ) : (
-                            <ul className="space-y-3">
-                                {challengeLeaders.map((user, index) => (
-                                    <li key={user.uid} className="flex items-center gap-3">
-                                        <div className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-                                            {index + 1}
-                                        </div>
-                                        <img
-                                            src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`}
-                                            alt={user.name}
-                                            className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700 object-cover"
-                                        />
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{user.name}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{user.username}</p>
-                                        </div>
-                                        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-200">
-                                            {user.badgeCount} wins
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                </div>
-            </aside>
         </div>
       </div>
     </div>

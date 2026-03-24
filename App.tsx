@@ -84,6 +84,11 @@ const App: React.FC = () => {
     localStorage.setItem('app_theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.style.setProperty('--sidebar-width', isSidebarCollapsed ? '5.5rem' : '18rem');
+  }, [isSidebarCollapsed]);
+
   // Listen for Font Changes
   useEffect(() => {
       const handleFontChange = (e: CustomEvent) => {
@@ -398,7 +403,7 @@ const App: React.FC = () => {
               </header>
 
               {/* Conditionally apply padding and overflow for chat/playground to allow full height */}
-              <main className={`flex-1 h-full w-full ${(activeTab === 'chat' || activeTab === 'playground') ? 'overflow-hidden' : 'p-4 sm:p-6 lg:p-8 overflow-y-auto scroll-smooth custom-scrollbar'}`}>
+              <main className={`flex-1 h-full w-full ${(activeTab === 'chat' || activeTab === 'playground') ? 'overflow-hidden' : `${activeTab === 'feed' ? 'pt-0 px-4 sm:px-6 lg:px-8 pb-6' : 'p-4 sm:p-6 lg:p-8'} overflow-y-auto scroll-smooth custom-scrollbar`}`}>
                 <Dashboard
                   activeTab={activeTab}
                   setActiveTab={handleTabChange}

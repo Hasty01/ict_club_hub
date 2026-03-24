@@ -181,6 +181,22 @@
     pointer-events: none;
   }
 
+  .feed-layout {
+    --feed-panel-left: 1.5rem;
+    --feed-panel-right: 1.5rem;
+    --feed-side-offset: 0px;
+    --feed-side-offset-right: 0px;
+  }
+
+  @media (min-width: 1024px) {
+    .feed-layout {
+      --feed-panel-left: calc(var(--sidebar-width, 5.5rem) + 1.5rem);
+      --feed-panel-right: 1.5rem;
+      --feed-side-offset: calc(var(--sidebar-width, 5.5rem) + 16rem + 3.5rem);
+      --feed-side-offset-right: calc(16rem + 2rem);
+    }
+  }
+
   .timeline-item {
     --timeline-x: -24px;
     --timeline-glow: 0;
