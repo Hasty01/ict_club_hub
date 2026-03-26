@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { PlayIcon } from './icons/PlayIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { UploadIcon } from './icons/UploadIcon';
@@ -11,8 +11,13 @@ import { ShareIcon } from './icons/ShareIcon';
 import { TrophyIcon } from './icons/TrophyIcon';
 import { LightBulbIcon } from './icons/LightBulbIcon';
 import { DotsVerticalIcon } from './icons/DotsVerticalIcon';
+import { DocumentTextIcon } from './icons/DocumentTextIcon';
+import { ViewGridIcon } from './icons/ViewGridIcon';
+import { UsersIcon } from './icons/UsersIcon';
+import { RefreshIcon } from './icons/RefreshIcon';
+import { PencilIcon } from './icons/PencilIcon';
 import Editor from '@monaco-editor/react';
-import { User, Tab } from '../types';
+import { User, Tab, PlaygroundProject, PlaygroundProjectFile, PlaygroundProjectActivity } from '../types';
 import * as api from '../services/apiService';
 import * as geminiService from '../services/geminiService';
 import ConfirmationModal from './ConfirmationModal';
@@ -20,6 +25,7 @@ import ShareCodeModal from './ShareCodeModal';
 import SubmitToChallengeModal from './SubmitToChallengeModal';
 import { useData } from '../DataContext';
 import { FormattedMessage } from './FormattedMessage';
+import { supabase } from '../services/supabaseClient';
 
 interface CodePlaygroundProps {
     theme: 'light' | 'dark';
@@ -39,7 +45,7 @@ interface ScriptFile {
     size: number;
 }
 
-type Language = 'python' | 'javascript';
+type Language = 'python' | 'javascript' | 'html';
 
 const DEFAULT_PYTHON = `#  A Python Example
 name = "ICT Club Member"
@@ -80,6 +86,28 @@ console.log("High Scores:", highScores);
 // Arrow Functions
 const greet = (user) => \`Happy coding, \${user}!\`;
 console.log(greet(member.name));`;
+
+const DEFAULT_HTML = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClubHub Preview</title>
+    <style>
+      body { font-family: system-ui, sans-serif; padding: 24px; background: #0f172a; color: #f8fafc; }
+      .card { background: #1e293b; padding: 20px; border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); }
+      h1 { margin: 0 0 12px; }
+      button { background: #ec4899; color: white; border: 0; padding: 10px 14px; border-radius: 10px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Hello from ClubHub</h1>
+      <p>Edit this HTML and click Preview.</p>
+      <button onclick="alert('Keep building!')">Click me</button>
+    </div>
+  </body>
+</html>`;
 
 const PublishModal: React.FC<{ isOpen: boolean, onClose: () => void, onPublish: (title: string, desc: string) => Promise<void> }> = ({ isOpen, onClose, onPublish }) => {
     const [title, setTitle] = useState('');
@@ -214,7 +242,7 @@ const processCarriageReturns = (text: string) => {
 };
 
 const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, setActiveTab }) => {
-  const { fetchShowcaseItems, showToast } = useData();
+  const { fetchShowcaseItems, showToast, teams } = useData();
   const [language, setLanguage] = useState<Language>(() => {
       return (localStorage.getItem('playground_lang') as Language) || 'python';
   });
@@ -222,8 +250,27 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   const [code, setCode] = useState<string>(() => {
       const saved = localStorage.getItem(`playground_code_${language}`);
       if (saved) return saved;
-      return language === 'python' ? DEFAULT_PYTHON : DEFAULT_JS;
+      if (language === 'python') return DEFAULT_PYTHON;
+      if (language === 'javascript') return DEFAULT_JS;
+      return DEFAULT_HTML;
   });
+
+  const [projects, setProjects] = useState<PlaygroundProject[]>([]);
+  const [projectFiles, setProjectFiles] = useState<PlaygroundProjectFile[]>([]);
+  const [projectActivity, setProjectActivity] = useState<PlaygroundProjectActivity[]>([]);
+  const [activeProject, setActiveProject] = useState<PlaygroundProject | null>(null);
+  const [activeFile, setActiveFile] = useState<PlaygroundProjectFile | null>(null);
+  const [fileContents, setFileContents] = useState<Record<string, string>>({});
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false);
+  const [isProjectPanelOpen, setIsProjectPanelOpen] = useState(false);
+  const [newProject, setNewProject] = useState({ name: '', language: 'python' as Language, teamId: '' });
+  const [newFileName, setNewFileName] = useState('');
+  const [projectToDelete, setProjectToDelete] = useState<PlaygroundProject | null>(null);
+  const [renamingFile, setRenamingFile] = useState<PlaygroundProjectFile | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [activityFilter, setActivityFilter] = useState<'all' | 'me' | 'team'>('all');
   
   const [output, setOutput] = useState<OutputLine[]>([{ type: 'log', content: 'Click "Run Code" to see the output here.' }]);
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
@@ -259,20 +306,35 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const codeRef = useRef(code);
+  const activeFileRef = useRef<PlaygroundProjectFile | null>(null);
   const completionProvidersRef = useRef<any[]>([]);
+  const collabChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const broadcastTimerRef = useRef<number | null>(null);
+  const lastRemoteUpdateRef = useRef<Record<string, number>>({});
+  const isProjectMode = !!activeProject;
 
   useEffect(() => {
-      localStorage.setItem(`playground_code_${language}`, code);
+      if (!activeProject) {
+          localStorage.setItem(`playground_code_${language}`, code);
+      }
       codeRef.current = code;
-  }, [code, language]);
+      if (activeProject && activeFile) {
+          setFileContents(prev => ({ ...prev, [activeFile.path]: code }));
+      }
+  }, [code, language, activeProject, activeFile]);
 
   const handleLanguageChange = (newLang: Language) => {
+    if (activeProject) {
+        showToast("Project language is locked. Exit the project to switch.", "info");
+        return;
+    }
     if (newLang === language) return;
     
     const currentCode = code.trim();
     // Check if current code is one of the defaults
     const isDefault = currentCode === DEFAULT_PYTHON.trim() || 
                       currentCode === DEFAULT_JS.trim() || 
+                      currentCode === DEFAULT_HTML.trim() ||
                       currentCode === '';
 
     setLanguage(newLang);
@@ -283,7 +345,9 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
         setCode(saved);
     } else if (isDefault) {
         // If it was default/empty, load the new language's default
-        setCode(newLang === 'python' ? DEFAULT_PYTHON : DEFAULT_JS);
+        if (newLang === 'python') setCode(DEFAULT_PYTHON);
+        else if (newLang === 'javascript') setCode(DEFAULT_JS);
+        else setCode(DEFAULT_HTML);
     }
   };
   
@@ -293,6 +357,91 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
         completionProvidersRef.current = [];
     };
   }, []);
+
+  useEffect(() => {
+      loadProjects();
+  }, []);
+
+  useEffect(() => {
+      if (!activeProject) {
+          setProjectFiles([]);
+          setActiveFile(null);
+          const saved = localStorage.getItem(`playground_code_${language}`);
+          if (saved) {
+              setCode(saved);
+          } else {
+              if (language === 'python') setCode(DEFAULT_PYTHON);
+              else if (language === 'javascript') setCode(DEFAULT_JS);
+              else setCode(DEFAULT_HTML);
+          }
+      }
+  }, [activeProject]);
+
+  useEffect(() => {
+      activeFileRef.current = activeFile;
+  }, [activeFile]);
+
+  useEffect(() => {
+      if (!activeProject) {
+          if (collabChannelRef.current) {
+              supabase.removeChannel(collabChannelRef.current);
+              collabChannelRef.current = null;
+          }
+          return;
+      }
+
+      const channel = supabase.channel(`playground-project:${activeProject.id}`, {
+          config: { broadcast: { ack: false } }
+      });
+
+      channel.on('broadcast', { event: 'file_update' }, ({ payload }) => {
+          if (!payload || payload.userId === currentUser.uid) return;
+          const path = payload.path as string;
+          const content = payload.content as string;
+          lastRemoteUpdateRef.current[path] = Date.now();
+          setFileContents(prev => ({ ...prev, [path]: content }));
+          if (activeFileRef.current?.path === path) {
+              setCode(content);
+          }
+      });
+
+      channel.subscribe();
+      collabChannelRef.current = channel;
+
+      return () => {
+          supabase.removeChannel(channel);
+          collabChannelRef.current = null;
+      };
+  }, [activeProject?.id, currentUser.uid]);
+
+  useEffect(() => {
+      if (!isProjectMode || !activeProject || !activeFile || !collabChannelRef.current) return;
+      const lastRemote = lastRemoteUpdateRef.current[activeFile.path] || 0;
+      if (Date.now() - lastRemote < 400) return;
+
+      if (broadcastTimerRef.current) {
+          clearTimeout(broadcastTimerRef.current);
+      }
+      broadcastTimerRef.current = window.setTimeout(() => {
+          collabChannelRef.current?.send({
+              type: 'broadcast',
+              event: 'file_update',
+              payload: {
+                  projectId: activeProject.id,
+                  path: activeFile.path,
+                  content: codeRef.current,
+                  userId: currentUser.uid,
+                  updatedAt: new Date().toISOString()
+              }
+          });
+      }, 700);
+
+      return () => {
+          if (broadcastTimerRef.current) {
+              clearTimeout(broadcastTimerRef.current);
+          }
+      };
+  }, [code, activeFile?.path, activeProject?.id, isProjectMode, currentUser.uid]);
 
   const handleEditorDidMount = (editor: any, monaco: any) => {
       editor.updateOptions({
@@ -338,8 +487,299 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       completionProvidersRef.current.push(monaco.languages.registerCompletionItemProvider(language, staticProvider));
   };
 
+  const loadProjects = async () => {
+      setIsLoadingProjects(true);
+      try {
+          const data = await api.getPlaygroundProjects();
+          setProjects(data);
+      } catch (error: any) {
+          console.error("Failed to load projects", error);
+          showToast("Failed to load projects.", "error");
+      } finally {
+          setIsLoadingProjects(false);
+      }
+  };
+
+  const loadProjectFiles = async (projectId: string) => {
+      setIsLoadingFiles(true);
+      try {
+          const files = await api.getPlaygroundProjectFiles(projectId);
+          setProjectFiles(files);
+          if (files.length > 0) {
+              await openFile(files[0]);
+          } else {
+              setActiveFile(null);
+              setCode('');
+          }
+      } catch (error: any) {
+          console.error("Failed to load project files", error);
+          showToast("Failed to load project files.", "error");
+      } finally {
+          setIsLoadingFiles(false);
+      }
+  };
+
+  const loadProjectActivity = async (projectId: string) => {
+      setIsLoadingActivity(true);
+      try {
+          const activity = await api.getPlaygroundActivity(projectId);
+          setProjectActivity(activity);
+      } catch (error: any) {
+          console.error("Failed to load project activity", error);
+          setProjectActivity([]);
+      } finally {
+          setIsLoadingActivity(false);
+      }
+  };
+
+  const openProject = async (project: PlaygroundProject) => {
+      setActiveProject(project);
+      setLanguage(project.language);
+      setFileContents({});
+      setIsProjectPanelOpen(false);
+      await loadProjectFiles(project.id);
+      await loadProjectActivity(project.id);
+      api.logPlaygroundActivity({
+          projectId: project.id,
+          userId: currentUser.uid,
+          action: 'opened_project',
+          detail: project.name
+      }).catch(() => undefined);
+  };
+
+  const openFile = async (file: PlaygroundProjectFile) => {
+      if (activeFile) {
+          setFileContents(prev => ({ ...prev, [activeFile.path]: codeRef.current }));
+      }
+      const cached = fileContents[file.path];
+      if (cached !== undefined) {
+          setActiveFile(file);
+          setCode(cached);
+          return;
+      }
+      try {
+          const content = await api.downloadPlaygroundFile(file.projectId, file.path);
+          setFileContents(prev => ({ ...prev, [file.path]: content }));
+          setActiveFile(file);
+          setCode(content);
+          api.logPlaygroundActivity({
+              projectId: file.projectId,
+              userId: currentUser.uid,
+              action: 'opened_file',
+              detail: file.path
+          }).catch(() => undefined);
+      } catch (error: any) {
+          console.error("Failed to load file", error);
+          showToast("Failed to load file.", "error");
+      }
+  };
+
+  const handleCreateProject = async () => {
+      if (!newProject.name.trim()) return;
+      try {
+          const created = await api.createPlaygroundProject({
+              name: newProject.name.trim(),
+              language: newProject.language,
+              createdBy: currentUser.uid,
+              teamId: newProject.teamId || null
+          });
+          await api.logPlaygroundActivity({
+              projectId: created.id,
+              userId: currentUser.uid,
+              action: 'created_project',
+              detail: created.name
+          });
+
+          const starterName = created.language === 'python' ? 'main.py' : 'index.js';
+          const starterCode = created.language === 'python' ? DEFAULT_PYTHON : DEFAULT_JS;
+          await api.savePlaygroundFile({
+              projectId: created.id,
+              path: starterName,
+              content: starterCode,
+              userId: currentUser.uid
+          });
+          await api.logPlaygroundActivity({
+              projectId: created.id,
+              userId: currentUser.uid,
+              action: 'added_file',
+              detail: starterName
+          });
+
+          setNewProject({ name: '', language: 'python', teamId: '' });
+          await loadProjects();
+          await openProject(created);
+      } catch (error: any) {
+          console.error("Failed to create project", error);
+          showToast("Failed to create project.", "error");
+      }
+  };
+
+  const handleAddFile = async () => {
+      if (!activeProject || !newFileName.trim()) return;
+      const fileName = newFileName.trim();
+      try {
+          await api.savePlaygroundFile({
+              projectId: activeProject.id,
+              path: fileName,
+              content: '',
+              userId: currentUser.uid
+          });
+          await api.logPlaygroundActivity({
+              projectId: activeProject.id,
+              userId: currentUser.uid,
+              action: 'added_file',
+              detail: fileName
+          });
+          setNewFileName('');
+          await loadProjectFiles(activeProject.id);
+          await loadProjectActivity(activeProject.id);
+      } catch (error: any) {
+          console.error("Failed to add file", error);
+          showToast("Failed to add file.", "error");
+      }
+  };
+
+  const handleSaveFile = async () => {
+      if (!activeProject || !activeFile) return;
+      try {
+          await api.savePlaygroundFile({
+              projectId: activeProject.id,
+              path: activeFile.path,
+              content: codeRef.current,
+              userId: currentUser.uid
+          });
+          await api.logPlaygroundActivity({
+              projectId: activeProject.id,
+              userId: currentUser.uid,
+              action: 'saved_file',
+              detail: activeFile.path
+          });
+          await loadProjectFiles(activeProject.id);
+          await loadProjectActivity(activeProject.id);
+          showToast("File saved.", "success");
+      } catch (error: any) {
+          console.error("Failed to save file", error);
+          showToast("Failed to save file.", "error");
+      }
+  };
+
+  const handleDeleteFile = async (file: PlaygroundProjectFile) => {
+      if (!activeProject) return;
+      try {
+          await api.deletePlaygroundFile(activeProject.id, file.path);
+          await api.logPlaygroundActivity({
+              projectId: activeProject.id,
+              userId: currentUser.uid,
+              action: 'deleted_file',
+              detail: file.path
+          });
+          if (activeFile?.path === file.path) {
+              setActiveFile(null);
+              setCode('');
+          }
+          await loadProjectFiles(activeProject.id);
+          await loadProjectActivity(activeProject.id);
+      } catch (error: any) {
+          console.error("Failed to delete file", error);
+          showToast("Failed to delete file.", "error");
+      }
+  };
+
+  const handleDeleteProject = async () => {
+      if (!projectToDelete) return;
+      try {
+          await api.deletePlaygroundProject(projectToDelete.id);
+          await api.logPlaygroundActivity({
+              projectId: projectToDelete.id,
+              userId: currentUser.uid,
+              action: 'deleted_project',
+              detail: projectToDelete.name
+          }).catch(() => undefined);
+          if (activeProject?.id === projectToDelete.id) {
+              setActiveProject(null);
+          }
+          await loadProjects();
+          setProjectToDelete(null);
+          showToast("Project deleted.", "success");
+      } catch (error: any) {
+          console.error("Failed to delete project", error);
+          showToast("Failed to delete project.", "error");
+      }
+  };
+
+  const startRenameFile = (file: PlaygroundProjectFile) => {
+      setRenamingFile(file);
+      setRenameValue(file.path);
+  };
+
+  const handleRenameFile = async () => {
+      if (!activeProject || !renamingFile) return;
+      const newPath = renameValue.trim();
+      if (!newPath || newPath === renamingFile.path) {
+          setRenamingFile(null);
+          return;
+      }
+      try {
+          await api.movePlaygroundFile(activeProject.id, renamingFile.path, newPath);
+          await api.logPlaygroundActivity({
+              projectId: activeProject.id,
+              userId: currentUser.uid,
+              action: 'renamed_file',
+              detail: `${renamingFile.path} -> ${newPath}`
+          });
+          setFileContents(prev => {
+              const next = { ...prev };
+              if (next[renamingFile.path] !== undefined) {
+                  next[newPath] = next[renamingFile.path];
+                  delete next[renamingFile.path];
+              }
+              return next;
+          });
+          if (activeFile?.path === renamingFile.path) {
+              setActiveFile({ ...renamingFile, path: newPath });
+          }
+          setRenamingFile(null);
+          setRenameValue('');
+          await loadProjectFiles(activeProject.id);
+          await loadProjectActivity(activeProject.id);
+          showToast("File renamed.", "success");
+      } catch (error: any) {
+          console.error("Failed to rename file", error);
+          showToast("Failed to rename file.", "error");
+      }
+  };
+
+  const accessibleProjects = useMemo(() => {
+      if (currentUser.role === 'PATRON') return projects;
+      const teamIds = new Set(teams.filter(team => team.memberIds.includes(currentUser.uid)).map(team => team.id));
+      return projects.filter(project => project.createdBy === currentUser.uid || (project.teamId && teamIds.has(project.teamId)));
+  }, [projects, teams, currentUser]);
+
+  const selectableTeams = useMemo(() => {
+      if (currentUser.role === 'PATRON') return teams;
+      return teams.filter(team => team.memberIds.includes(currentUser.uid));
+  }, [teams, currentUser]);
+
+  const filteredActivity = useMemo(() => {
+      if (!activeProject) return projectActivity;
+      if (activityFilter === 'me') {
+          return projectActivity.filter(activity => activity.userId === currentUser.uid);
+      }
+      if (activityFilter === 'team') {
+          const team = teams.find(t => t.id === activeProject.teamId);
+          if (!team) return projectActivity;
+          const memberSet = new Set(team.memberIds);
+          return projectActivity.filter(activity => memberSet.has(activity.userId));
+      }
+      return projectActivity;
+  }, [projectActivity, activityFilter, activeProject, teams, currentUser.uid]);
+
 
   const handleImportCode = (importedCode: string) => {
+      if (activeProject) {
+           showToast("Exit project mode to import code into the single-file playground.", "info");
+           return;
+      }
       const currentCode = codeRef.current;
       const def = language === 'python' ? DEFAULT_PYTHON : DEFAULT_JS;
       
@@ -567,10 +1007,23 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       }
   };
 
+
   const runJS = () => {
       setIsExecuting(true);
       setActiveTabState('output');
       setOutput([]);
+
+      if (activeProject) {
+          api.logPlaygroundActivity({
+              projectId: activeProject.id,
+              userId: currentUser.uid,
+              action: 'ran_project',
+              detail: activeFile?.path || 'script'
+          }).catch(() => undefined);
+          if (code.includes('import ')) {
+              setOutput(prev => [...prev, { type: 'hint', content: 'JS multi-file imports are not supported in the runner yet. Use a single file or switch to Python for module imports.' }]);
+          }
+      }
       
       const originalLog = console.log;
       const originalError = console.error;
@@ -657,6 +1110,16 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
         scrollToBottom();
     };
 
+    if (activeProject) {
+        await preparePythonProjectFiles();
+        api.logPlaygroundActivity({
+            projectId: activeProject.id,
+            userId: currentUser.uid,
+            action: 'ran_project',
+            detail: activeFile?.path || 'script'
+        }).catch(() => undefined);
+    }
+
     const setupCode = `
 import sys
 import builtins
@@ -724,6 +1187,51 @@ asyncio.sleep = custom_sleep_async
       setIsWaitingForInput(false);
   };
 
+  const ensureProjectFilesLoaded = async () => {
+      if (!activeProject) return {};
+      const contents: Record<string, string> = { ...fileContents };
+      for (const file of projectFiles) {
+          if (contents[file.path] === undefined) {
+              try {
+                  const content = await api.downloadPlaygroundFile(activeProject.id, file.path);
+                  contents[file.path] = content;
+              } catch (error) {
+                  console.error("Failed to load project file content", error);
+              }
+          }
+      }
+      setFileContents(contents);
+      return contents;
+  };
+
+  const preparePythonProjectFiles = async () => {
+      if (!activeProject || !pyodideRef.current) return;
+      const contents = await ensureProjectFilesLoaded();
+      const projectDir = `/home/pyodide/projects/${activeProject.id}`;
+      try {
+          pyodideRef.current.FS.mkdirTree(projectDir);
+      } catch {
+          // ignore
+      }
+      Object.entries(contents).forEach(([path, content]) => {
+          const fullPath = `${projectDir}/${path}`;
+          const folder = fullPath.split('/').slice(0, -1).join('/');
+          if (folder) {
+              try {
+                  pyodideRef.current.FS.mkdirTree(folder);
+              } catch {
+                  // ignore
+              }
+          }
+          pyodideRef.current.FS.writeFile(fullPath, content);
+      });
+      await pyodideRef.current.runPythonAsync(`
+import sys
+if "${projectDir}" not in sys.path:
+    sys.path.insert(0, "${projectDir}")
+      `);
+  };
+
   const handleCopyOutput = () => {
       const text = output.map(line => line.content).join('\n');
       navigator.clipboard.writeText(text).then(() => {
@@ -733,6 +1241,226 @@ asyncio.sleep = custom_sleep_async
   };
 
   const editorTheme = theme === 'dark' ? 'vs-dark' : 'light';
+
+  const projectPanel = (
+      <div className="flex flex-col h-full w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
+          <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
+                  <ViewGridIcon />
+                  Projects
+              </div>
+              <button
+                  onClick={loadProjects}
+                  className="p-1.5 rounded-md text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                  title="Refresh"
+              >
+                  <RefreshIcon />
+              </button>
+          </div>
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-4">
+              <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">New Project</p>
+                  <input
+                      value={newProject.name}
+                      onChange={(e) => setNewProject(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Project name"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                  />
+                  <select
+                      value={newProject.language}
+                      onChange={(e) => setNewProject(prev => ({ ...prev, language: e.target.value as Language }))}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                  >
+                      <option value="python">Python</option>
+                      <option value="javascript">JavaScript</option>
+                  </select>
+                  <select
+                      value={newProject.teamId}
+                      onChange={(e) => setNewProject(prev => ({ ...prev, teamId: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                  >
+                      <option value="">Personal project</option>
+                      {selectableTeams.map(team => (
+                          <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                  </select>
+                  <button
+                      onClick={handleCreateProject}
+                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg bg-pink-600 text-white hover:bg-pink-700"
+                  >
+                      Create Project
+                  </button>
+              </div>
+
+              <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Your Projects</p>
+                  {isLoadingProjects ? (
+                      <p className="text-xs text-gray-400">Loading...</p>
+                  ) : accessibleProjects.length === 0 ? (
+                      <p className="text-xs text-gray-400">No projects yet.</p>
+                  ) : (
+                      <div className="space-y-2">
+                          {accessibleProjects.map(project => (
+                              <div key={project.id} className="flex items-center gap-2">
+                                  <button
+                                      onClick={() => openProject(project)}
+                                      className={`flex-1 text-left px-3 py-2 rounded-lg border text-xs transition-colors ${
+                                          activeProject?.id === project.id
+                                              ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20 text-pink-700 dark:text-pink-200'
+                                              : 'border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
+                                      }`}
+                                  >
+                                      <div className="font-semibold">{project.name}</div>
+                                      <div className="text-[10px] text-gray-500 dark:text-gray-400 capitalize flex items-center gap-1">
+                                          <DocumentTextIcon className="w-3 h-3" /> {project.language}
+                                          {project.teamId && <span className="flex items-center gap-1"><UsersIcon className="w-3 h-3" /> Team</span>}
+                                      </div>
+                                  </button>
+                                  {(currentUser.role === 'PATRON' || project.createdBy === currentUser.uid) && (
+                                      <button
+                                          onClick={() => setProjectToDelete(project)}
+                                          className="p-1.5 text-gray-400 hover:text-red-500"
+                                          title="Delete project"
+                                      >
+                                          <TrashIcon className="w-4 h-4" />
+                                      </button>
+                                  )}
+                              </div>
+                          ))}
+                      </div>
+                  )}
+              </div>
+
+              {activeProject && (
+                  <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Files</p>
+                          <button
+                              onClick={() => { setActiveProject(null); setIsProjectPanelOpen(false); }}
+                              className="text-[10px] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+                          >
+                              Exit
+                          </button>
+                      </div>
+
+                      <div className="space-y-2">
+                          {isLoadingFiles ? (
+                              <p className="text-xs text-gray-400">Loading files...</p>
+                          ) : projectFiles.length === 0 ? (
+                              <p className="text-xs text-gray-400">No files yet.</p>
+                          ) : (
+                              projectFiles.map(file => (
+                                  <div key={file.id} className="flex items-center gap-2">
+                                      <button
+                                          onClick={() => openFile(file)}
+                                          className={`flex-1 text-left px-2 py-1.5 text-xs rounded-md border ${
+                                              activeFile?.id === file.id
+                                                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-200'
+                                                  : 'border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
+                                          }`}
+                                      >
+                                          {file.path}
+                                          </button>
+                                      <button
+                                          onClick={() => startRenameFile(file)}
+                                          className="p-1 text-gray-400 hover:text-indigo-500"
+                                          title="Rename file"
+                                      >
+                                          <PencilIcon className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                          onClick={() => handleDeleteFile(file)}
+                                          className="p-1 text-gray-400 hover:text-red-500"
+                                          title="Delete file"
+                                      >
+                                          <TrashIcon className="w-4 h-4" />
+                                      </button>
+                                  </div>
+                              ))
+                          )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                          <input
+                              value={newFileName}
+                              onChange={(e) => setNewFileName(e.target.value)}
+                              placeholder="new_file.py"
+                              className="flex-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                          />
+                          <button
+                              onClick={handleAddFile}
+                              className="px-2 py-1.5 text-xs font-semibold rounded-md bg-gray-900 text-white hover:bg-gray-800"
+                          >
+                              Add
+                          </button>
+                      </div>
+
+                      {renamingFile && (
+                          <div className="mt-2 space-y-2">
+                              <input
+                                  value={renameValue}
+                                  onChange={(e) => setRenameValue(e.target.value)}
+                                  className="w-full px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                              />
+                              <div className="flex gap-2">
+                                  <button
+                                      onClick={handleRenameFile}
+                                      className="px-2 py-1.5 text-xs font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
+                                  >
+                                      Rename
+                                  </button>
+                                  <button
+                                      onClick={() => { setRenamingFile(null); setRenameValue(''); }}
+                                      className="px-2 py-1.5 text-xs font-semibold rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                                  >
+                                      Cancel
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              )}
+
+              {activeProject && (
+                  <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Activity Log</p>
+                          <div className="flex gap-1 text-[10px]">
+                              {(['all', 'me', 'team'] as const).map(filter => (
+                                  <button
+                                      key={filter}
+                                      onClick={() => setActivityFilter(filter)}
+                                      className={`px-2 py-1 rounded-full ${
+                                          activityFilter === filter
+                                              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                                              : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                                      }`}
+                                  >
+                                      {filter === 'all' ? 'All' : filter === 'me' ? 'Me' : 'Team'}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                      {isLoadingActivity ? (
+                          <p className="text-xs text-gray-400">Loading activity...</p>
+                      ) : filteredActivity.length === 0 ? (
+                          <p className="text-xs text-gray-400">No activity yet.</p>
+                      ) : (
+                          <ul className="space-y-2 text-xs text-gray-500 dark:text-gray-400">
+                              {filteredActivity.slice(0, 8).map(activity => (
+                                  <li key={activity.id} className="flex flex-col">
+                                      <span className="font-semibold text-gray-700 dark:text-gray-200">{activity.action.replace('_', ' ')}</span>
+                                      {activity.detail && <span className="text-[11px]">{activity.detail}</span>}
+                                      <span className="text-[10px] text-gray-400">{new Date(activity.createdAt).toLocaleString()}</span>
+                                  </li>
+                              ))}
+                          </ul>
+                      )}
+                  </div>
+              )}
+          </div>
+      </div>
+  );
   
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 overflow-hidden relative">
@@ -747,19 +1475,45 @@ asyncio.sleep = custom_sleep_async
       {/* Compact Toolbar */}
       <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
         <div className="flex items-center gap-3">
+             <button
+                onClick={() => setIsProjectPanelOpen(true)}
+                className="lg:hidden p-1.5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                title="Projects"
+             >
+                <ViewGridIcon />
+             </button>
              <div className="flex bg-gray-200 dark:bg-gray-700 p-0.5 rounded-lg">
-                <button onClick={() => handleLanguageChange('python')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'python' ? 'bg-white dark:bg-gray-600 shadow text-pink-600 dark:text-pink-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>PY</button>
-                <button onClick={() => handleLanguageChange('javascript')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'javascript' ? 'bg-white dark:bg-gray-600 shadow text-yellow-600 dark:text-yellow-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>JS</button>
+                <button onClick={() => handleLanguageChange('python')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'python' ? 'bg-white dark:bg-gray-600 shadow text-pink-600 dark:text-pink-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'} ${isProjectMode ? 'opacity-60 cursor-not-allowed' : ''}`}>PY</button>
+                <button onClick={() => handleLanguageChange('javascript')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'javascript' ? 'bg-white dark:bg-gray-600 shadow text-yellow-600 dark:text-yellow-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'} ${isProjectMode ? 'opacity-60 cursor-not-allowed' : ''}`}>JS</button>
+                <button onClick={() => handleLanguageChange('html')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${language === 'html' ? 'bg-white dark:bg-gray-600 shadow text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'} ${isProjectMode ? 'opacity-60 cursor-not-allowed' : ''}`}>HTML</button>
              </div>
              <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-1 hidden sm:block"></div>
              {/* Tabs */}
              <div className="flex bg-gray-200 dark:bg-gray-700 p-0.5 rounded-lg">
                 <button onClick={() => setActiveTabState('editor')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${activeTab === 'editor' ? 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>Code</button>
                 <button onClick={() => setActiveTabState('output')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${activeTab === 'output' ? 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>Output</button>
+                {language === 'html' && (
+                    <button onClick={() => setActiveTabState('preview')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${activeTab === 'preview' ? 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>Preview</button>
+                )}
              </div>
+             {activeProject && (
+                <div className="hidden md:flex flex-col text-[11px] text-gray-500 dark:text-gray-300 ml-2">
+                    <span className="font-semibold">{activeProject.name}</span>
+                    <span className="truncate max-w-[140px]">{activeFile?.path || 'No file selected'}</span>
+                </div>
+             )}
         </div>
 
         <div className="flex items-center gap-2">
+             {activeProject && (
+                <button
+                    onClick={handleSaveFile}
+                    className="px-2 py-1 text-xs font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
+                    title="Save file"
+                >
+                    Save
+                </button>
+             )}
              <button 
                 onClick={handleGetHint} 
                 disabled={isExecuting || (language === 'python' && !isPyodideReady) || isWaitingForInput || isGettingHint}
@@ -807,86 +1561,107 @@ asyncio.sleep = custom_sleep_async
 
       {/* Main Area */}
       <div className="flex-1 relative w-full h-full overflow-hidden">
-        {/* Editor */}
-        <div className={`absolute inset-0 w-full h-full ${activeTab === 'editor' ? 'z-10 opacity-100' : 'z-0 opacity-0 pointer-events-none'}`}>
-             <Editor
-                height="100%"
-                defaultLanguage={language}
-                language={language}
-                theme={editorTheme}
-                value={code}
-                onChange={(value) => setCode(value || '')}
-                onMount={handleEditorDidMount}
-                loading={<div className="flex items-center justify-center h-full text-gray-500">Loading editor...</div>}
-                options={{
-                    padding: { top: 16, bottom: 16 },
-                }}
-            />
-        </div>
-        
-        {/* Output */}
-        <div className={`absolute inset-0 w-full h-full bg-gray-900 dark:bg-black text-gray-300 font-mono text-sm overflow-hidden flex flex-col ${activeTab === 'output' ? 'z-10 opacity-100' : 'z-0 opacity-0 pointer-events-none'}`}>
-             <div className="flex justify-between items-center p-2 bg-gray-800 dark:bg-gray-900 border-b border-gray-700">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider pl-2">Console</span>
-                <div className="flex gap-1">
-                    <button onClick={handleCopyOutput} className="p-1.5 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors" title="Copy Output">
-                        <CopyIcon className="w-4 h-4" />
-                    </button>
-                    <button onClick={handleClearOutput} className="p-1.5 text-gray-400 hover:text-red-400 rounded hover:bg-gray-700 transition-colors" title="Clear Console">
-                        <TrashIcon className="w-4 h-4" />
-                    </button>
-                </div>
-             </div>
-             <div 
-                ref={outputContainerRef}
-                className="flex-1 p-4 overflow-y-auto custom-scrollbar break-all"
-                onClick={() => {
-                    if (isWaitingForInput && consoleInputRef.current) {
-                        consoleInputRef.current.focus();
-                    }
-                }}
-             >
-                {output.length === 0 && !isWaitingForInput ? (
-                    <span className="text-gray-600 italic select-none">Run code to see output...</span>
-                ) : (
-                    output.map((line, index) => (
-                       <div key={index} className="leading-relaxed mb-0.5">
-                            {line.type === 'log' ? (
-                                <span className="text-gray-300">{line.content}</span>
-                            ) : line.type === 'hint' ? (
-                                <div className="bg-yellow-900/20 p-3 rounded border-l-2 border-yellow-600 my-2 flex gap-3 font-sans text-gray-200">
-                                    <div className="text-yellow-500 mt-0.5 flex-shrink-0">
-                                        <LightBulbIcon className="w-4 h-4"/>
-                                    </div>
-                                    <div className="flex-1 text-sm">
-                                        <FormattedMessage text={line.content} isUser={false} />
-                                    </div>
-                                </div>
-                            ) : (
-                                <span className="text-red-400 font-medium">{line.content}</span>
-                            )}
-                        </div>
-                    ))
-                )}
-                
-                {isWaitingForInput && (
-                    <div className="flex items-center text-gray-300 leading-relaxed mt-1">
-                        <span className="whitespace-pre-wrap">{inputPrompt}</span>
-                        <input
-                            ref={consoleInputRef}
-                            value={consoleInput}
-                            onChange={e => setConsoleInput(e.target.value)}
-                            onKeyDown={handleConsoleInputEnter}
-                            className="flex-1 bg-transparent border-none outline-none text-green-400 font-bold ml-1 min-w-[50px]"
-                            autoFocus
-                            autoComplete="off"
-                            spellCheck="false"
-                        />
+        <div className="absolute inset-0 flex">
+          <aside className="hidden lg:flex">
+            {projectPanel}
+          </aside>
+
+          {isProjectPanelOpen && (
+            <div className="lg:hidden fixed inset-0 z-50 bg-black/50 flex">
+              <div className="h-full">
+                {projectPanel}
+              </div>
+              <button
+                onClick={() => setIsProjectPanelOpen(false)}
+                className="flex-1"
+                aria-label="Close project panel"
+              />
+            </div>
+          )}
+
+          <div className="relative flex-1">
+            {/* Editor */}
+            <div className={`absolute inset-0 w-full h-full ${activeTab === 'editor' ? 'z-10 opacity-100' : 'z-0 opacity-0 pointer-events-none'}`}>
+                 <Editor
+                    height="100%"
+                    defaultLanguage={language}
+                    language={language}
+                    theme={editorTheme}
+                    value={code}
+                    onChange={(value) => setCode(value || '')}
+                    onMount={handleEditorDidMount}
+                    loading={<div className="flex items-center justify-center h-full text-gray-500">Loading editor...</div>}
+                    options={{
+                        padding: { top: 16, bottom: 16 },
+                    }}
+                />
+            </div>
+            
+            {/* Output */}
+            <div className={`absolute inset-0 w-full h-full bg-gray-900 dark:bg-black text-gray-300 font-mono text-sm overflow-hidden flex flex-col ${activeTab === 'output' ? 'z-10 opacity-100' : 'z-0 opacity-0 pointer-events-none'}`}>
+                 <div className="flex justify-between items-center p-2 bg-gray-800 dark:bg-gray-900 border-b border-gray-700">
+                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider pl-2">Console</span>
+                    <div className="flex gap-1">
+                        <button onClick={handleCopyOutput} className="p-1.5 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors" title="Copy Output">
+                            <CopyIcon className="w-4 h-4" />
+                        </button>
+                        <button onClick={handleClearOutput} className="p-1.5 text-gray-400 hover:text-red-400 rounded hover:bg-gray-700 transition-colors" title="Clear Console">
+                            <TrashIcon className="w-4 h-4" />
+                        </button>
                     </div>
-                )}
-                
-                {isExecuting && !isWaitingForInput && <div className="animate-pulse mt-1 text-green-500">_</div>}
-             </div>
+                 </div>
+                 <div 
+                    ref={outputContainerRef}
+                    className="flex-1 p-4 overflow-y-auto custom-scrollbar break-all"
+                    onClick={() => {
+                        if (isWaitingForInput && consoleInputRef.current) {
+                            consoleInputRef.current.focus();
+                        }
+                    }}
+                 >
+                    {output.length === 0 && !isWaitingForInput ? (
+                        <span className="text-gray-600 italic select-none">Run code to see output...</span>
+                    ) : (
+                        output.map((line, index) => (
+                           <div key={index} className="leading-relaxed mb-0.5">
+                                {line.type === 'log' ? (
+                                    <span className="text-gray-300">{line.content}</span>
+                                ) : line.type === 'hint' ? (
+                                    <div className="bg-yellow-900/20 p-3 rounded border-l-2 border-yellow-600 my-2 flex gap-3 font-sans text-gray-200">
+                                        <div className="text-yellow-500 mt-0.5 flex-shrink-0">
+                                            <LightBulbIcon className="w-4 h-4"/>
+                                        </div>
+                                        <div className="flex-1 text-sm">
+                                            <FormattedMessage text={line.content} isUser={false} />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <span className="text-red-400 font-medium">{line.content}</span>
+                                )}
+                            </div>
+                        ))
+                    )}
+                    
+                    {isWaitingForInput && (
+                        <div className="flex items-center text-gray-300 leading-relaxed mt-1">
+                            <span className="whitespace-pre-wrap">{inputPrompt}</span>
+                            <input
+                                ref={consoleInputRef}
+                                value={consoleInput}
+                                onChange={e => setConsoleInput(e.target.value)}
+                                onKeyDown={handleConsoleInputEnter}
+                                className="flex-1 bg-transparent border-none outline-none text-green-400 font-bold ml-1 min-w-[50px]"
+                                autoFocus
+                                autoComplete="off"
+                                spellCheck="false"
+                            />
+                        </div>
+                    )}
+                    
+                    {isExecuting && !isWaitingForInput && <div className="animate-pulse mt-1 text-green-500">_</div>}
+                 </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -975,6 +1750,16 @@ asyncio.sleep = custom_sleep_async
         title="Unsaved Changes"
         message="Your current code in the playground will be overwritten. Do you want to continue?"
         confirmText="Replace"
+      />
+
+      <ConfirmationModal
+        isOpen={!!projectToDelete}
+        onClose={() => setProjectToDelete(null)}
+        onConfirm={handleDeleteProject}
+        title="Delete Project"
+        message={`Delete "${projectToDelete?.name}"? This will remove all project files for the team.`}
+        confirmText="Delete"
+        isDangerous
       />
 
       <ConfirmationModal

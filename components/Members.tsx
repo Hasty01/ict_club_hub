@@ -9,6 +9,7 @@ import { CheckIcon } from './icons/CheckIcon';
 import { SearchIcon } from './icons/SearchIcon';
 import { useData } from '../DataContext';
 import ConfirmationModal from './ConfirmationModal';
+import MemberPortfolioModal from './MemberPortfolioModal';
 
 interface MembersProps {
     currentUser: User;
@@ -19,6 +20,7 @@ const Members: React.FC<MembersProps> = ({ currentUser }) => {
     const [activeTab, setActiveTab] = useState<'active' | 'pending'>('active');
     const [searchTerm, setSearchTerm] = useState('');
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
+    const [portfolioUser, setPortfolioUser] = useState<User | null>(null);
 
     const handleAction = async (action: () => Promise<any>, successMsg: string) => {
         try {
@@ -196,6 +198,14 @@ const Members: React.FC<MembersProps> = ({ currentUser }) => {
                                     )}
                                     <td className="py-4 px-4 text-right">
                                         <div className="inline-flex items-center space-x-2">
+                                            {activeTab === 'active' && (
+                                                <button
+                                                    onClick={() => setPortfolioUser(user)}
+                                                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-900 text-white hover:bg-gray-800"
+                                                >
+                                                    View Portfolio
+                                                </button>
+                                            )}
                                             {activeTab === 'pending' && (
                                                 <button 
                                                     onClick={() => onApproveUser(user.uid)}
@@ -252,6 +262,11 @@ const Members: React.FC<MembersProps> = ({ currentUser }) => {
                 message={`Are you sure you want to remove ${userToDelete?.name}? This action cannot be undone.`}
                 confirmText={activeTab === 'pending' ? "Reject" : "Remove"}
                 isDangerous
+            />
+            <MemberPortfolioModal
+                isOpen={!!portfolioUser}
+                user={portfolioUser}
+                onClose={() => setPortfolioUser(null)}
             />
         </div>
     );

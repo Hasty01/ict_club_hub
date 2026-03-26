@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { User, Activity, AttendanceRecord, AttendanceStatus, FeedItem, ProjectData, ProjectTask, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab, Roadmap, RoadmapProgress, ShowcaseComment, Message, Team, TeamChallenge, TeamChallengeSubmission } from '../types';
+import { User, Activity, AttendanceRecord, AttendanceStatus, FeedItem, ProjectData, ProjectTask, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab, Roadmap, RoadmapProgress, ShowcaseComment, Message, Team, TeamChallenge, TeamChallengeSubmission, PlaygroundProject, PlaygroundProjectFile, PlaygroundProjectActivity, PlaygroundProjectMember } from '../types';
 
 // --- Helper for Notifications ---
 const notifyAllUsers = async (message: string, linkTo: Tab, excludeUid?: string) => {
@@ -167,23 +167,86 @@ export const updateUser = async (uid: string, data: Partial<User>) => {
 };
 
 export const deleteUser = async (uid: string) => {
-    // 1. Delete the profile from the public 'users' table.
-    // Note: Due to foreign keys, this may fail if the user has attendance, messages, etc.
-    // In a real app, you might want a Postgres trigger or function to handle cascade deletion.
-    const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('uid', uid);
-    
-    if (error) {
-        console.error("Supabase Deletion Error Details:", error);
-        // If code is 23503, it means foreign key violation (User has related data)
-        if (error.code === '23503') {
-            throw new Error("Cannot delete member: User has existing activity records, messages, or project tasks. Remove those first or contact support.");
+    const safeDelete = async (table: string, match: Record<string, any>) => {
+        const { error } = await supabase.from(table).delete().match(match);
+        if (error && error.code !== '42P01') {
+            throw error;
         }
+    };
+
+    const safeDeleteIn = async (table: string, column: string, values: string[] | number[]) => {
+        if (!values || values.length === 0) return;
+        const { error } = await supabase.from(table).delete().in(column, values);
+        if (error && error.code !== '42P01') {
+            throw error;
+        }
+    };
+
+    try {
+        await safeDelete('notifications', { user_uid: uid });
+        await safeDelete('attendance', { user_uid: uid });
+        await safeDelete('activity_rsvps', { user_uid: uid });
+        await safeDelete('project_task_assignees', { user_uid: uid });
+        await safeDelete('challenge_submissions', { user_uid: uid });
+        await safeDelete('team_challenge_submissions', { user_uid: uid });
+        await safeDelete('team_members', { user_uid: uid });
+        await safeDelete('playground_project_activity', { user_uid: uid });
+        await safeDelete('playground_project_files', { created_by: uid });
+        await safeDelete('showcase_comments', { user_uid: uid });
+        await safeDelete('suggestions', { user_uid: uid });
+        await safeDelete('messages', { sender_id: uid });
+
+        // Delete showcase items + their comments
+        const { data: showcaseItems } = await supabase.from('showcase_items').select('id').eq('user_uid', uid);
+        const showcaseIds = (showcaseItems || []).map((s: any) => String(s.id));
+        await safeDeleteIn('showcase_comments', 'showcase_item_id', showcaseIds);
+        await safeDeleteIn('showcase_items', 'id', showcaseIds);
+
+        // Delete feed items + their comments + poll options/votes
+        const { data: feedItems } = await supabase.from('feed_items').select('id').eq('author_uid', uid);
+        const feedIds = (feedItems || []).map((f: any) => String(f.id));
+        if (feedIds.length > 0) {
+            const { data: pollOptions } = await supabase.from('poll_options').select('id, feed_item_id').in('feed_item_id', feedIds);
+            const pollOptionIds = (pollOptions || []).map((p: any) => String(p.id));
+            await safeDeleteIn('poll_votes', 'poll_option_id', pollOptionIds);
+            await safeDeleteIn('poll_options', 'feed_item_id', feedIds);
+            await safeDeleteIn('feed_comments', 'feed_item_id', feedIds);
+            await safeDeleteIn('feed_items', 'id', feedIds);
+        }
+        await safeDelete('feed_comments', { user_uid: uid });
+        await safeDelete('poll_votes', { user_uid: uid });
+
+        // Delete resources by user
+        await safeDelete('resources', { uploader_uid: uid });
+
+        // Delete team challenges created by user and teams created by user (cascade)
+        await safeDelete('team_challenges', { created_by: uid });
+        await safeDelete('teams', { created_by: uid });
+
+        // Delete playground projects created by user (cascade to files/activity)
+        await safeDelete('playground_projects', { created_by: uid });
+
+        // Delete rooms created by user (messages remain tied to room, so delete those rooms)
+        await safeDelete('rooms', { created_by: uid });
+
+        // Finally delete the profile
+        const { error } = await supabase
+            .from('users')
+            .delete()
+            .eq('uid', uid);
+
+        if (error) {
+            console.error("Supabase Deletion Error Details:", error);
+            if (error.code === '23503') {
+                throw new Error("Cannot delete member: User still has linked records. Try again after clearing dependencies.");
+            }
+            throw new Error(error.message || "Failed to delete member profile.");
+        }
+        return true;
+    } catch (error: any) {
+        console.error("Delete user failed:", error);
         throw new Error(error.message || "Failed to delete member profile.");
     }
-    return true;
 };
 
 export const approveMember = async (uid: string) => {
@@ -1471,4 +1534,192 @@ export const upsertTeamChallengeSubmission = async (payload: { challengeId: stri
             submitted_at: new Date().toISOString()
         }, { onConflict: 'challenge_id,user_uid' });
     if (error) throw error;
+};
+
+// --- Playground Projects ---
+
+export const getPlaygroundProjects = async (): Promise<PlaygroundProject[]> => {
+    const { data, error } = await supabase
+        .from('playground_projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map((row: any) => ({
+        id: String(row.id),
+        name: row.name,
+        language: row.language,
+        createdBy: row.created_by,
+        teamId: row.team_id ? String(row.team_id) : null,
+        createdAt: row.created_at
+    }));
+};
+
+export const createPlaygroundProject = async (payload: { name: string; language: 'python' | 'javascript'; createdBy: string; teamId?: string | null }) => {
+    const { data, error } = await supabase
+        .from('playground_projects')
+        .insert({
+            name: payload.name,
+            language: payload.language,
+            created_by: payload.createdBy,
+            team_id: payload.teamId || null
+        })
+        .select()
+        .single();
+    if (error) throw error;
+    return {
+        id: String(data.id),
+        name: data.name,
+        language: data.language,
+        createdBy: data.created_by,
+        teamId: data.team_id ? String(data.team_id) : null,
+        createdAt: data.created_at
+    } as PlaygroundProject;
+};
+
+export const deletePlaygroundProject = async (projectId: string) => {
+    const { error } = await supabase.from('playground_projects').delete().eq('id', projectId);
+    if (error) throw error;
+};
+
+export const getPlaygroundProjectFiles = async (projectId: string): Promise<PlaygroundProjectFile[]> => {
+    const { data, error } = await supabase
+        .from('playground_project_files')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('updated_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map((row: any) => ({
+        id: String(row.id),
+        projectId: String(row.project_id),
+        path: row.path,
+        createdBy: row.created_by,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+    }));
+};
+
+export const getPlaygroundProjectMembers = async (projectId: string): Promise<PlaygroundProjectMember[]> => {
+    const { data, error } = await supabase
+        .from('playground_project_members')
+        .select('*')
+        .eq('project_id', projectId);
+    if (error) throw error;
+    return (data || []).map((row: any) => ({
+        id: String(row.id),
+        projectId: String(row.project_id),
+        userId: row.user_uid,
+        addedBy: row.added_by,
+        addedAt: row.added_at
+    }));
+};
+
+export const addPlaygroundProjectMember = async (projectId: string, userId: string, addedBy: string) => {
+    const { error } = await supabase
+        .from('playground_project_members')
+        .insert({
+            project_id: projectId,
+            user_uid: userId,
+            added_by: addedBy
+        });
+    if (error && error.code !== '23505') throw error;
+};
+
+export const addPlaygroundProjectMembers = async (projectId: string, userIds: string[], addedBy: string) => {
+    if (userIds.length === 0) return;
+    const payload = userIds.map(userId => ({
+        project_id: projectId,
+        user_uid: userId,
+        added_by: addedBy
+    }));
+    const { error } = await supabase
+        .from('playground_project_members')
+        .upsert(payload, { onConflict: 'project_id,user_uid' });
+    if (error) throw error;
+};
+
+export const removePlaygroundProjectMember = async (projectId: string, userId: string) => {
+    const { error } = await supabase
+        .from('playground_project_members')
+        .delete()
+        .match({ project_id: projectId, user_uid: userId });
+    if (error) throw error;
+};
+
+export const downloadPlaygroundFile = async (projectId: string, path: string): Promise<string> => {
+    const filePath = `projects/${projectId}/${path}`;
+    const { data, error } = await supabase.storage.from('project_files').download(filePath);
+    if (error) throw error;
+    return await data.text();
+};
+
+export const savePlaygroundFile = async (payload: { projectId: string; path: string; content: string; userId: string }) => {
+    const filePath = `projects/${payload.projectId}/${payload.path}`;
+    const { error: uploadError } = await supabase.storage
+        .from('project_files')
+        .upload(filePath, payload.content, {
+            upsert: true,
+            contentType: 'text/plain'
+        });
+    if (uploadError) throw uploadError;
+
+    const { error } = await supabase
+        .from('playground_project_files')
+        .upsert({
+            project_id: payload.projectId,
+            path: payload.path,
+            created_by: payload.userId,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'project_id,path' });
+    if (error) throw error;
+};
+
+export const deletePlaygroundFile = async (projectId: string, path: string) => {
+    const filePath = `projects/${projectId}/${path}`;
+    await supabase.storage.from('project_files').remove([filePath]);
+    const { error } = await supabase
+        .from('playground_project_files')
+        .delete()
+        .match({ project_id: projectId, path });
+    if (error) throw error;
+};
+
+export const movePlaygroundFile = async (projectId: string, fromPath: string, toPath: string) => {
+    const from = `projects/${projectId}/${fromPath}`;
+    const to = `projects/${projectId}/${toPath}`;
+    const { error: moveError } = await supabase.storage.from('project_files').move(from, to);
+    if (moveError) throw moveError;
+
+    const { error } = await supabase
+        .from('playground_project_files')
+        .update({ path: toPath, updated_at: new Date().toISOString() })
+        .match({ project_id: projectId, path: fromPath });
+    if (error) throw error;
+};
+
+export const logPlaygroundActivity = async (payload: { projectId: string; userId: string; action: string; detail?: string }) => {
+    const { error } = await supabase.from('playground_project_activity').insert({
+        project_id: payload.projectId,
+        user_uid: payload.userId,
+        action: payload.action,
+        detail: payload.detail || null
+    });
+    if (error) throw error;
+};
+
+export const getPlaygroundActivity = async (projectId: string): Promise<PlaygroundProjectActivity[]> => {
+    const { data, error } = await supabase
+        .from('playground_project_activity')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false })
+        .limit(15);
+    if (error) throw error;
+    return (data || []).map((row: any) => ({
+        id: String(row.id),
+        projectId: String(row.project_id),
+        userId: row.user_uid,
+        action: row.action,
+        detail: row.detail,
+        createdAt: row.created_at
+    }));
 };

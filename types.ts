@@ -43,6 +43,41 @@ export interface TeamChallenge {
   submissions: Record<string, TeamChallengeSubmission>;
 }
 
+export interface PlaygroundProject {
+  id: string;
+  name: string;
+  language: 'python' | 'javascript' | 'html';
+  createdBy: string;
+  teamId?: string | null;
+  createdAt: string;
+}
+
+export interface PlaygroundProjectFile {
+  id: string;
+  projectId: string;
+  path: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlaygroundProjectActivity {
+  id: string;
+  projectId: string;
+  userId: string;
+  action: string;
+  detail?: string;
+  createdAt: string;
+}
+
+export interface PlaygroundProjectMember {
+  id: string;
+  projectId: string;
+  userId: string;
+  addedBy: string;
+  addedAt: string;
+}
+
 export interface User {
   uid: string; // Changed from id: number
   email: string;

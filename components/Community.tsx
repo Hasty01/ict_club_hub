@@ -228,25 +228,38 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
                     )}
                 </div>
 
-                <div className="bg-gradient-to-br from-pink-500/10 via-purple-500/10 to-indigo-500/10 dark:from-pink-500/20 dark:via-purple-500/20 dark:to-indigo-500/10 border border-pink-200/40 dark:border-pink-500/20 rounded-2xl p-6 shadow-sm">
-                    <div className="flex items-center gap-3 mb-4">
+                <div className="relative overflow-hidden bg-gradient-to-br from-pink-500/25 via-purple-500/25 to-indigo-500/20 dark:from-pink-500/35 dark:via-purple-500/35 dark:to-indigo-500/25 border border-pink-300/60 dark:border-pink-500/40 rounded-3xl p-8 shadow-[0_20px_60px_-30px_rgba(236,72,153,0.6)]">
+                    <div className="absolute -top-16 -right-12 w-48 h-48 bg-pink-400/20 blur-3xl rounded-full"></div>
+                    <div className="absolute -bottom-20 -left-16 w-56 h-56 bg-purple-500/20 blur-3xl rounded-full"></div>
+                    <div className="flex items-center gap-3 mb-6 relative z-10">
                         <SparklesIcon />
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Member Spotlight</h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Top community contributor.</p>
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Member Spotlight</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">Top community contributor.</p>
                         </div>
                     </div>
                     {topMember ? (
-                        <div className="flex items-center gap-4">
-                            <img
-                                src={topMember.user.avatarUrl || `https://i.pravatar.cc/80?u=${topMember.user.username}`}
-                                alt={topMember.user.name}
-                                className="w-16 h-16 rounded-full object-cover border-2 border-pink-400"
-                            />
-                            <div>
-                                <p className="text-xl font-bold text-gray-900 dark:text-white">{topMember.user.name}</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-300">@{topMember.user.username}</p>
-                                <p className="text-sm text-pink-600 dark:text-pink-400 font-semibold mt-1">{topMember.score} points this week</p>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-6 relative z-10">
+                            <div className="relative">
+                                <div className="absolute inset-0 rounded-full bg-pink-500/30 blur-xl animate-pulse"></div>
+                                <img
+                                    src={topMember.user.avatarUrl || `https://i.pravatar.cc/120?u=${topMember.user.username}`}
+                                    alt={topMember.user.name}
+                                    className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-4 border-white/80 dark:border-gray-900 shadow-xl"
+                                />
+                                <span className="absolute -bottom-1 -right-1 px-2 py-1 text-[11px] font-bold bg-gray-900 text-white dark:bg-white dark:text-gray-900 rounded-full shadow-md">
+                                    #1
+                                </span>
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">{topMember.user.name}</p>
+                                <p className="text-sm text-gray-700 dark:text-gray-300">@{topMember.user.username}</p>
+                                <p className="text-base text-pink-700 dark:text-pink-300 font-semibold mt-2">{topMember.score} points this week</p>
+                                <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+                                    <span className="px-3 py-1 rounded-full bg-white/70 text-gray-900 shadow-sm">Showcases {topMember.showcaseScore}</span>
+                                    <span className="px-3 py-1 rounded-full bg-white/70 text-gray-900 shadow-sm">Ideas {topMember.suggestionScore}</span>
+                                    <span className="px-3 py-1 rounded-full bg-white/70 text-gray-900 shadow-sm">Badges {topMember.badges}</span>
+                                </div>
                             </div>
                         </div>
                     ) : (
