@@ -17,6 +17,32 @@ export interface FeatureFlags {
   showPlayground: boolean;
 }
 
+export interface Team {
+  id: string;
+  name: string;
+  description?: string;
+  createdBy: string;
+  createdAt: string;
+  memberIds: string[];
+}
+
+export interface TeamChallengeSubmission {
+  userId: string;
+  note: string;
+  submittedAt: string;
+}
+
+export interface TeamChallenge {
+  id: string;
+  teamId: string;
+  title: string;
+  description?: string;
+  dueDate?: string;
+  createdBy: string;
+  createdAt: string;
+  submissions: Record<string, TeamChallengeSubmission>;
+}
+
 export interface User {
   uid: string; // Changed from id: number
   email: string;

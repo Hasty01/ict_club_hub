@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { User, Activity, AttendanceRecord, AttendanceStatus, FeedItem, ProjectData, ProjectTask, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab, Roadmap, RoadmapProgress, ShowcaseComment, Message } from '../types';
+import { User, Activity, AttendanceRecord, AttendanceStatus, FeedItem, ProjectData, ProjectTask, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab, Roadmap, RoadmapProgress, ShowcaseComment, Message, Team, TeamChallenge, TeamChallengeSubmission } from '../types';
 
 // --- Helper for Notifications ---
 const notifyAllUsers = async (message: string, linkTo: Tab, excludeUid?: string) => {
@@ -1339,4 +1339,136 @@ export const updateMilestoneProgress = async (userId: string, roadmapId: string,
             completed_milestone_indices: [milestoneIndex]
         });
     }
+};
+
+// --- Community (Teams) ---
+
+export const getTeams = async (): Promise<Team[]> => {
+    const { data, error } = await supabase
+        .from('teams')
+        .select(`
+            id,
+            name,
+            description,
+            created_by,
+            created_at,
+            team_members (
+                user_uid
+            )
+        `)
+        .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map((team: any) => ({
+        id: String(team.id),
+        name: team.name,
+        description: team.description,
+        createdBy: team.created_by,
+        createdAt: team.created_at,
+        memberIds: team.team_members?.map((m: any) => m.user_uid) || []
+    }));
+};
+
+export const createTeam = async (payload: { name: string; description?: string; createdBy: string }) => {
+    const { data, error } = await supabase
+        .from('teams')
+        .insert({
+            name: payload.name,
+            description: payload.description || null,
+            created_by: payload.createdBy
+        })
+        .select()
+        .single();
+    if (error) throw error;
+    return {
+        id: String(data.id),
+        name: data.name,
+        description: data.description,
+        createdBy: data.created_by,
+        createdAt: data.created_at
+    };
+};
+
+export const addTeamMember = async (teamId: string, userId: string) => {
+    const { error } = await supabase.from('team_members').insert({
+        team_id: teamId,
+        user_uid: userId
+    });
+    if (error && error.code !== '23505') throw error;
+};
+
+export const removeTeamMember = async (teamId: string, userId: string) => {
+    const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .match({ team_id: teamId, user_uid: userId });
+    if (error) throw error;
+};
+
+export const getTeamChallenges = async (): Promise<TeamChallenge[]> => {
+    const { data, error } = await supabase
+        .from('team_challenges')
+        .select(`
+            id,
+            team_id,
+            title,
+            description,
+            due_date,
+            created_by,
+            created_at,
+            team_challenge_submissions (
+                user_uid,
+                note,
+                submitted_at
+            )
+        `)
+        .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map((row: any) => {
+        const submissions: Record<string, TeamChallengeSubmission> = {};
+        row.team_challenge_submissions?.forEach((s: any) => {
+            submissions[s.user_uid] = {
+                userId: s.user_uid,
+                note: s.note,
+                submittedAt: s.submitted_at
+            };
+        });
+        return {
+            id: String(row.id),
+            teamId: String(row.team_id),
+            title: row.title,
+            description: row.description,
+            dueDate: row.due_date || undefined,
+            createdBy: row.created_by,
+            createdAt: row.created_at,
+            submissions
+        };
+    });
+};
+
+export const createTeamChallenge = async (payload: { teamId: string; title: string; description?: string; dueDate?: string; createdBy: string }) => {
+    const { data, error } = await supabase
+        .from('team_challenges')
+        .insert({
+            team_id: payload.teamId,
+            title: payload.title,
+            description: payload.description || null,
+            due_date: payload.dueDate || null,
+            created_by: payload.createdBy
+        })
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
+};
+
+export const upsertTeamChallengeSubmission = async (payload: { challengeId: string; userId: string; note: string }) => {
+    const { error } = await supabase
+        .from('team_challenge_submissions')
+        .upsert({
+            challenge_id: payload.challengeId,
+            user_uid: payload.userId,
+            note: payload.note,
+            submitted_at: new Date().toISOString()
+        }, { onConflict: 'challenge_id,user_uid' });
+    if (error) throw error;
 };

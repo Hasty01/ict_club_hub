@@ -1,7 +1,7 @@
 
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
-import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType, Roadmap, FeatureFlags } from './types';
+import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType, Roadmap, FeatureFlags, Team, TeamChallenge } from './types';
 import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
 
@@ -22,6 +22,8 @@ interface IDataContext {
   suggestions: Suggestion[];
   challenges: Challenge[];
   roadmaps: Roadmap[];
+  teams: Team[];
+  teamChallenges: TeamChallenge[];
   
   // Toasts
   toasts: Toast[];
@@ -45,6 +47,8 @@ interface IDataContext {
   isLoadingSuggestions: boolean;
   isLoadingChallenges: boolean;
   isLoadingRoadmaps: boolean;
+  isLoadingTeams: boolean;
+  isLoadingTeamChallenges: boolean;
   isInitialLoading: boolean;
 
   // Error states
@@ -60,6 +64,8 @@ interface IDataContext {
   suggestionsError: string | null;
   challengesError: string | null;
   roadmapsError: string | null;
+  teamsError: string | null;
+  teamChallengesError: string | null;
 
   // Refetch functions
   fetchActivities: () => Promise<void>;
@@ -74,6 +80,8 @@ interface IDataContext {
   fetchSuggestions: () => Promise<void>;
   fetchChallenges: () => Promise<void>;
   fetchRoadmaps: () => Promise<void>;
+  fetchTeams: () => Promise<void>;
+  fetchTeamChallenges: () => Promise<void>;
   updateUserSkillLevel: (newLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED') => Promise<void>;
   featureFlags: FeatureFlags;
   updateFeatureFlags: (updates: Partial<FeatureFlags>) => void;
@@ -116,6 +124,8 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamChallenges, setTeamChallenges] = useState<TeamChallenge[]>([]);
   const [unreadMessageCounts, setUnreadMessageCounts] = useState<Record<string, number>>({});
   const [featureFlags, setFeatureFlags] = useState<FeatureFlags>(() => {
       if (typeof window === 'undefined') return defaultFeatureFlags;
@@ -144,6 +154,8 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(true);
   const [isLoadingChallenges, setIsLoadingChallenges] = useState(true);
   const [isLoadingRoadmaps, setIsLoadingRoadmaps] = useState(true);
+  const [isLoadingTeams, setIsLoadingTeams] = useState(true);
+  const [isLoadingTeamChallenges, setIsLoadingTeamChallenges] = useState(true);
 
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
@@ -157,6 +169,8 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
   const [challengesError, setChallengesError] = useState<string | null>(null);
   const [roadmapsError, setRoadmapsError] = useState<string | null>(null);
+  const [teamsError, setTeamsError] = useState<string | null>(null);
+  const [teamChallengesError, setTeamChallengesError] = useState<string | null>(null);
 
   // Sync initialUser prop to state if it changes (e.g. re-login)
   useEffect(() => {
@@ -349,6 +363,34 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         setIsLoadingRoadmaps(false);
     }
   }, []);
+
+  const fetchTeams = useCallback(async () => {
+    setIsLoadingTeams(true);
+    setTeamsError(null);
+    try {
+      const data = await api.getTeams();
+      setTeams(data);
+    } catch (e: any) {
+      console.error("Failed to fetch teams", e);
+      setTeamsError(getErrorMessage(e));
+    } finally {
+      setIsLoadingTeams(false);
+    }
+  }, []);
+
+  const fetchTeamChallenges = useCallback(async () => {
+    setIsLoadingTeamChallenges(true);
+    setTeamChallengesError(null);
+    try {
+      const data = await api.getTeamChallenges();
+      setTeamChallenges(data);
+    } catch (e: any) {
+      console.error("Failed to fetch team challenges", e);
+      setTeamChallengesError(getErrorMessage(e));
+    } finally {
+      setIsLoadingTeamChallenges(false);
+    }
+  }, []);
   
   const clearUnreadCount = useCallback((roomId: string) => {
     setUnreadMessageCounts(prev => {
@@ -517,11 +559,13 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         fetchSuggestions(),
         fetchChallenges(),
         fetchRoadmaps(),
+        fetchTeams(),
+        fetchTeamChallenges(),
       ]).then(() => {
         fetchResources();
       });
     }
-  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources, fetchNotifications, fetchRooms, fetchShowcaseItems, fetchSuggestions, fetchChallenges, fetchRoadmaps]);
+  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources, fetchNotifications, fetchRooms, fetchShowcaseItems, fetchSuggestions, fetchChallenges, fetchRoadmaps, fetchTeams, fetchTeamChallenges]);
 
   const value = {
     activities,
@@ -538,6 +582,8 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     suggestions,
     challenges,
     roadmaps,
+    teams,
+    teamChallenges,
     unreadMessageCounts,
     clearUnreadCount,
     isLoadingActivities,
@@ -552,6 +598,8 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     isLoadingSuggestions,
     isLoadingChallenges,
     isLoadingRoadmaps,
+    isLoadingTeams,
+    isLoadingTeamChallenges,
     activitiesError,
     attendanceError,
     feedItemsError,
@@ -564,7 +612,9 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     suggestionsError,
     challengesError,
     roadmapsError,
-    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources || isLoadingNotifications || isLoadingRooms || isLoadingShowcase || isLoadingSuggestions || isLoadingChallenges || isLoadingRoadmaps,
+    teamsError,
+    teamChallengesError,
+    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources || isLoadingNotifications || isLoadingRooms || isLoadingShowcase || isLoadingSuggestions || isLoadingChallenges || isLoadingRoadmaps || isLoadingTeams || isLoadingTeamChallenges,
     fetchActivities,
     fetchAttendance,
     fetchFeedItems,
@@ -577,6 +627,8 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     fetchSuggestions,
     fetchChallenges,
     fetchRoadmaps,
+    fetchTeams,
+    fetchTeamChallenges,
     updateUserSkillLevel,
     featureFlags,
     updateFeatureFlags,

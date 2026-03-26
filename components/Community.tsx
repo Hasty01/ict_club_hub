@@ -1,69 +1,39 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { User } from '../types';
 import { useData } from '../DataContext';
+import * as api from '../services/apiService';
 import { TrophyIcon } from './icons/TrophyIcon';
 import { UsersIcon } from './icons/UsersIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
+import MemberPortfolioModal from './MemberPortfolioModal';
 
 interface CommunityProps {
     currentUser: User;
 }
 
-type Team = {
-    id: string;
-    name: string;
-    description: string;
-    members: string[];
-    createdBy: string;
-    createdAt: string;
-};
-
-type TeamChallenge = {
-    id: string;
-    teamId: string;
-    title: string;
-    description: string;
-    dueDate: string;
-    createdBy: string;
-    createdAt: string;
-    submissions: Record<string, { note: string; submittedAt: string }>;
-};
-
-const TEAM_STORAGE_KEY = 'clubhub_teams';
-const TEAM_CHALLENGE_KEY = 'clubhub_team_challenges';
-
-const loadFromStorage = <T,>(key: string, fallback: T): T => {
-    if (typeof window === 'undefined') return fallback;
-    try {
-        const raw = localStorage.getItem(key);
-        if (!raw) return fallback;
-        return JSON.parse(raw) as T;
-    } catch {
-        return fallback;
-    }
-};
-
 const Community: React.FC<CommunityProps> = ({ currentUser }) => {
-    const { allUsers, showcaseItems, suggestions } = useData();
-    const [teams, setTeams] = useState<Team[]>(() => loadFromStorage<Team[]>(TEAM_STORAGE_KEY, []));
-    const [teamChallenges, setTeamChallenges] = useState<TeamChallenge[]>(() => loadFromStorage<TeamChallenge[]>(TEAM_CHALLENGE_KEY, []));
+    const {
+        allUsers,
+        showcaseItems,
+        suggestions,
+        teams,
+        teamChallenges,
+        isLoadingTeams,
+        isLoadingTeamChallenges,
+        teamsError,
+        teamChallengesError,
+        fetchTeams,
+        fetchTeamChallenges,
+        showToast
+    } = useData();
     const [teamForm, setTeamForm] = useState({ name: '', description: '' });
     const [challengeForm, setChallengeForm] = useState({ teamId: '', title: '', description: '', dueDate: '' });
     const [submissionNote, setSubmissionNote] = useState<Record<string, string>>({});
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(teams));
-        }
-    }, [teams]);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            localStorage.setItem(TEAM_CHALLENGE_KEY, JSON.stringify(teamChallenges));
-        }
-    }, [teamChallenges]);
+    const [memberInvite, setMemberInvite] = useState<Record<string, string>>({});
+    const [memberSearch, setMemberSearch] = useState('');
+    const [selectedMember, setSelectedMember] = useState<User | null>(null);
 
     const userMap = useMemo(() => {
         return new Map(allUsers.map(user => [user.uid, user]));
@@ -86,7 +56,7 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
             badgeCount.set(user.uid, user.badges?.length || 0);
         });
 
-        const scored = allUsers
+        return allUsers
             .filter(user => user.status === 'APPROVED')
             .map(user => {
                 const showcaseScore = showcaseCount.get(user.uid) || 0;
@@ -104,81 +74,114 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
             .filter(entry => entry.score > 0)
             .sort((a, b) => b.score - a.score)
             .slice(0, 5);
-
-        return scored;
     }, [allUsers, showcaseItems, suggestions]);
 
     const topMember = recognitionBoard[0];
 
-    const handleCreateTeam = () => {
+    const handleCreateTeam = async () => {
         if (!teamForm.name.trim()) return;
-        const newTeam: Team = {
-            id: `team_${Date.now()}`,
-            name: teamForm.name.trim(),
-            description: teamForm.description.trim(),
-            members: [currentUser.uid],
-            createdBy: currentUser.uid,
-            createdAt: new Date().toISOString()
-        };
-        setTeams(prev => [newTeam, ...prev]);
-        setTeamForm({ name: '', description: '' });
+        try {
+            const created = await api.createTeam({
+                name: teamForm.name.trim(),
+                description: teamForm.description.trim(),
+                createdBy: currentUser.uid
+            });
+            await api.addTeamMember(created.id, currentUser.uid);
+            await fetchTeams();
+            setTeamForm({ name: '', description: '' });
+            showToast('Team created.', 'success');
+        } catch (error) {
+            console.error("Failed to create team", error);
+            showToast('Failed to create team.', 'error');
+        }
     };
 
-    const handleJoinTeam = (teamId: string) => {
-        setTeams(prev => prev.map(team => (
-            team.id === teamId && !team.members.includes(currentUser.uid)
-                ? { ...team, members: [...team.members, currentUser.uid] }
-                : team
-        )));
+    const handleJoinTeam = async (teamId: string) => {
+        try {
+            await api.addTeamMember(teamId, currentUser.uid);
+            await fetchTeams();
+        } catch (error) {
+            console.error("Failed to join team", error);
+            showToast('Failed to join team.', 'error');
+        }
     };
 
-    const handleLeaveTeam = (teamId: string) => {
-        setTeams(prev => prev.map(team => (
-            team.id === teamId
-                ? { ...team, members: team.members.filter(id => id !== currentUser.uid) }
-                : team
-        )));
+    const handleLeaveTeam = async (teamId: string) => {
+        try {
+            await api.removeTeamMember(teamId, currentUser.uid);
+            await fetchTeams();
+        } catch (error) {
+            console.error("Failed to leave team", error);
+            showToast('Failed to leave team.', 'error');
+        }
     };
 
-    const handleCreateChallenge = () => {
+    const handleAddMember = async (teamId: string) => {
+        const targetId = memberInvite[teamId];
+        if (!targetId) return;
+        try {
+            await api.addTeamMember(teamId, targetId);
+            await fetchTeams();
+            setMemberInvite(prev => ({ ...prev, [teamId]: '' }));
+            showToast('Member added.', 'success');
+        } catch (error) {
+            console.error("Failed to add member", error);
+            showToast('Failed to add member.', 'error');
+        }
+    };
+
+    const handleCreateChallenge = async () => {
         if (!challengeForm.teamId || !challengeForm.title.trim()) return;
-        const newChallenge: TeamChallenge = {
-            id: `team_ch_${Date.now()}`,
-            teamId: challengeForm.teamId,
-            title: challengeForm.title.trim(),
-            description: challengeForm.description.trim(),
-            dueDate: challengeForm.dueDate,
-            createdBy: currentUser.uid,
-            createdAt: new Date().toISOString(),
-            submissions: {}
-        };
-        setTeamChallenges(prev => [newChallenge, ...prev]);
-        setChallengeForm({ teamId: '', title: '', description: '', dueDate: '' });
+        try {
+            await api.createTeamChallenge({
+                teamId: challengeForm.teamId,
+                title: challengeForm.title.trim(),
+                description: challengeForm.description.trim(),
+                dueDate: challengeForm.dueDate || undefined,
+                createdBy: currentUser.uid
+            });
+            await fetchTeamChallenges();
+            setChallengeForm({ teamId: '', title: '', description: '', dueDate: '' });
+            showToast('Team challenge created.', 'success');
+        } catch (error) {
+            console.error("Failed to create team challenge", error);
+            showToast('Failed to create challenge.', 'error');
+        }
     };
 
-    const handleSubmitChallenge = (challengeId: string) => {
+    const handleSubmitChallenge = async (challengeId: string) => {
         const note = submissionNote[challengeId]?.trim();
         if (!note) return;
-        setTeamChallenges(prev => prev.map(challenge => (
-            challenge.id === challengeId
-                ? {
-                    ...challenge,
-                    submissions: {
-                        ...challenge.submissions,
-                        [currentUser.uid]: {
-                            note,
-                            submittedAt: new Date().toISOString()
-                        }
-                    }
-                }
-                : challenge
-        )));
-        setSubmissionNote(prev => ({ ...prev, [challengeId]: '' }));
+        try {
+            await api.upsertTeamChallengeSubmission({
+                challengeId,
+                userId: currentUser.uid,
+                note
+            });
+            await fetchTeamChallenges();
+            setSubmissionNote(prev => ({ ...prev, [challengeId]: '' }));
+            showToast('Submission saved.', 'success');
+        } catch (error) {
+            console.error("Failed to submit challenge", error);
+            showToast('Failed to submit challenge.', 'error');
+        }
     };
 
     const teamsById = useMemo(() => new Map(teams.map(team => [team.id, team])), [teams]);
 
+    const directoryMembers = useMemo(() => {
+        const term = memberSearch.trim().toLowerCase();
+        return allUsers
+            .filter(user => user.status === 'APPROVED')
+            .filter(user => {
+                if (!term) return true;
+                return user.name.toLowerCase().includes(term) || user.username.toLowerCase().includes(term);
+            })
+            .slice(0, 20);
+    }, [allUsers, memberSearch]);
+
     return (
+        <>
         <div className="max-w-6xl mx-auto space-y-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
@@ -288,12 +291,20 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
                     </div>
                 )}
 
-                {teams.length === 0 ? (
+                {isLoadingTeams ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Loading teams...</p>
+                ) : teamsError ? (
+                    <p className="text-sm text-red-500 dark:text-red-400">{teamsError}</p>
+                ) : teams.length === 0 ? (
                     <p className="text-sm text-gray-500 dark:text-gray-400">No teams yet. Create the first one.</p>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         {teams.map(team => {
-                            const isMember = team.members.includes(currentUser.uid);
+                            const isMember = team.memberIds.includes(currentUser.uid);
+                            const canManageMembers = isMember || currentUser.role === 'PATRON';
+                            const availableMembers = allUsers
+                                .filter(user => user.status === 'APPROVED')
+                                .filter(user => !team.memberIds.includes(user.uid));
                             return (
                                 <div key={team.id} className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-gray-50 dark:bg-gray-900/50">
                                     <div className="flex items-center justify-between">
@@ -318,7 +329,7 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
                                         )}
                                     </div>
                                     <div className="mt-3 flex flex-wrap gap-2">
-                                        {team.members.slice(0, 6).map(uid => {
+                                        {team.memberIds.slice(0, 6).map(uid => {
                                             const user = userMap.get(uid);
                                             return (
                                                 <img
@@ -329,13 +340,81 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
                                                 />
                                             );
                                         })}
-                                        {team.members.length > 6 && (
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">+{team.members.length - 6} more</span>
+                                        {team.memberIds.length > 6 && (
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">+{team.memberIds.length - 6} more</span>
                                         )}
                                     </div>
+                                    {canManageMembers && availableMembers.length > 0 && (
+                                        <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                                            <select
+                                                value={memberInvite[team.id] ?? ''}
+                                                onChange={(e) => setMemberInvite(prev => ({ ...prev, [team.id]: e.target.value }))}
+                                                className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm flex-1"
+                                            >
+                                                <option value="">Add member</option>
+                                                {availableMembers.map(user => (
+                                                    <option key={user.uid} value={user.uid}>
+                                                        {user.name} (@{user.username})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                onClick={() => handleAddMember(team.id)}
+                                                className="px-3 py-2 text-xs font-semibold rounded-lg bg-gray-900 text-white hover:bg-gray-800"
+                                            >
+                                                Add
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
+                    </div>
+                )}
+            </section>
+
+            <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Member Portfolio</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Browse achievements and activity.</p>
+                    </div>
+                    <input
+                        value={memberSearch}
+                        onChange={(e) => setMemberSearch(e.target.value)}
+                        placeholder="Search members..."
+                        className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm w-56"
+                    />
+                </div>
+
+                {directoryMembers.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No members found.</p>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {directoryMembers.map(member => (
+                            <div key={member.uid} className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-gray-50 dark:bg-gray-900/40">
+                                <div className="flex items-center gap-3">
+                                    <img
+                                        src={member.avatarUrl || `https://i.pravatar.cc/40?u=${member.username}`}
+                                        alt={member.name}
+                                        className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 object-cover"
+                                    />
+                                    <div className="flex-1">
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{member.name}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">@{member.username}</p>
+                                    </div>
+                                </div>
+                                <div className="mt-3 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                                    <span>{member.badges?.length || 0} badges</span>
+                                    <button
+                                        onClick={() => setSelectedMember(member)}
+                                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-900 text-white hover:bg-gray-800"
+                                    >
+                                        View Portfolio
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 )}
             </section>
@@ -389,13 +468,17 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
                     </div>
                 )}
 
-                {teamChallenges.length === 0 ? (
+                {isLoadingTeamChallenges ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Loading challenges...</p>
+                ) : teamChallengesError ? (
+                    <p className="text-sm text-red-500 dark:text-red-400">{teamChallengesError}</p>
+                ) : teamChallenges.length === 0 ? (
                     <p className="text-sm text-gray-500 dark:text-gray-400">No team challenges yet.</p>
                 ) : (
                     <div className="space-y-4">
                         {teamChallenges.map(challenge => {
                             const team = teamsById.get(challenge.teamId);
-                            const isMember = team?.members.includes(currentUser.uid);
+                            const isMember = team?.memberIds.includes(currentUser.uid);
                             const submission = challenge.submissions[currentUser.uid];
                             return (
                                 <div key={challenge.id} className="border border-gray-200 dark:border-gray-700 rounded-xl p-4">
@@ -442,6 +525,12 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
                 )}
             </section>
         </div>
+        <MemberPortfolioModal
+            isOpen={!!selectedMember}
+            user={selectedMember}
+            onClose={() => setSelectedMember(null)}
+        />
+        </>
     );
 };
 

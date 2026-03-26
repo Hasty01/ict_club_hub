@@ -73,6 +73,23 @@ create policy "Users can join themselves"
   on public.team_members for insert
   with check (auth.uid()::text = user_uid);
 
+create policy "Team members can add others"
+  on public.team_members for insert
+  with check (
+    exists (
+      select 1
+      from public.team_members tm
+      where tm.team_id = team_members.team_id
+        and tm.user_uid = auth.uid()::text
+    )
+    or exists (
+      select 1
+      from public.teams t
+      where t.id = team_members.team_id
+        and t.created_by = auth.uid()::text
+    )
+  );
+
 create policy "Users can leave themselves"
   on public.team_members for delete
   using (auth.uid()::text = user_uid);
