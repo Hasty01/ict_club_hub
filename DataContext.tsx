@@ -1,7 +1,7 @@
 
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
-import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType, Roadmap } from './types';
+import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType, Roadmap, FeatureFlags } from './types';
 import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
 
@@ -75,10 +75,29 @@ interface IDataContext {
   fetchChallenges: () => Promise<void>;
   fetchRoadmaps: () => Promise<void>;
   updateUserSkillLevel: (newLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED') => Promise<void>;
+  featureFlags: FeatureFlags;
+  updateFeatureFlags: (updates: Partial<FeatureFlags>) => void;
+  resetFeatureFlags: () => void;
 }
 
 // Create the context with a default value
 const DataContext = createContext<IDataContext | undefined>(undefined);
+
+const FEATURE_FLAG_KEY = 'clubhub_feature_flags';
+const defaultFeatureFlags: FeatureFlags = {
+  showFeed: true,
+  showActivities: true,
+  showAttendance: true,
+  showProjects: true,
+  showResources: true,
+  showChat: true,
+  showShowcase: true,
+  showSuggestions: true,
+  showChallenges: true,
+  showRoadmap: true,
+  showCommunity: true,
+  showPlayground: true
+};
 
 // Create a provider component
 export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> = ({ children, currentUser: initialUser }) => {
@@ -98,6 +117,17 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
   const [unreadMessageCounts, setUnreadMessageCounts] = useState<Record<string, number>>({});
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>(() => {
+      if (typeof window === 'undefined') return defaultFeatureFlags;
+      try {
+          const raw = localStorage.getItem(FEATURE_FLAG_KEY);
+          if (!raw) return defaultFeatureFlags;
+          const parsed = JSON.parse(raw) as Partial<FeatureFlags>;
+          return { ...defaultFeatureFlags, ...parsed };
+      } catch {
+          return defaultFeatureFlags;
+      }
+  });
   
   // Toast State
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -340,6 +370,23 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
       }
   }, [currentUser.uid, showToast]);
 
+  const updateFeatureFlags = useCallback((updates: Partial<FeatureFlags>) => {
+      setFeatureFlags(prev => {
+          const next = { ...prev, ...updates };
+          if (typeof window !== 'undefined') {
+              localStorage.setItem(FEATURE_FLAG_KEY, JSON.stringify(next));
+          }
+          return next;
+      });
+  }, []);
+
+  const resetFeatureFlags = useCallback(() => {
+      setFeatureFlags(defaultFeatureFlags);
+      if (typeof window !== 'undefined') {
+          localStorage.setItem(FEATURE_FLAG_KEY, JSON.stringify(defaultFeatureFlags));
+      }
+  }, []);
+
   // Effect to perform the client-side join for resources
   useEffect(() => {
     if (isLoadingUsers || resourcesError) { 
@@ -531,6 +578,9 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     fetchChallenges,
     fetchRoadmaps,
     updateUserSkillLevel,
+    featureFlags,
+    updateFeatureFlags,
+    resetFeatureFlags,
     
     // New Toast exports
     toasts,

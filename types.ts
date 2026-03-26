@@ -1,6 +1,21 @@
 
 
-export type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'profile' | 'members' | 'playground' | 'resources' | 'chat' | 'showcase' | 'suggestions' | 'challenges' | 'roadmap';
+export type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'profile' | 'members' | 'playground' | 'resources' | 'chat' | 'showcase' | 'suggestions' | 'challenges' | 'roadmap' | 'community' | 'admin';
+
+export interface FeatureFlags {
+  showFeed: boolean;
+  showActivities: boolean;
+  showAttendance: boolean;
+  showProjects: boolean;
+  showResources: boolean;
+  showChat: boolean;
+  showShowcase: boolean;
+  showSuggestions: boolean;
+  showChallenges: boolean;
+  showRoadmap: boolean;
+  showCommunity: boolean;
+  showPlayground: boolean;
+}
 
 export interface User {
   uid: string; // Changed from id: number

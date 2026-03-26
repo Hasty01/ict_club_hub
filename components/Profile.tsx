@@ -335,7 +335,7 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
     const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
     const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'details' | 'appearance'>('details');
-    const { fetchUsers, fetchFeedItems, fetchProjectData } = useData();
+    const { fetchUsers, fetchFeedItems, fetchProjectData, showcaseItems } = useData();
     const badgesRef = useRef<HTMLDivElement>(null);
     const summaryRef = useRef<HTMLDivElement>(null);
 
@@ -381,6 +381,12 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
     }, [attendance]);
     
     const totalActivities = attendance.length;
+
+    const portfolioItems = useMemo(() => {
+        return showcaseItems
+            .filter(item => item.userUid === currentUser.uid)
+            .slice(0, 4);
+    }, [showcaseItems, currentUser.uid]);
 
     const getPercentage = (count: number) => {
         if (totalActivities === 0) return '0.0';
@@ -496,6 +502,24 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
                                                     <BadgeCheckIcon className="w-4 h-4 text-yellow-700 dark:text-yellow-100" />
                                                 </div>
                                                 {badge}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Portfolio Section */}
+                            <div className="scroll-animate mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+                                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Portfolio Highlights</h3>
+                                {portfolioItems.length === 0 ? (
+                                    <p className="text-gray-500 dark:text-gray-400 text-sm italic">No showcases yet. Share your work to build your portfolio.</p>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {portfolioItems.map(item => (
+                                            <div key={item.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-700/40">
+                                                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{item.title}</h4>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{item.description}</p>
+                                                <p className="text-[11px] text-gray-400 mt-2">Shared {item.createdAt}</p>
                                             </div>
                                         ))}
                                     </div>

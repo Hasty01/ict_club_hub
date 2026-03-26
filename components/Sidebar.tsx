@@ -95,7 +95,7 @@ const ClubHubLogo = () => (
 );
 
 const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen, onClose, isCollapsed, onToggleCollapse }) => {
-  const { unreadMessageCounts, notifications } = useData();
+  const { unreadMessageCounts, notifications, featureFlags } = useData();
   
   const totalUnread = useMemo(() => {
       return Object.values(unreadMessageCounts).reduce((acc: number, count: number) => acc + count, 0);
@@ -124,38 +124,50 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen
       {
           title: "General",
           items: [
-              { tab: 'feed' as Tab, label: 'Feed', icon: <HomeIcon /> },
-              { tab: 'chat' as Tab, label: 'Messages', icon: <ChatBubbleIcon />, badge: totalUnread },
-              { tab: 'challenges' as Tab, label: 'Challenges', icon: <TrophyIcon />, badge: notificationCounts['challenges'] },
-              { tab: 'suggestions' as Tab, label: 'Suggestions', icon: <LightBulbIcon /> },
+              ...(featureFlags.showFeed ? [{ tab: 'feed' as Tab, label: 'Feed', icon: <HomeIcon /> }] : []),
+              ...(featureFlags.showCommunity ? [{ tab: 'community' as Tab, label: 'Community', icon: <UsersIcon /> }] : []),
+              ...(featureFlags.showChat ? [{ tab: 'chat' as Tab, label: 'Messages', icon: <ChatBubbleIcon />, badge: totalUnread }] : []),
+              ...(featureFlags.showChallenges ? [{ tab: 'challenges' as Tab, label: 'Challenges', icon: <TrophyIcon />, badge: notificationCounts['challenges'] }] : []),
+              ...(featureFlags.showSuggestions ? [{ tab: 'suggestions' as Tab, label: 'Suggestions', icon: <LightBulbIcon /> }] : []),
           ]
       },
       {
           title: "Manage",
           items: [
-              { tab: 'activities' as Tab, label: 'Activities', icon: <CalendarIcon />, badge: notificationCounts['activities'] },
-              { tab: 'projects' as Tab, label: 'Projects', icon: <ClipboardListIcon />, badge: notificationCounts['projects'] },
-              { tab: 'attendance' as Tab, label: 'Attendance', icon: <CheckCircleIcon /> },
+              ...(featureFlags.showActivities ? [{ tab: 'activities' as Tab, label: 'Activities', icon: <CalendarIcon />, badge: notificationCounts['activities'] }] : []),
+              ...(featureFlags.showProjects ? [{ tab: 'projects' as Tab, label: 'Projects', icon: <ClipboardListIcon />, badge: notificationCounts['projects'] }] : []),
+              ...(featureFlags.showAttendance ? [{ tab: 'attendance' as Tab, label: 'Attendance', icon: <CheckCircleIcon /> }] : []),
           ]
       },
       {
           title: "Learn & Share",
           items: [
-              { tab: 'roadmap' as Tab, label: 'Roadmap', icon: <MapIcon />, badge: notificationCounts['roadmap'] },
-              { tab: 'resources' as Tab, label: 'Resources', icon: <BookOpenIcon /> },
-              { tab: 'playground' as Tab, label: 'Playground', icon: <CodeIcon /> },
-              { tab: 'showcase' as Tab, label: 'Showcase', icon: <GlobeIcon /> },
+              ...(featureFlags.showRoadmap ? [{ tab: 'roadmap' as Tab, label: 'Roadmap', icon: <MapIcon />, badge: notificationCounts['roadmap'] }] : []),
+              ...(featureFlags.showResources ? [{ tab: 'resources' as Tab, label: 'Resources', icon: <BookOpenIcon /> }] : []),
+              ...(featureFlags.showPlayground ? [{ tab: 'playground' as Tab, label: 'Playground', icon: <CodeIcon /> }] : []),
+              ...(featureFlags.showShowcase ? [{ tab: 'showcase' as Tab, label: 'Showcase', icon: <GlobeIcon /> }] : []),
           ]
       },
+      ...(user.role === 'PATRON'
+          ? [{
+              title: "Admin",
+              items: [
+                  { tab: 'members' as Tab, label: 'Members', icon: <UsersIcon /> },
+                  { tab: 'admin' as Tab, label: 'Admin Tools', icon: <ClipboardListIcon /> }
+              ]
+          }]
+          : []),
       {
           title: "Account",
           items: [
-              // Only show Members for Patron
-              ...(user.role === 'PATRON' ? [{ tab: 'members' as Tab, label: 'Members', icon: <UsersIcon /> }] : []),
               { tab: 'profile' as Tab, label: 'Profile', icon: <IdentificationIcon /> },
           ]
       }
   ];
+
+  const filteredGroups = navGroups
+      .map(group => ({ ...group, items: group.items.filter(Boolean) }))
+      .filter(group => group.items.length > 0);
 
   return (
     <>
@@ -194,7 +206,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen
         
         {/* Navigation */}
         <nav className="flex-1 px-4 py-4 overflow-y-auto overflow-x-hidden custom-scrollbar space-y-6 relative z-10">
-            {navGroups.map((group, groupIndex) => (
+            {filteredGroups.map((group, groupIndex) => (
                 <div key={group.title}>
                     {!isCollapsed && (
                         <h3 className="px-3 mb-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
