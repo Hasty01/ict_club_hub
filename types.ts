@@ -309,6 +309,11 @@ export interface Toast {
   type: ToastType;
 }
 
+export interface NotificationPrefs {
+  browserEnabled: boolean;
+  notifyWhenAway: boolean;
+}
+
 // Roadmap Types
 export interface RoadmapResource {
   title: string;

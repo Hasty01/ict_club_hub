@@ -6,6 +6,13 @@ import * as api from '../services/apiService';
 import { BellIcon } from './icons/BellIcon';
 import { User, AppNotification, Tab } from '../types';
 
+const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+};
+
 interface NotificationsProps {
   currentUser: User;
   setActiveTab: (tab: Tab) => void;
@@ -13,7 +20,7 @@ interface NotificationsProps {
 }
 
 const Notifications: React.FC<NotificationsProps> = ({ currentUser, setActiveTab, isSidebarCollapsed }) => {
-    const { notifications, fetchNotifications, isLoadingNotifications } = useData();
+    const { notifications, fetchNotifications, isLoadingNotifications, notificationPrefs, updateNotificationPrefs } = useData();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const [permission, setPermission] = useState(
@@ -63,8 +70,22 @@ const Notifications: React.FC<NotificationsProps> = ({ currentUser, setActiveTab
                 body: 'You will now receive alerts for club activities.',
                 icon: '/favicon.svg'
             });
+            updateNotificationPrefs({ browserEnabled: true });
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                const existing = await reg.pushManager.getSubscription();
+                const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
+                if (!vapidKey) return;
+                const subscription = existing || await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(vapidKey)
+                });
+                await api.upsertPushSubscription(currentUser.uid, subscription);
+            } catch (err) {
+                console.error("Failed to subscribe for push notifications", err);
+            }
         }
-    }, []);
+    }, [updateNotificationPrefs]);
 
     return (
         <div className="relative" ref={dropdownRef}>
@@ -92,12 +113,12 @@ const Notifications: React.FC<NotificationsProps> = ({ currentUser, setActiveTab
                     <div className="p-3 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
                         <h4 className="font-semibold text-gray-800 dark:text-gray-200">Notifications</h4>
                         <div className="flex gap-2 items-center">
-                            {permission === 'default' && (
+                            {(permission === 'default' || !notificationPrefs.browserEnabled) && (
                                 <button 
                                     onClick={requestPermission} 
                                     className="text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-1 rounded hover:bg-blue-200 transition-colors"
                                 >
-                                    Enable Push
+                                    Enable Browser
                                 </button>
                             )}
                             {unreadCount > 0 && (

@@ -1,7 +1,7 @@
 
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
-import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType, Roadmap, FeatureFlags, Team, TeamChallenge } from './types';
+import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType, Roadmap, FeatureFlags, Team, TeamChallenge, NotificationPrefs } from './types';
 import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
 
@@ -29,6 +29,10 @@ interface IDataContext {
   toasts: Toast[];
   showToast: (message: string, type?: ToastType) => void;
   removeToast: (id: string) => void;
+
+  // Notification prefs
+  notificationPrefs: NotificationPrefs;
+  updateNotificationPrefs: (updates: Partial<NotificationPrefs>) => void;
 
   // Chat Unread State
   unreadMessageCounts: Record<string, number>;
@@ -92,6 +96,7 @@ interface IDataContext {
 const DataContext = createContext<IDataContext | undefined>(undefined);
 
 const FEATURE_FLAG_KEY = 'clubhub_feature_flags';
+const NOTIFICATION_PREFS_KEY = 'clubhub_notification_prefs';
 const defaultFeatureFlags: FeatureFlags = {
   showFeed: true,
   showActivities: true,
@@ -105,6 +110,11 @@ const defaultFeatureFlags: FeatureFlags = {
   showRoadmap: true,
   showCommunity: true,
   showPlayground: true
+};
+
+const defaultNotificationPrefs: NotificationPrefs = {
+  browserEnabled: false,
+  notifyWhenAway: true
 };
 
 // Create a provider component
@@ -136,6 +146,17 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
           return { ...defaultFeatureFlags, ...parsed };
       } catch {
           return defaultFeatureFlags;
+      }
+  });
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPrefs>(() => {
+      if (typeof window === 'undefined') return defaultNotificationPrefs;
+      try {
+          const raw = localStorage.getItem(NOTIFICATION_PREFS_KEY);
+          if (!raw) return defaultNotificationPrefs;
+          const parsed = JSON.parse(raw) as Partial<NotificationPrefs>;
+          return { ...defaultNotificationPrefs, ...parsed };
+      } catch {
+          return defaultNotificationPrefs;
       }
   });
   
@@ -185,6 +206,30 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
+
+  const updateNotificationPrefs = useCallback((updates: Partial<NotificationPrefs>) => {
+      setNotificationPrefs(prev => {
+          const next = { ...prev, ...updates };
+          localStorage.setItem(NOTIFICATION_PREFS_KEY, JSON.stringify(next));
+          return next;
+      });
+  }, []);
+
+  const showBrowserNotification = useCallback((title: string, body: string) => {
+      if (typeof window === 'undefined') return;
+      if (!notificationPrefs.browserEnabled) return;
+      if (!('Notification' in window)) return;
+      if (Notification.permission !== 'granted') return;
+      if (notificationPrefs.notifyWhenAway) {
+          const isVisible = document.visibilityState === 'visible';
+          const hasFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : false;
+          if (isVisible && hasFocus) return;
+      }
+      new Notification(title, {
+          body,
+          icon: '/favicon.svg'
+      });
+  }, [notificationPrefs]);
 
   // Helper to extract error messages safely
   const getErrorMessage = (error: any) => {
@@ -533,6 +578,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
                 
                 // Trigger Toast for new notification
                 showToast(newNotif.message, 'info');
+                showBrowserNotification('ClubHub Notification', newNotif.message);
             }
         )
         .subscribe();
@@ -541,7 +587,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         supabase.removeChannel(messageChannel);
         supabase.removeChannel(notificationChannel);
     };
-  }, [currentUser, rooms, showToast]); 
+  }, [currentUser, rooms, showToast, showBrowserNotification]); 
 
 
   // Fetch all data when the provider mounts
@@ -633,6 +679,8 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     featureFlags,
     updateFeatureFlags,
     resetFeatureFlags,
+    notificationPrefs,
+    updateNotificationPrefs,
     
     // New Toast exports
     toasts,

@@ -10,6 +10,8 @@ import { CheckIcon } from './icons/CheckIcon';
 interface DailyTipModalProps {
     isOpen: boolean;
     onClose: () => void;
+    skillLevel?: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+    preferredLanguage?: 'python' | 'javascript';
 }
 
 // Regex for Python/JavaScript Syntax Highlighting
@@ -37,7 +39,7 @@ const SyntaxHighlightedText: React.FC<{ text: string }> = ({ text }) => {
     );
 };
 
-const DailyTipModal: React.FC<DailyTipModalProps> = ({ isOpen, onClose }) => {
+const DailyTipModal: React.FC<DailyTipModalProps> = ({ isOpen, onClose, skillLevel = 'BEGINNER', preferredLanguage = 'python' }) => {
     const [tip, setTip] = useState<CodingTip | null>(null);
     const [loading, setLoading] = useState(true);
     const [copied, setCopied] = useState(false);
@@ -46,13 +48,7 @@ const DailyTipModal: React.FC<DailyTipModalProps> = ({ isOpen, onClose }) => {
         if (isOpen && !tip) {
             setLoading(true);
             
-            // Alternating logic based on date
-            // Odd day = Python, Even day = JavaScript
-            const today = new Date();
-            const dateNum = today.getDate();
-            const lang: 'python' | 'javascript' = (dateNum % 2 !== 0) ? 'python' : 'javascript';
-
-            generateCodingTip(lang)
+            generateCodingTip(preferredLanguage, skillLevel)
                 .then(data => {
                     setTip(data);
                     setLoading(false);

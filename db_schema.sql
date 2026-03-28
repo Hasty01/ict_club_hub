@@ -172,6 +172,32 @@ create index if not exists idx_playground_project_members_user_uid on public.pla
 create index if not exists idx_playground_project_files_project_id on public.playground_project_files(project_id);
 create index if not exists idx_playground_project_activity_project_id on public.playground_project_activity(project_id);
 
+-- Push subscriptions for browser notifications
+create table if not exists public.push_subscriptions (
+  id bigserial primary key,
+  user_uid text not null,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamp with time zone default now()
+);
+
+create index if not exists idx_push_subscriptions_user_uid on public.push_subscriptions(user_uid);
+
+alter table public.push_subscriptions enable row level security;
+
+create policy "Push subs select own"
+  on public.push_subscriptions for select
+  using (auth.uid()::text = user_uid);
+
+create policy "Push subs insert own"
+  on public.push_subscriptions for insert
+  with check (auth.uid()::text = user_uid);
+
+create policy "Push subs delete own"
+  on public.push_subscriptions for delete
+  using (auth.uid()::text = user_uid);
+
 alter table public.playground_projects enable row level security;
 alter table public.playground_project_members enable row level security;
 alter table public.playground_project_files enable row level security;

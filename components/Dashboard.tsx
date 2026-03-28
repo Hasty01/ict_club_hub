@@ -145,7 +145,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
       <AiTutor currentUser={currentUser} />
 
       {/* Daily Coding Tip Modal (Python on odd days, JS on even days) */}
-      <DailyTipModal isOpen={showTipModal} onClose={() => setShowTipModal(false)} />
+      <DailyTipModal 
+        isOpen={showTipModal} 
+        onClose={() => setShowTipModal(false)} 
+        skillLevel={currentUser.skillLevel || 'BEGINNER'}
+      />
     </div>
   );
 };

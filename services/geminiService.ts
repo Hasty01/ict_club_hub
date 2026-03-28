@@ -221,8 +221,10 @@ export const evaluateShortAnswer = async (question: string, userAnswer: string, 
     }
 };
 
-export const generateCodingTip = async (lang: 'python' | 'javascript'): Promise<CodingTip> => {
-    const prompt = `Generate a modern ${lang} tip (JSON) for students.
+export const generateCodingTip = async (lang: 'python' | 'javascript', skillLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' = 'BEGINNER'): Promise<CodingTip> => {
+    const prompt = `Generate a modern ${lang} tip (JSON) for high school students.
+    Target skill level: ${skillLevel}.
+    Keep it short, practical, and appropriate for the level.
     Include title, explanation, and codeSnippet.`;
 
     try {
@@ -234,4 +236,4 @@ export const generateCodingTip = async (lang: 'python' | 'javascript'): Promise<
     }
 };
 
-export const generatePythonTip = () => generateCodingTip('python');
+export const generatePythonTip = (skillLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' = 'BEGINNER') => generateCodingTip('python', skillLevel);

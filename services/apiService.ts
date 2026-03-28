@@ -30,6 +30,56 @@ const notifyAllUsers = async (message: string, linkTo: Tab, excludeUid?: string)
             }
         }
     }
+
+    try {
+        await sendPushNotifications({
+            userIds: notifications.map(n => n.user_uid),
+            title: 'ClubHub',
+            body: message,
+            url: '/'
+        });
+    } catch (error) {
+        console.warn("Push notify failed", error);
+    }
+};
+
+const notifyUsers = async (userIds: string[], message: string, linkTo: Tab, excludeUid?: string) => {
+    const uniqueIds = Array.from(new Set(userIds.filter(uid => uid && uid !== excludeUid)));
+    if (uniqueIds.length === 0) return;
+    const notifications = uniqueIds.map(uid => ({
+        user_uid: uid,
+        message,
+        is_read: false,
+        link_to: linkTo
+    }));
+    const { error } = await supabase.from('notifications').insert(notifications);
+    if (error) {
+        const msg = (error.message || '').toLowerCase();
+        const isConflict =
+            (error as any).status === 409 ||
+            error.code === '23505' ||
+            msg.includes('duplicate') ||
+            msg.includes('conflict');
+        if (!isConflict) {
+            throw error;
+        }
+    }
+
+    try {
+        await sendPushNotifications({
+            userIds: notifications.map(n => n.user_uid),
+            title: 'ClubHub',
+            body: message,
+            url: '/'
+        });
+    } catch (error) {
+        console.warn("Push notify failed", error);
+    }
+};
+
+const truncateText = (text: string, maxLen: number) => {
+    if (!text) return '';
+    return text.length > maxLen ? `${text.slice(0, maxLen)}…` : text;
 };
 
 // --- Auth & User ---
@@ -486,6 +536,9 @@ export const addFeedItem = async (item: { title: string, message: string, type: 
         const { error: pollError } = await supabase.from('poll_options').insert(optionsToInsert);
         if (pollError) throw pollError;
     }
+
+    const headline = item.title || truncateText(item.message, 60) || 'New post';
+    await notifyAllUsers(`New post: ${headline}`, 'feed', userId);
 };
 
 export const deleteFeedItem = async (id: string) => {
@@ -886,6 +939,39 @@ export const deleteResource = async (resource: Resource) => {
     if (error) throw error;
 };
 
+// --- Push Subscriptions ---
+export const upsertPushSubscription = async (userId: string, subscription: PushSubscription) => {
+    const data = subscription.toJSON();
+    const endpoint = data.endpoint;
+    const p256dh = data.keys?.p256dh;
+    const auth = data.keys?.auth;
+    if (!endpoint || !p256dh || !auth) {
+        throw new Error("Invalid push subscription.");
+    }
+    const { error } = await supabase
+        .from('push_subscriptions')
+        .upsert({
+            user_uid: userId,
+            endpoint,
+            p256dh,
+            auth
+        }, { onConflict: 'endpoint' });
+    if (error) throw error;
+};
+
+export const deletePushSubscription = async (endpoint: string) => {
+    const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
+    if (error) throw error;
+};
+
+export const sendPushNotifications = async (payload: { userIds: string[]; title: string; body: string; url?: string }) => {
+    const { data, error } = await supabase.functions.invoke('push-notify', {
+        body: payload
+    });
+    if (error) throw error;
+    return data;
+};
+
 // --- Notifications ---
 
 export const getNotifications = async (userId: string): Promise<AppNotification[]> => {
@@ -1012,6 +1098,15 @@ export const sendMessage = async (roomId: string, senderId: string, content: str
 
     if (error) throw error;
     await supabase.from('rooms').update({ updated_at: new Date().toISOString() }).eq('id', roomId);
+
+    try {
+        const { data: room } = await supabase.from('rooms').select('title, metadata').eq('id', roomId).single();
+        const participants: string[] = room?.metadata?.participants || [];
+        const title = room?.title ? ` in ${room.title}` : '';
+        await notifyUsers(participants, `New message${title}: ${truncateText(content, 80)}`, 'chat', senderId);
+    } catch (notifyErr) {
+        console.error("Failed to send message notification", notifyErr);
+    }
 
     return {
         id: String(data.id),
