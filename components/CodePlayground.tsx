@@ -17,7 +17,7 @@ import { UsersIcon } from './icons/UsersIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import Editor from '@monaco-editor/react';
-import { User, Tab, PlaygroundProject, PlaygroundProjectFile, PlaygroundProjectActivity } from '../types';
+import { User, Tab, PlaygroundProject, PlaygroundProjectFile, PlaygroundProjectActivity, PlaygroundProjectMember } from '../types';
 import * as api from '../services/apiService';
 import * as geminiService from '../services/geminiService';
 import ConfirmationModal from './ConfirmationModal';
@@ -242,7 +242,7 @@ const processCarriageReturns = (text: string) => {
 };
 
 const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, setActiveTab }) => {
-  const { fetchShowcaseItems, showToast, teams } = useData();
+  const { fetchShowcaseItems, showToast, teams, allUsers } = useData();
   const [language, setLanguage] = useState<Language>(() => {
       return (localStorage.getItem('playground_lang') as Language) || 'python';
   });
@@ -258,12 +258,15 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   const [projects, setProjects] = useState<PlaygroundProject[]>([]);
   const [projectFiles, setProjectFiles] = useState<PlaygroundProjectFile[]>([]);
   const [projectActivity, setProjectActivity] = useState<PlaygroundProjectActivity[]>([]);
+  const [projectMembers, setProjectMembers] = useState<PlaygroundProjectMember[]>([]);
+  const [memberProjectIds, setMemberProjectIds] = useState<string[]>([]);
   const [activeProject, setActiveProject] = useState<PlaygroundProject | null>(null);
   const [activeFile, setActiveFile] = useState<PlaygroundProjectFile | null>(null);
   const [fileContents, setFileContents] = useState<Record<string, string>>({});
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [isLoadingActivity, setIsLoadingActivity] = useState(false);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isProjectPanelOpen, setIsProjectPanelOpen] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', language: 'python' as Language, teamId: '' });
   const [newFileName, setNewFileName] = useState('');
@@ -271,12 +274,15 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   const [renamingFile, setRenamingFile] = useState<PlaygroundProjectFile | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [activityFilter, setActivityFilter] = useState<'all' | 'me' | 'team'>('all');
+  const [inviteUserId, setInviteUserId] = useState('');
+  const [inviteTeamId, setInviteTeamId] = useState('');
+  const [htmlPreview, setHtmlPreview] = useState(DEFAULT_HTML);
   
   const [output, setOutput] = useState<OutputLine[]>([{ type: 'log', content: 'Click "Run Code" to see the output here.' }]);
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
   const pyodideRef = useRef<any | null>(null);
   const [isPyodideReady, setIsPyodideReady] = useState(false);
-  const [activeTab, setActiveTabState] = useState<'editor' | 'output'>('editor');
+  const [activeTab, setActiveTabState] = useState<'editor' | 'output' | 'preview'>('editor');
   const [isGettingHint, setIsGettingHint] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
@@ -343,13 +349,23 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
     const saved = localStorage.getItem(`playground_code_${newLang}`);
     if (saved) {
         setCode(saved);
+        if (newLang === 'html') setHtmlPreview(saved);
     } else if (isDefault) {
         // If it was default/empty, load the new language's default
         if (newLang === 'python') setCode(DEFAULT_PYTHON);
         else if (newLang === 'javascript') setCode(DEFAULT_JS);
-        else setCode(DEFAULT_HTML);
+        else {
+            setCode(DEFAULT_HTML);
+            setHtmlPreview(DEFAULT_HTML);
+        }
     }
   };
+
+  useEffect(() => {
+      if (language !== 'html' && activeTab === 'preview') {
+          setActiveTabState('editor');
+      }
+  }, [language, activeTab]);
   
   useEffect(() => {
     return () => {
@@ -366,6 +382,9 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       if (!activeProject) {
           setProjectFiles([]);
           setActiveFile(null);
+          setProjectMembers([]);
+          setInviteUserId('');
+          setInviteTeamId('');
           const saved = localStorage.getItem(`playground_code_${language}`);
           if (saved) {
               setCode(saved);
@@ -376,6 +395,12 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           }
       }
   }, [activeProject]);
+
+  useEffect(() => {
+      if (!activeProject && language === 'html') {
+          setHtmlPreview(code);
+      }
+  }, [language, activeProject]);
 
   useEffect(() => {
       activeFileRef.current = activeFile;
@@ -492,6 +517,12 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       try {
           const data = await api.getPlaygroundProjects();
           setProjects(data);
+          if (currentUser.role === 'PATRON') {
+              setMemberProjectIds([]);
+          } else {
+              const memberships = await api.getPlaygroundProjectMemberships(currentUser.uid);
+              setMemberProjectIds(memberships);
+          }
       } catch (error: any) {
           console.error("Failed to load projects", error);
           showToast("Failed to load projects.", "error");
@@ -532,13 +563,30 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       }
   };
 
+  const loadProjectMembers = async (projectId: string) => {
+      setIsLoadingMembers(true);
+      try {
+          const members = await api.getPlaygroundProjectMembers(projectId);
+          setProjectMembers(members);
+      } catch (error: any) {
+          console.error("Failed to load project members", error);
+          setProjectMembers([]);
+      } finally {
+          setIsLoadingMembers(false);
+      }
+  };
+
   const openProject = async (project: PlaygroundProject) => {
       setActiveProject(project);
       setLanguage(project.language);
       setFileContents({});
+      setInviteUserId('');
+      setInviteTeamId('');
+      setActiveTabState('editor');
       setIsProjectPanelOpen(false);
       await loadProjectFiles(project.id);
       await loadProjectActivity(project.id);
+      await loadProjectMembers(project.id);
       api.logPlaygroundActivity({
           projectId: project.id,
           userId: currentUser.uid,
@@ -555,6 +603,9 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       if (cached !== undefined) {
           setActiveFile(file);
           setCode(cached);
+          if (language === 'html') {
+              setHtmlPreview(cached);
+          }
           return;
       }
       try {
@@ -562,6 +613,9 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           setFileContents(prev => ({ ...prev, [file.path]: content }));
           setActiveFile(file);
           setCode(content);
+          if (language === 'html') {
+              setHtmlPreview(content);
+          }
           api.logPlaygroundActivity({
               projectId: file.projectId,
               userId: currentUser.uid,
@@ -590,8 +644,16 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
               detail: created.name
           });
 
-          const starterName = created.language === 'python' ? 'main.py' : 'index.js';
-          const starterCode = created.language === 'python' ? DEFAULT_PYTHON : DEFAULT_JS;
+          const starterName = created.language === 'python'
+              ? 'main.py'
+              : created.language === 'javascript'
+                  ? 'index.js'
+                  : 'index.html';
+          const starterCode = created.language === 'python'
+              ? DEFAULT_PYTHON
+              : created.language === 'javascript'
+                  ? DEFAULT_JS
+                  : DEFAULT_HTML;
           await api.savePlaygroundFile({
               projectId: created.id,
               path: starterName,
@@ -749,16 +811,95 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       }
   };
 
+  const handleInviteUser = async () => {
+      if (!activeProject || !inviteUserId) return;
+      try {
+          await api.addPlaygroundProjectMember(activeProject.id, inviteUserId, currentUser.uid);
+          await api.logPlaygroundActivity({
+              projectId: activeProject.id,
+              userId: currentUser.uid,
+              action: 'invited_member',
+              detail: inviteUserId
+          });
+          setInviteUserId('');
+          await loadProjectMembers(activeProject.id);
+          await loadProjects();
+          showToast("Member invited.", "success");
+      } catch (error: any) {
+          console.error("Failed to invite member", error);
+          showToast("Failed to invite member.", "error");
+      }
+  };
+
+  const handleInviteTeam = async () => {
+      if (!activeProject || !inviteTeamId) return;
+      const team = teams.find(t => t.id === inviteTeamId);
+      if (!team || team.memberIds.length === 0) {
+          showToast("Team has no members.", "info");
+          return;
+      }
+      try {
+          await api.addPlaygroundProjectMembers(activeProject.id, team.memberIds, currentUser.uid);
+          await api.logPlaygroundActivity({
+              projectId: activeProject.id,
+              userId: currentUser.uid,
+              action: 'invited_team',
+              detail: team.name
+          });
+          setInviteTeamId('');
+          await loadProjectMembers(activeProject.id);
+          await loadProjects();
+          showToast("Team invited.", "success");
+      } catch (error: any) {
+          console.error("Failed to invite team", error);
+          showToast("Failed to invite team.", "error");
+      }
+  };
+
   const accessibleProjects = useMemo(() => {
       if (currentUser.role === 'PATRON') return projects;
       const teamIds = new Set(teams.filter(team => team.memberIds.includes(currentUser.uid)).map(team => team.id));
-      return projects.filter(project => project.createdBy === currentUser.uid || (project.teamId && teamIds.has(project.teamId)));
-  }, [projects, teams, currentUser]);
+      const memberProjects = new Set(memberProjectIds);
+      return projects.filter(project =>
+          project.createdBy === currentUser.uid ||
+          (project.teamId && teamIds.has(project.teamId)) ||
+          memberProjects.has(project.id)
+      );
+  }, [projects, teams, currentUser, memberProjectIds]);
 
   const selectableTeams = useMemo(() => {
       if (currentUser.role === 'PATRON') return teams;
       return teams.filter(team => team.memberIds.includes(currentUser.uid));
   }, [teams, currentUser]);
+
+  const collaborators = useMemo(() => {
+      if (!activeProject) return [];
+      const ids = new Set<string>();
+      ids.add(activeProject.createdBy);
+      projectMembers.forEach(member => ids.add(member.userId));
+      if (activeProject.teamId) {
+          const team = teams.find(t => t.id === activeProject.teamId);
+          team?.memberIds.forEach(id => ids.add(id));
+      }
+      return Array.from(ids).map(uid => {
+          const profile = allUsers.find(user => user.uid === uid);
+          return {
+              uid,
+              name: profile?.name || 'Member',
+              username: profile?.username,
+              avatarUrl: profile?.avatarUrl,
+              isOwner: uid === activeProject.createdBy,
+              isTeamMember: !!activeProject.teamId && !!teams.find(t => t.id === activeProject.teamId)?.memberIds.includes(uid),
+              isInvited: projectMembers.some(member => member.userId === uid)
+          };
+      });
+  }, [activeProject, projectMembers, teams, allUsers]);
+
+  const availableInviteUsers = useMemo(() => {
+      if (!activeProject) return [];
+      const collaboratorIds = new Set(collaborators.map(member => member.uid));
+      return allUsers.filter(user => !collaboratorIds.has(user.uid));
+  }, [activeProject, collaborators, allUsers]);
 
   const filteredActivity = useMemo(() => {
       if (!activeProject) return projectActivity;
@@ -781,7 +922,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
            return;
       }
       const currentCode = codeRef.current;
-      const def = language === 'python' ? DEFAULT_PYTHON : DEFAULT_JS;
+      const def = language === 'python' ? DEFAULT_PYTHON : language === 'javascript' ? DEFAULT_JS : DEFAULT_HTML;
       
       if (!currentCode || currentCode.trim() === '' || currentCode.trim() === def.trim()) {
            setCode(importedCode);
@@ -884,8 +1025,13 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   };
 
   const handleDownloadCode = () => {
-    const ext = language === 'python' ? 'py' : 'js';
-    const blob = new Blob([code], { type: language === 'python' ? 'text/x-python' : 'text/javascript' });
+    const ext = language === 'python' ? 'py' : language === 'javascript' ? 'js' : 'html';
+    const mime = language === 'python'
+        ? 'text/x-python'
+        : language === 'javascript'
+            ? 'text/javascript'
+            : 'text/html';
+    const blob = new Blob([code], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1152,7 +1298,11 @@ asyncio.sleep = custom_sleep_async
     `;
 
     try {
-        await pyodideRef.current.loadPackagesFromImports(code);
+        try {
+            await pyodideRef.current.loadPackagesFromImports(code);
+        } catch (error) {
+            console.warn("Package auto-load skipped:", error);
+        }
         await pyodideRef.current.runPythonAsync(setupCode);
         
         const asyncCode = wrapAsyncCalls(code, ['input', 'time.sleep', 'asyncio.sleep']);
@@ -1179,7 +1329,11 @@ asyncio.sleep = custom_sleep_async
 
   const handleRunCode = () => {
       if (language === 'python') runPython();
-      else runJS();
+      else if (language === 'javascript') runJS();
+      else {
+          setHtmlPreview(code);
+          setActiveTabState('preview');
+      }
   };
   
   const handleClearOutput = () => {
@@ -1273,6 +1427,7 @@ if "${projectDir}" not in sys.path:
                   >
                       <option value="python">Python</option>
                       <option value="javascript">JavaScript</option>
+                      <option value="html">HTML</option>
                   </select>
                   <select
                       value={newProject.teamId}
@@ -1384,7 +1539,7 @@ if "${projectDir}" not in sys.path:
                           <input
                               value={newFileName}
                               onChange={(e) => setNewFileName(e.target.value)}
-                              placeholder="new_file.py"
+                              placeholder={activeProject?.language === 'javascript' ? "new_file.js" : activeProject?.language === 'html' ? "index.html" : "new_file.py"}
                               className="flex-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
                           />
                           <button
@@ -1418,6 +1573,82 @@ if "${projectDir}" not in sys.path:
                               </div>
                           </div>
                       )}
+                  </div>
+              )}
+
+              {activeProject && (
+                  <div className="space-y-3">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Collaborators</p>
+                      {isLoadingMembers && collaborators.length === 0 ? (
+                          <p className="text-xs text-gray-400">Loading members...</p>
+                      ) : collaborators.length === 0 ? (
+                          <p className="text-xs text-gray-400">No collaborators yet.</p>
+                      ) : (
+                          <ul className="space-y-2">
+                              {collaborators.map(member => (
+                                  <li key={member.uid} className="flex items-center gap-2 text-xs">
+                                      <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-semibold text-gray-700 dark:text-gray-200">
+                                          {member.name.slice(0, 2).toUpperCase()}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                          <div className="font-semibold text-gray-700 dark:text-gray-200 truncate">{member.name}</div>
+                                          {member.username && (
+                                              <div className="text-[10px] text-gray-400 truncate">@{member.username}</div>
+                                          )}
+                                      </div>
+                                      <div className="flex flex-wrap gap-1">
+                                          {member.isOwner && <span className="px-2 py-0.5 text-[9px] rounded-full bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-200">Owner</span>}
+                                          {member.isTeamMember && <span className="px-2 py-0.5 text-[9px] rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">Team</span>}
+                                          {member.isInvited && !member.isTeamMember && !member.isOwner && (
+                                              <span className="px-2 py-0.5 text-[9px] rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200">Invited</span>
+                                          )}
+                                      </div>
+                                  </li>
+                              ))}
+                          </ul>
+                      )}
+
+                      <div className="space-y-2">
+                          <div className="flex gap-2">
+                              <select
+                                  value={inviteUserId}
+                                  onChange={(e) => setInviteUserId(e.target.value)}
+                                  className="flex-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                              >
+                                  <option value="">Invite member</option>
+                                  {availableInviteUsers.map(user => (
+                                      <option key={user.uid} value={user.uid}>{user.name}</option>
+                                  ))}
+                              </select>
+                              <button
+                                  onClick={handleInviteUser}
+                                  disabled={!inviteUserId}
+                                  className="px-2 py-1.5 text-xs font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                              >
+                                  Invite
+                              </button>
+                          </div>
+
+                          <div className="flex gap-2">
+                              <select
+                                  value={inviteTeamId}
+                                  onChange={(e) => setInviteTeamId(e.target.value)}
+                                  className="flex-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                              >
+                                  <option value="">Invite team</option>
+                                  {selectableTeams.map(team => (
+                                      <option key={team.id} value={team.id}>{team.name}</option>
+                                  ))}
+                              </select>
+                              <button
+                                  onClick={handleInviteTeam}
+                                  disabled={!inviteTeamId}
+                                  className="px-2 py-1.5 text-xs font-semibold rounded-md bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50"
+                              >
+                                  Add
+                              </button>
+                          </div>
+                      </div>
                   </div>
               )}
 
@@ -1468,7 +1699,7 @@ if "${projectDir}" not in sys.path:
         type="file"
         ref={fileInputRef}
         onChange={handleFileUpload}
-        accept={language === 'python' ? ".py,.txt" : ".js,.txt"}
+        accept={language === 'python' ? ".py,.txt" : language === 'javascript' ? ".js,.txt" : ".html,.htm,.txt"}
         className="hidden"
       />
 
@@ -1661,6 +1892,27 @@ if "${projectDir}" not in sys.path:
                     {isExecuting && !isWaitingForInput && <div className="animate-pulse mt-1 text-green-500">_</div>}
                  </div>
             </div>
+
+            {/* Preview */}
+            <div className={`absolute inset-0 w-full h-full bg-white dark:bg-gray-900 overflow-hidden flex flex-col ${activeTab === 'preview' ? 'z-10 opacity-100' : 'z-0 opacity-0 pointer-events-none'}`}>
+                 <div className="flex justify-between items-center p-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider pl-2">Preview</span>
+                    <button
+                        onClick={() => setHtmlPreview(code)}
+                        className="px-2 py-1 text-xs font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
+                    >
+                        Refresh
+                    </button>
+                 </div>
+                 <div className="flex-1 bg-white">
+                    <iframe
+                        title="HTML Preview"
+                        className="w-full h-full border-0 bg-white"
+                        sandbox="allow-scripts allow-modals allow-forms"
+                        srcDoc={htmlPreview}
+                    />
+                 </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1690,7 +1942,7 @@ if "${projectDir}" not in sys.path:
                        <div className="flex gap-2">
                            <input 
                                 type="text" 
-                                placeholder={`filename.${language === 'python' ? 'py' : 'js'}`} 
+                                placeholder={`filename.${language === 'python' ? 'py' : language === 'javascript' ? 'js' : 'html'}`} 
                                 value={saveFileName}
                                 onChange={(e) => setSaveFileName(e.target.value)}
                                 className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"

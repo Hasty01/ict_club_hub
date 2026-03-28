@@ -1554,7 +1554,7 @@ export const getPlaygroundProjects = async (): Promise<PlaygroundProject[]> => {
     }));
 };
 
-export const createPlaygroundProject = async (payload: { name: string; language: 'python' | 'javascript'; createdBy: string; teamId?: string | null }) => {
+export const createPlaygroundProject = async (payload: { name: string; language: 'python' | 'javascript' | 'html'; createdBy: string; teamId?: string | null }) => {
     const { data, error } = await supabase
         .from('playground_projects')
         .insert({
@@ -1611,6 +1611,15 @@ export const getPlaygroundProjectMembers = async (projectId: string): Promise<Pl
         addedBy: row.added_by,
         addedAt: row.added_at
     }));
+};
+
+export const getPlaygroundProjectMemberships = async (userId: string): Promise<string[]> => {
+    const { data, error } = await supabase
+        .from('playground_project_members')
+        .select('project_id')
+        .eq('user_uid', userId);
+    if (error) throw error;
+    return (data || []).map((row: any) => String(row.project_id));
 };
 
 export const addPlaygroundProjectMember = async (projectId: string, userId: string, addedBy: string) => {
