@@ -46,7 +46,7 @@ export interface TeamChallenge {
 export interface PlaygroundProject {
   id: string;
   name: string;
-  language: 'python' | 'javascript' | 'html';
+  language: 'python' | 'javascript' | 'html' | 'web';
   createdBy: string;
   teamId?: string | null;
   createdAt: string;

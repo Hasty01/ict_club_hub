@@ -17,6 +17,7 @@ import { UsersIcon } from './icons/UsersIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import Editor from '@monaco-editor/react';
+import { emmetHTML } from 'emmet-monaco-es';
 import { User, Tab, PlaygroundProject, PlaygroundProjectFile, PlaygroundProjectActivity, PlaygroundProjectMember } from '../types';
 import * as api from '../services/apiService';
 import * as geminiService from '../services/geminiService';
@@ -45,7 +46,8 @@ interface ScriptFile {
     size: number;
 }
 
-type Language = 'python' | 'javascript' | 'html';
+type SingleLanguage = 'python' | 'javascript' | 'html';
+type ProjectLanguage = 'python' | 'web' | 'javascript' | 'html';
 
 const DEFAULT_PYTHON = `#  A Python Example
 name = "ICT Club Member"
@@ -108,6 +110,59 @@ const DEFAULT_HTML = `<!doctype html>
     </div>
   </body>
 </html>`;
+
+const DEFAULT_WEB_HTML = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClubHub Web Project</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="card">
+      <h1>Welcome to your Web Project</h1>
+      <p>Edit <strong>index.html</strong>, <strong>styles.css</strong>, and <strong>app.js</strong>.</p>
+      <button id="helloBtn">Click me</button>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>`;
+
+const DEFAULT_WEB_CSS = `:root {
+  color-scheme: dark;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  padding: 24px;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.card {
+  background: #1e293b;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  max-width: 520px;
+}
+
+button {
+  background: #ec4899;
+  color: white;
+  border: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}`;
+
+const DEFAULT_WEB_JS = `const button = document.getElementById('helloBtn');
+if (button) {
+  button.addEventListener('click', () => {
+    alert('Keep building your web project!');
+  });
+}`;
 
 const PublishModal: React.FC<{ isOpen: boolean, onClose: () => void, onPublish: (title: string, desc: string) => Promise<void> }> = ({ isOpen, onClose, onPublish }) => {
     const [title, setTitle] = useState('');
@@ -243,8 +298,8 @@ const processCarriageReturns = (text: string) => {
 
 const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, setActiveTab }) => {
   const { fetchShowcaseItems, showToast, teams, allUsers } = useData();
-  const [language, setLanguage] = useState<Language>(() => {
-      return (localStorage.getItem('playground_lang') as Language) || 'python';
+  const [language, setLanguage] = useState<SingleLanguage>(() => {
+      return (localStorage.getItem('playground_lang') as SingleLanguage) || 'python';
   });
 
   const [code, setCode] = useState<string>(() => {
@@ -268,7 +323,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   const [isLoadingActivity, setIsLoadingActivity] = useState(false);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isProjectPanelOpen, setIsProjectPanelOpen] = useState(false);
-  const [newProject, setNewProject] = useState({ name: '', language: 'python' as Language, teamId: '' });
+  const [newProject, setNewProject] = useState({ name: '', language: 'python' as ProjectLanguage, teamId: '' });
   const [newFileName, setNewFileName] = useState('');
   const [projectToDelete, setProjectToDelete] = useState<PlaygroundProject | null>(null);
   const [renamingFile, setRenamingFile] = useState<PlaygroundProjectFile | null>(null);
@@ -314,10 +369,14 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   const codeRef = useRef(code);
   const activeFileRef = useRef<PlaygroundProjectFile | null>(null);
   const completionProvidersRef = useRef<any[]>([]);
+  const emmetInitializedRef = useRef(false);
   const collabChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const broadcastTimerRef = useRef<number | null>(null);
   const lastRemoteUpdateRef = useRef<Record<string, number>>({});
   const isProjectMode = !!activeProject;
+  const canPreview = isProjectMode
+      ? activeProject?.language === 'web' || activeProject?.language === 'html'
+      : language === 'html';
 
   useEffect(() => {
       if (!activeProject) {
@@ -329,7 +388,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       }
   }, [code, language, activeProject, activeFile]);
 
-  const handleLanguageChange = (newLang: Language) => {
+  const handleLanguageChange = (newLang: SingleLanguage) => {
     if (activeProject) {
         showToast("Project language is locked. Exit the project to switch.", "info");
         return;
@@ -362,10 +421,10 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   };
 
   useEffect(() => {
-      if (language !== 'html' && activeTab === 'preview') {
+      if (!canPreview && activeTab === 'preview') {
           setActiveTabState('editor');
       }
-  }, [language, activeTab]);
+  }, [canPreview, activeTab]);
   
   useEffect(() => {
     return () => {
@@ -489,6 +548,11 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           }
       });
 
+      if (!emmetInitializedRef.current) {
+          emmetHTML(monaco, ['html']);
+          emmetInitializedRef.current = true;
+      }
+
       completionProvidersRef.current.forEach(provider => provider.dispose());
       completionProvidersRef.current = [];
 
@@ -497,7 +561,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
               const word = model.getWordUntilPosition(position);
               const range = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber, startColumn: word.startColumn, endColumn: word.endColumn };
               
-              if (language === 'python') {
+              if (editorLanguage === 'python') {
                 const suggestions = [
                     ...PYTHON_KEYWORDS.map(k => ({ label: k, kind: monaco.languages.CompletionItemKind.Keyword, insertText: k, range, detail: 'Keyword' })),
                     ...PYTHON_BUILTINS.map(b => ({ label: b, kind: monaco.languages.CompletionItemKind.Function, insertText: b, range, detail: 'Built-in' })),
@@ -509,7 +573,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
               return { suggestions: [] };
           }
       };
-      completionProvidersRef.current.push(monaco.languages.registerCompletionItemProvider(language, staticProvider));
+      completionProvidersRef.current.push(monaco.languages.registerCompletionItemProvider(editorLanguage, staticProvider));
   };
 
   const loadProjects = async () => {
@@ -531,13 +595,17 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       }
   };
 
-  const loadProjectFiles = async (projectId: string) => {
+  const loadProjectFiles = async (projectId: string, projectLanguage?: ProjectLanguage) => {
       setIsLoadingFiles(true);
       try {
           const files = await api.getPlaygroundProjectFiles(projectId);
           setProjectFiles(files);
           if (files.length > 0) {
-              await openFile(files[0]);
+              const languageToUse = projectLanguage || activeProject?.language;
+              const preferred = languageToUse === 'web'
+                  ? files.find(file => file.path.toLowerCase().endsWith('index.html'))
+                  : null;
+              await openFile(preferred || files[0]);
           } else {
               setActiveFile(null);
               setCode('');
@@ -578,13 +646,13 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
 
   const openProject = async (project: PlaygroundProject) => {
       setActiveProject(project);
-      setLanguage(project.language);
+      setLanguage(project.language === 'web' ? 'html' : (project.language as SingleLanguage));
       setFileContents({});
       setInviteUserId('');
       setInviteTeamId('');
       setActiveTabState('editor');
       setIsProjectPanelOpen(false);
-      await loadProjectFiles(project.id);
+      await loadProjectFiles(project.id, project.language as ProjectLanguage);
       await loadProjectActivity(project.id);
       await loadProjectMembers(project.id);
       api.logPlaygroundActivity({
@@ -603,7 +671,9 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
       if (cached !== undefined) {
           setActiveFile(file);
           setCode(cached);
-          if (language === 'html') {
+          if (!activeProject && language === 'html') {
+              setHtmlPreview(cached);
+          } else if (activeProject?.language === 'web' && getFileExtension(file.path) === 'html') {
               setHtmlPreview(cached);
           }
           return;
@@ -613,7 +683,9 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           setFileContents(prev => ({ ...prev, [file.path]: content }));
           setActiveFile(file);
           setCode(content);
-          if (language === 'html') {
+          if (!activeProject && language === 'html') {
+              setHtmlPreview(content);
+          } else if (activeProject?.language === 'web' && getFileExtension(file.path) === 'html') {
               setHtmlPreview(content);
           }
           api.logPlaygroundActivity({
@@ -644,28 +716,42 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
               detail: created.name
           });
 
-          const starterName = created.language === 'python'
-              ? 'main.py'
-              : created.language === 'javascript'
-                  ? 'index.js'
-                  : 'index.html';
-          const starterCode = created.language === 'python'
-              ? DEFAULT_PYTHON
-              : created.language === 'javascript'
-                  ? DEFAULT_JS
-                  : DEFAULT_HTML;
-          await api.savePlaygroundFile({
-              projectId: created.id,
-              path: starterName,
-              content: starterCode,
-              userId: currentUser.uid
-          });
-          await api.logPlaygroundActivity({
-              projectId: created.id,
-              userId: currentUser.uid,
-              action: 'added_file',
-              detail: starterName
-          });
+          if (created.language === 'web') {
+              const starterFiles = [
+                  { path: 'index.html', content: DEFAULT_WEB_HTML },
+                  { path: 'styles.css', content: DEFAULT_WEB_CSS },
+                  { path: 'app.js', content: DEFAULT_WEB_JS }
+              ];
+              for (const file of starterFiles) {
+                  await api.savePlaygroundFile({
+                      projectId: created.id,
+                      path: file.path,
+                      content: file.content,
+                      userId: currentUser.uid
+                  });
+                  await api.logPlaygroundActivity({
+                      projectId: created.id,
+                      userId: currentUser.uid,
+                      action: 'added_file',
+                      detail: file.path
+                  });
+              }
+          } else {
+              const starterName = created.language === 'python' ? 'main.py' : 'index.js';
+              const starterCode = created.language === 'python' ? DEFAULT_PYTHON : DEFAULT_JS;
+              await api.savePlaygroundFile({
+                  projectId: created.id,
+                  path: starterName,
+                  content: starterCode,
+                  userId: currentUser.uid
+              });
+              await api.logPlaygroundActivity({
+                  projectId: created.id,
+                  userId: currentUser.uid,
+                  action: 'added_file',
+                  detail: starterName
+              });
+          }
 
           setNewProject({ name: '', language: 'python', teamId: '' });
           await loadProjects();
@@ -693,7 +779,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
               detail: fileName
           });
           setNewFileName('');
-          await loadProjectFiles(activeProject.id);
+          await loadProjectFiles(activeProject.id, activeProject.language as ProjectLanguage);
           await loadProjectActivity(activeProject.id);
       } catch (error: any) {
           console.error("Failed to add file", error);
@@ -716,7 +802,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
               action: 'saved_file',
               detail: activeFile.path
           });
-          await loadProjectFiles(activeProject.id);
+          await loadProjectFiles(activeProject.id, activeProject.language as ProjectLanguage);
           await loadProjectActivity(activeProject.id);
           showToast("File saved.", "success");
       } catch (error: any) {
@@ -739,7 +825,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
               setActiveFile(null);
               setCode('');
           }
-          await loadProjectFiles(activeProject.id);
+          await loadProjectFiles(activeProject.id, activeProject.language as ProjectLanguage);
           await loadProjectActivity(activeProject.id);
       } catch (error: any) {
           console.error("Failed to delete file", error);
@@ -802,7 +888,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           }
           setRenamingFile(null);
           setRenameValue('');
-          await loadProjectFiles(activeProject.id);
+          await loadProjectFiles(activeProject.id, activeProject.language as ProjectLanguage);
           await loadProjectActivity(activeProject.id);
           showToast("File renamed.", "success");
       } catch (error: any) {
@@ -1328,6 +1414,15 @@ asyncio.sleep = custom_sleep_async
   };
 
   const handleRunCode = () => {
+      if (activeProject) {
+          if (activeProject.language === 'python') {
+              runPython();
+          } else {
+              runWebPreview();
+          }
+          return;
+      }
+
       if (language === 'python') runPython();
       else if (language === 'javascript') runJS();
       else {
@@ -1386,6 +1481,67 @@ if "${projectDir}" not in sys.path:
       `);
   };
 
+  const getFileExtension = (path: string) => {
+      const parts = path.split('.');
+      if (parts.length < 2) return '';
+      return parts[parts.length - 1].toLowerCase();
+  };
+
+  const buildWebPreviewHtml = (contents: Record<string, string>) => {
+      const filePaths = Object.keys(contents);
+      const htmlPath = filePaths.find(path => path.toLowerCase().endsWith('index.html'))
+          || filePaths.find(path => getFileExtension(path) === 'html');
+      let html = htmlPath ? contents[htmlPath] : DEFAULT_WEB_HTML;
+
+      const css = filePaths
+          .filter(path => getFileExtension(path) === 'css')
+          .map(path => contents[path])
+          .join('\n\n');
+      const js = filePaths
+          .filter(path => ['js', 'mjs'].includes(getFileExtension(path)))
+          .map(path => contents[path])
+          .join('\n\n');
+
+      if (css.trim()) {
+          const styleTag = `\n<style id="clubhub-inline-styles">\n${css}\n</style>\n`;
+          if (html.includes('</head>')) {
+              html = html.replace('</head>', `${styleTag}</head>`);
+          } else {
+              html = styleTag + html;
+          }
+      }
+
+      if (js.trim()) {
+          const scriptTag = `\n<script id="clubhub-inline-scripts">\n${js}\n</script>\n`;
+          if (html.includes('</body>')) {
+              html = html.replace('</body>', `${scriptTag}</body>`);
+          } else {
+              html += scriptTag;
+          }
+      }
+
+      return html;
+  };
+
+  const runWebPreview = async () => {
+      if (!activeProject) return;
+      try {
+          const contents = await ensureProjectFilesLoaded();
+          const previewHtml = buildWebPreviewHtml(contents);
+          setHtmlPreview(previewHtml);
+          setActiveTabState('preview');
+          await api.logPlaygroundActivity({
+              projectId: activeProject.id,
+              userId: currentUser.uid,
+              action: 'ran_web_preview',
+              detail: activeFile?.path || 'preview'
+          });
+      } catch (error) {
+          console.error("Failed to build web preview", error);
+          showToast("Failed to build web preview.", "error");
+      }
+  };
+
   const handleCopyOutput = () => {
       const text = output.map(line => line.content).join('\n');
       navigator.clipboard.writeText(text).then(() => {
@@ -1395,6 +1551,17 @@ if "${projectDir}" not in sys.path:
   };
 
   const editorTheme = theme === 'dark' ? 'vs-dark' : 'light';
+  const editorLanguage = useMemo(() => {
+      if (activeProject && activeFile) {
+          const ext = getFileExtension(activeFile.path);
+          if (ext === 'py') return 'python';
+          if (ext === 'js' || ext === 'mjs') return 'javascript';
+          if (ext === 'html' || ext === 'htm') return 'html';
+          if (ext === 'css') return 'css';
+          return 'plaintext';
+      }
+      return language;
+  }, [activeProject, activeFile?.path, language]);
 
   const projectPanel = (
       <div className="flex flex-col h-full w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
@@ -1422,12 +1589,11 @@ if "${projectDir}" not in sys.path:
                   />
                   <select
                       value={newProject.language}
-                      onChange={(e) => setNewProject(prev => ({ ...prev, language: e.target.value as Language }))}
+                      onChange={(e) => setNewProject(prev => ({ ...prev, language: e.target.value as ProjectLanguage }))}
                       className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
                   >
                       <option value="python">Python</option>
-                      <option value="javascript">JavaScript</option>
-                      <option value="html">HTML</option>
+                      <option value="web">Web</option>
                   </select>
                   <select
                       value={newProject.teamId}
@@ -1723,7 +1889,7 @@ if "${projectDir}" not in sys.path:
              <div className="flex bg-gray-200 dark:bg-gray-700 p-0.5 rounded-lg">
                 <button onClick={() => setActiveTabState('editor')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${activeTab === 'editor' ? 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>Code</button>
                 <button onClick={() => setActiveTabState('output')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${activeTab === 'output' ? 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>Output</button>
-                {language === 'html' && (
+                {canPreview && (
                     <button onClick={() => setActiveTabState('preview')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${activeTab === 'preview' ? 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>Preview</button>
                 )}
              </div>
@@ -1815,8 +1981,8 @@ if "${projectDir}" not in sys.path:
             <div className={`absolute inset-0 w-full h-full ${activeTab === 'editor' ? 'z-10 opacity-100' : 'z-0 opacity-0 pointer-events-none'}`}>
                  <Editor
                     height="100%"
-                    defaultLanguage={language}
-                    language={language}
+                    defaultLanguage={editorLanguage}
+                    language={editorLanguage}
                     theme={editorTheme}
                     value={code}
                     onChange={(value) => setCode(value || '')}

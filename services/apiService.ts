@@ -1554,7 +1554,7 @@ export const getPlaygroundProjects = async (): Promise<PlaygroundProject[]> => {
     }));
 };
 
-export const createPlaygroundProject = async (payload: { name: string; language: 'python' | 'javascript' | 'html'; createdBy: string; teamId?: string | null }) => {
+export const createPlaygroundProject = async (payload: { name: string; language: 'python' | 'javascript' | 'html' | 'web'; createdBy: string; teamId?: string | null }) => {
     const { data, error } = await supabase
         .from('playground_projects')
         .insert({
