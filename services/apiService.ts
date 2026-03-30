@@ -3,6 +3,27 @@ import { supabase } from './supabaseClient';
 import { User, Activity, AttendanceRecord, AttendanceStatus, FeedItem, ProjectData, ProjectTask, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab, Roadmap, RoadmapProgress, ShowcaseComment, Message, Team, TeamChallenge, TeamChallengeSubmission, PlaygroundProject, PlaygroundProjectFile, PlaygroundProjectActivity, PlaygroundProjectMember } from '../types';
 
 // --- Helper for Notifications ---
+const insertNotifications = async (notifications: Array<{ user_uid: string; message: string; is_read: boolean; link_to: Tab }>) => {
+    if (notifications.length === 0) return;
+    const { error } = await supabase
+        .from('notifications')
+        .upsert(notifications, {
+            onConflict: 'user_uid,message,link_to',
+            ignoreDuplicates: true
+        });
+    if (error) {
+        const msg = (error.message || '').toLowerCase();
+        const isConflict =
+            (error as any).status === 409 ||
+            error.code === '23505' ||
+            msg.includes('duplicate') ||
+            msg.includes('conflict');
+        if (!isConflict) {
+            throw error;
+        }
+    }
+};
+
 const notifyAllUsers = async (message: string, linkTo: Tab, excludeUid?: string) => {
     const { data: users } = await supabase.from('users').select('uid');
     if (!users) return;
@@ -16,20 +37,7 @@ const notifyAllUsers = async (message: string, linkTo: Tab, excludeUid?: string)
             link_to: linkTo
         }));
 
-    if (notifications.length > 0) {
-        const { error } = await supabase.from('notifications').insert(notifications);
-        if (error) {
-            const msg = (error.message || '').toLowerCase();
-            const isConflict =
-                (error as any).status === 409 ||
-                error.code === '23505' ||
-                msg.includes('duplicate') ||
-                msg.includes('conflict');
-            if (!isConflict) {
-                throw error;
-            }
-        }
-    }
+    await insertNotifications(notifications);
 
     try {
         await sendPushNotifications({
@@ -52,18 +60,7 @@ const notifyUsers = async (userIds: string[], message: string, linkTo: Tab, excl
         is_read: false,
         link_to: linkTo
     }));
-    const { error } = await supabase.from('notifications').insert(notifications);
-    if (error) {
-        const msg = (error.message || '').toLowerCase();
-        const isConflict =
-            (error as any).status === 409 ||
-            error.code === '23505' ||
-            msg.includes('duplicate') ||
-            msg.includes('conflict');
-        if (!isConflict) {
-            throw error;
-        }
-    }
+    await insertNotifications(notifications);
 
     try {
         await sendPushNotifications({
@@ -750,9 +747,7 @@ export const addProjectTask = async (taskData: { content: string, priority: Task
                 link_to: 'projects' as Tab
             }));
         
-        if (notifications.length > 0) {
-            await supabase.from('notifications').insert(notifications);
-        }
+        await insertNotifications(notifications);
     }
 };
 
@@ -816,9 +811,7 @@ export const updateTaskAssignees = async (taskId: string, newAssigneeIds: string
                 link_to: 'projects' as Tab
             }));
 
-            if (notifications.length > 0) {
-                await supabase.from('notifications').insert(notifications);
-            }
+            await insertNotifications(notifications);
         } catch (notifError) {}
     }
 };
@@ -845,9 +838,7 @@ export const toggleProjectTaskCompletion = async (taskId: string, isCompleted: b
                         link_to: 'projects' as Tab,
                     }));
 
-                if (notifications.length > 0) {
-                    await supabase.from('notifications').insert(notifications);
-                }
+                await insertNotifications(notifications);
             }
         } catch (notifError) {}
     }

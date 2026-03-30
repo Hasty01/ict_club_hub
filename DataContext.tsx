@@ -548,6 +548,12 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
                         ...prev,
                         [newMsg.room_id]: (prev[newMsg.room_id] || 0) + 1
                     }));
+                    const room = rooms.find(r => r.id === newMsg.room_id);
+                    const title = room?.title ? `New message in ${room.title}` : 'New message';
+                    const body = typeof newMsg.content === 'string' && newMsg.content.length > 0
+                        ? (newMsg.content.length > 80 ? `${newMsg.content.slice(0, 80)}…` : newMsg.content)
+                        : 'You received a new message.';
+                    showBrowserNotification(title, body);
                 }
             }
         )

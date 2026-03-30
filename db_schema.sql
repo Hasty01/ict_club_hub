@@ -184,6 +184,10 @@ create table if not exists public.push_subscriptions (
 
 create index if not exists idx_push_subscriptions_user_uid on public.push_subscriptions(user_uid);
 
+-- Optional de-dupe for notifications
+create unique index if not exists idx_notifications_dedupe
+  on public.notifications (user_uid, message, link_to);
+
 alter table public.push_subscriptions enable row level security;
 
 create policy "Push subs select own"
