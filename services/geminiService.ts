@@ -18,12 +18,77 @@ const getApiKey = (): string => {
   }
 };
 
+const getGeminiKey = (): string => {
+  try {
+    // @ts-ignore
+    return import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+  } catch {
+    try {
+      // @ts-ignore
+      return process.env.GEMINI_API_KEY || '';
+    } catch {
+      return '';
+    }
+  }
+};
+
+const getGeminiModel = (): string => {
+  try {
+    // @ts-ignore
+    return import.meta.env.VITE_GEMINI_MODEL || process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  } catch {
+    try {
+      // @ts-ignore
+      return process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    } catch {
+      return 'gemini-1.5-flash';
+    }
+  }
+};
+
+const getCachedGeminiModel = (): string | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+        const model = localStorage.getItem('gemini_model_resolved');
+        const ts = Number(localStorage.getItem('gemini_model_resolved_at') || '0');
+        if (model && Date.now() - ts < 1000 * 60 * 60 * 24) return model; // 24h cache
+        return null;
+    } catch {
+        return null;
+    }
+};
+
+const setCachedGeminiModel = (model: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+        localStorage.setItem('gemini_model_resolved', model);
+        localStorage.setItem('gemini_model_resolved_at', String(Date.now()));
+    } catch {}
+};
+
+const fetchGeminiModels = async (): Promise<string[]> => {
+    if (!geminiKey) return [];
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`);
+    if (!response.ok) return [];
+    const data = await response.json();
+    const models = Array.isArray(data?.models) ? data.models : [];
+    return models
+        .filter((m: any) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+        .map((m: any) => String(m.name || '').replace(/^models\//, ''))
+        .filter(Boolean);
+};
+
 const apiKey = getApiKey();
+const geminiKey = getGeminiKey();
 const MODEL_NAME = "openai/gpt-oss-20b";
 const API_ENDPOINT = `https://router.huggingface.co/v1/chat/completions`;
+const GEMINI_MODEL = getGeminiModel();
 
 if (!apiKey) {
     console.warn("Hugging Face API Token is missing. AI features will be disabled.");
+}
+if (!geminiKey) {
+    console.warn("Gemini API key is missing. Roadmap/quiz generation will fall back to Hugging Face.");
 }
 
 // Helper to clean and parse responses
@@ -33,7 +98,14 @@ const cleanResponse = (text: string): string => {
 };
 
 const parseJSONResponse = (text: string) => {
-    const cleaned = text.replace(/^```(json)?\s*/, '').replace(/\s*```$/, '').trim();
+    const cleaned = text
+        .replace(/^\uFEFF/, '')
+        .replace(/^```(json)?\s*/, '')
+        .replace(/\s*```$/, '')
+        .trim()
+        // Fix common malformed JSON issues from models
+        .replace(/,\s*"\s*\{/g, ',{')
+        .replace(/\}\s*"\s*,/g, '},');
     try {
         return JSON.parse(cleaned);
     } catch (e) {
@@ -69,6 +141,127 @@ const callAI = async (messages: any[], jsonMode: boolean = false): Promise<strin
 
     const data = await response.json();
     return data.choices?.[0]?.message?.content || "";
+};
+
+const pickPreferredModel = (models: string[], preferred: string | null): string | null => {
+    if (!Array.isArray(models) || models.length === 0) return preferred || null;
+    const normalized = models.map(m => m.trim()).filter(Boolean);
+    if (preferred) {
+        const direct = normalized.find(m => m.toLowerCase() === preferred.toLowerCase());
+        if (direct) return direct;
+    }
+
+    const preferenceOrder = [
+        'gemini-2.0-pro',
+        'gemini-2.0-flash',
+        'gemini-1.5-pro',
+        'gemini-1.5-flash'
+    ];
+    for (const pref of preferenceOrder) {
+        const match = normalized.find(m => m.toLowerCase() === pref);
+        if (match) return match;
+    }
+    return normalized[0] || preferred || null;
+};
+
+const resolveGeminiModel = async (forceRefresh: boolean = false): Promise<string> => {
+    const preferred = GEMINI_MODEL || null;
+    if (!forceRefresh) {
+        const cached = getCachedGeminiModel();
+        if (cached) return cached;
+    }
+    const models = await fetchGeminiModels();
+    const chosen = pickPreferredModel(models, preferred);
+    if (chosen) setCachedGeminiModel(chosen);
+    return chosen || preferred || 'gemini-1.5-flash';
+};
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+let lastGeminiCallAt = 0;
+let geminiQueue: Promise<void> = Promise.resolve();
+const geminiInFlight = new Map<string, Promise<string>>();
+
+const applyGeminiThrottle = async () => {
+    const minGapMs = 1100;
+    const now = Date.now();
+    const waitMs = lastGeminiCallAt + minGapMs - now;
+    if (waitMs > 0) await sleep(waitMs);
+    lastGeminiCallAt = Date.now();
+};
+
+const enqueueGemini = async <T>(fn: () => Promise<T>): Promise<T> => {
+    let resolveQueue: () => void;
+    const queued = new Promise<void>(resolve => { resolveQueue = resolve; });
+    const prev = geminiQueue;
+    geminiQueue = prev.then(() => queued);
+    await prev;
+    try {
+        return await fn();
+    } finally {
+        // @ts-ignore
+        resolveQueue();
+    }
+};
+
+const callGemini = async (prompt: string): Promise<string> => {
+    if (!geminiKey) throw new Error("Gemini API key missing");
+    const existing = geminiInFlight.get(prompt);
+    if (existing) return existing;
+
+    const request = enqueueGemini(async () => {
+        let lastError: Error | null = null;
+        let model = await resolveGeminiModel(false);
+        const maxRetries = 3;
+
+        for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+            try {
+                await applyGeminiThrottle();
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+                const response = await fetch(`${endpoint}?key=${geminiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: "user", parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 2048
+                        }
+                    })
+                });
+                if (!response.ok) {
+                    if (response.status === 429) {
+                        const retryAfter = Number(response.headers.get('retry-after') || '0');
+                        const jitter = Math.floor(Math.random() * 250);
+                        const backoffMs = retryAfter > 0 ? retryAfter * 1000 : 1600 * (attempt + 1) + jitter;
+                        lastError = new Error(`Gemini API Error: ${response.status}`);
+                        await sleep(backoffMs);
+                        continue;
+                    }
+                    if (response.status === 404 || response.status === 400) {
+                        // Model not found or invalid; refresh model list and retry once
+                        lastError = new Error(`Gemini API Error: ${response.status}`);
+                        model = await resolveGeminiModel(true);
+                        continue;
+                    }
+                    throw new Error(`Gemini API Error: ${response.status}`);
+                }
+                const data = await response.json();
+                const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) return text;
+                throw new Error("Gemini API Error: empty response");
+            } catch (err: any) {
+                lastError = err;
+            }
+        }
+        throw lastError || new Error("Gemini API Error");
+    });
+
+    geminiInFlight.set(prompt, request);
+    try {
+        return await request;
+    } finally {
+        geminiInFlight.delete(prompt);
+    }
 };
 
 export interface QuizQuestion {
@@ -130,12 +323,14 @@ export const generateLearningRoadmap = async (topic: string, skillLevel: string,
     { "milestones": [ { "title": "...", "description": "...", "duration": "...", "resources": [ { "type": "VIDEO"|"ARTICLE", "title": "...", "url": "..." } ] } ] }`;
 
     try {
-        const text = await callAI([{ role: "user", content: prompt }], true);
+        const text = await callGemini(prompt);
         const parsed = parseJSONResponse(text);
         return parsed.milestones;
     } catch (error) {
-        console.error("Roadmap Error:", error);
-        throw error;
+        console.warn("Gemini roadmap error, falling back to Hugging Face:", error);
+        const text = await callAI([{ role: "user", content: prompt }], true);
+        const parsed = parseJSONResponse(text);
+        return parsed.milestones;
     }
 };
 
@@ -249,7 +444,7 @@ Question format:
 { "type": "MULTIPLE_CHOICE"|"TRUE_FALSE"|"SHORT_ANSWER", "question": "...", "options": ["..."], "correctAnswer": "..." }`;
 
     try {
-        const text = await callAI([{ role: "user", content: prompt }], true);
+        const text = await callGemini(prompt);
         const parsed = parseJSONResponse(text);
         const questions = Array.isArray(parsed?.questions) ? parsed.questions : [];
 
@@ -262,7 +457,17 @@ Question format:
 
         return ensureCodingQuestion(normalized, language, title, description);
     } catch (error) {
-        throw error;
+        console.warn("Gemini quiz error, falling back to Hugging Face:", error);
+        const text = await callAI([{ role: "user", content: prompt }], true);
+        const parsed = parseJSONResponse(text);
+        const questions = Array.isArray(parsed?.questions) ? parsed.questions : [];
+        const normalized: QuizQuestion[] = questions.map((q: any) => ({
+            type: q.type,
+            question: String(q.question || '').trim(),
+            options: Array.isArray(q.options) ? q.options.slice(0, 4) : undefined,
+            correctAnswer: String(q.correctAnswer || '').trim()
+        })).filter(q => q.question && q.correctAnswer);
+        return ensureCodingQuestion(normalized, language, title, description);
     }
 };
 

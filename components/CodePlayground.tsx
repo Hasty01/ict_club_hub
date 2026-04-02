@@ -17,7 +17,7 @@ import { UsersIcon } from './icons/UsersIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import Editor from '@monaco-editor/react';
-import { emmetHTML } from 'emmet-monaco-es';
+import { emmetHTML, emmetCSS } from 'emmet-monaco-es';
 import { User, Tab, PlaygroundProject, PlaygroundProjectFile, PlaygroundProjectActivity, PlaygroundProjectMember } from '../types';
 import * as api from '../services/apiService';
 import * as geminiService from '../services/geminiService';
@@ -582,8 +582,43 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
 
       if (!emmetInitializedRef.current) {
           emmetHTML(monaco, ['html']);
+          emmetCSS(monaco, ['css']);
           emmetInitializedRef.current = true;
       }
+
+      // Enable rich CSS/HTML suggestions (including <style> blocks)
+      try {
+          monaco.languages.css.cssDefaults.setOptions({
+              validate: true,
+              lint: {
+                  compatibleVendorPrefixes: 'warning',
+                  vendorPrefix: 'warning',
+                  duplicateProperties: 'warning',
+                  emptyRules: 'warning',
+                  importStatement: 'warning',
+                  boxModel: 'warning',
+                  universalSelector: 'warning',
+                  zeroUnits: 'warning',
+                  fontFaceProperties: 'warning',
+                  hexColorLength: 'warning',
+                  argumentsInColorFunction: 'warning',
+                  ieHack: 'warning',
+                  unknownProperties: 'warning',
+                  propertyIgnoredDueToDisplay: 'warning',
+                  important: 'warning',
+                  float: 'warning',
+                  idSelector: 'warning'
+              },
+              completion: {
+                  completePropertyWithSemicolon: true,
+                  triggerPropertyValueCompletion: true
+              }
+          });
+          monaco.languages.html.htmlDefaults.setOptions({
+              suggest: { html5: true },
+              format: { wrapLineLength: 140 }
+          });
+      } catch {}
 
       completionProvidersRef.current.forEach(provider => provider.dispose());
       completionProvidersRef.current = [];
@@ -592,20 +627,17 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           provideCompletionItems: (model: any, position: any) => {
               const word = model.getWordUntilPosition(position);
               const range = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber, startColumn: word.startColumn, endColumn: word.endColumn };
-              
-              if (editorLanguage === 'python') {
-                const suggestions = [
-                    ...PYTHON_KEYWORDS.map(k => ({ label: k, kind: monaco.languages.CompletionItemKind.Keyword, insertText: k, range, detail: 'Keyword' })),
-                    ...PYTHON_BUILTINS.map(b => ({ label: b, kind: monaco.languages.CompletionItemKind.Function, insertText: b, range, detail: 'Built-in' })),
-                    { label: 'def', kind: monaco.languages.CompletionItemKind.Snippet, insertText: 'def ${1:name}(${2:args}):\n\t${3:pass}', insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet, range, detail: 'Snippet' },
-                    { label: 'if', kind: monaco.languages.CompletionItemKind.Snippet, insertText: 'if ${1:condition}:\n\t${2:pass}', insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet, range, detail: 'Snippet' },
-                ];
-                return { suggestions };
-              }
-              return { suggestions: [] };
+
+              const suggestions = [
+                  ...PYTHON_KEYWORDS.map(k => ({ label: k, kind: monaco.languages.CompletionItemKind.Keyword, insertText: k, range, detail: 'Keyword' })),
+                  ...PYTHON_BUILTINS.map(b => ({ label: b, kind: monaco.languages.CompletionItemKind.Function, insertText: b, range, detail: 'Built-in' })),
+                  { label: 'def', kind: monaco.languages.CompletionItemKind.Snippet, insertText: 'def ${1:name}(${2:args}):\n\t${3:pass}', insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet, range, detail: 'Snippet' },
+                  { label: 'if', kind: monaco.languages.CompletionItemKind.Snippet, insertText: 'if ${1:condition}:\n\t${2:pass}', insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet, range, detail: 'Snippet' },
+              ];
+              return { suggestions };
           }
       };
-      completionProvidersRef.current.push(monaco.languages.registerCompletionItemProvider(editorLanguage, staticProvider));
+      completionProvidersRef.current.push(monaco.languages.registerCompletionItemProvider('python', staticProvider));
   };
 
   const loadProjects = async () => {

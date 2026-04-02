@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { XIcon } from './icons/XIcon';
 import { PlayIcon } from './icons/PlayIcon';
 import Editor from '@monaco-editor/react';
+import { emmetHTML, emmetCSS } from 'emmet-monaco-es';
 
 interface CodeRunnerModalProps {
   isOpen: boolean;
@@ -123,6 +124,7 @@ export const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClos
   const inputResolverRef = useRef<((value: string) => void) | null>(null);
   const consoleInputRef = useRef<HTMLInputElement>(null);
   const completionProvidersRef = useRef<any[]>([]);
+  const emmetInitializedRef = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -212,6 +214,46 @@ export const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClos
           formatOnType: true,
           formatOnPaste: true,
       });
+
+      if (!emmetInitializedRef.current) {
+          emmetHTML(monaco, ['html']);
+          emmetCSS(monaco, ['css']);
+          emmetInitializedRef.current = true;
+      }
+
+      // Enable rich CSS/HTML suggestions (including <style> blocks)
+      try {
+          monaco.languages.css.cssDefaults.setOptions({
+              validate: true,
+              lint: {
+                  compatibleVendorPrefixes: 'warning',
+                  vendorPrefix: 'warning',
+                  duplicateProperties: 'warning',
+                  emptyRules: 'warning',
+                  importStatement: 'warning',
+                  boxModel: 'warning',
+                  universalSelector: 'warning',
+                  zeroUnits: 'warning',
+                  fontFaceProperties: 'warning',
+                  hexColorLength: 'warning',
+                  argumentsInColorFunction: 'warning',
+                  ieHack: 'warning',
+                  unknownProperties: 'warning',
+                  propertyIgnoredDueToDisplay: 'warning',
+                  important: 'warning',
+                  float: 'warning',
+                  idSelector: 'warning'
+              },
+              completion: {
+                  completePropertyWithSemicolon: true,
+                  triggerPropertyValueCompletion: true
+              }
+          });
+          monaco.languages.html.htmlDefaults.setOptions({
+              suggest: { html5: true },
+              format: { wrapLineLength: 140 }
+          });
+      } catch {}
       
       completionProvidersRef.current.forEach(provider => provider.dispose());
       completionProvidersRef.current = [];
