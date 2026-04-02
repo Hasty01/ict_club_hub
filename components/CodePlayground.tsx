@@ -574,6 +574,8 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           guides: { bracketPairs: true, indentation: true },
           formatOnType: true,
           formatOnPaste: true,
+          colorDecorators: true,
+          quickSuggestions: { other: true, comments: false, strings: true },
           scrollbar: {
             vertical: 'auto',
             horizontal: 'auto',

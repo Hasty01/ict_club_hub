@@ -213,6 +213,8 @@ export const CodeRunnerModal: React.FC<CodeRunnerModalProps> = ({ isOpen, onClos
           guides: { bracketPairs: true, indentation: true },
           formatOnType: true,
           formatOnPaste: true,
+          colorDecorators: true,
+          quickSuggestions: { other: true, comments: false, strings: true },
       });
 
       if (!emmetInitializedRef.current) {
