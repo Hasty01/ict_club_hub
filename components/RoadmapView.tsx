@@ -336,7 +336,7 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
                 <div className="fixed inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl flex flex-col items-center">
                         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500 mb-3"></div>
-                        <p className="font-bold text-gray-800 dark:text-white">Generating AI Quiz...</p>
+                        <p className="font-bold text-gray-800 dark:text-white">Generating Quiz...</p>
                     </div>
                 </div>
             )}

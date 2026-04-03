@@ -102,18 +102,26 @@ const parseJSONResponse = (text: string) => {
         .replace(/^\uFEFF/, '')
         .replace(/^```(json)?\s*/, '')
         .replace(/\s*```$/, '')
-        .trim()
-        // Fix common malformed JSON issues from models
-        .replace(/,\s*"\s*\{/g, ',{')
-        .replace(/\}\s*"\s*,/g, '},');
+        .trim();
+    
     try {
         return JSON.parse(cleaned);
     } catch (e) {
-        console.error("Failed to parse JSON from AI:", cleaned);
+        // Try to find the JSON object/array within the text if direct parsing fails
         const jsonMatch = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
         if (jsonMatch) {
-            try { return JSON.parse(jsonMatch[0]); } catch(e2) {}
+            try {
+                return JSON.parse(jsonMatch[0]);
+            } catch (e2) {
+                // If it's still failing, it might be truncated. Try to close it manually if it's an object
+                const segment = jsonMatch[0];
+                if (segment.startsWith('{') && !segment.endsWith('}')) {
+                    try { return JSON.parse(segment + '}'); } catch (e3) {}
+                    // Further aggressive recovery could go here, but usually risky
+                }
+            }
         }
+        console.error("Failed to parse JSON from AI:", cleaned);
         throw new Error("AI returned invalid JSON format.");
     }
 };
@@ -131,7 +139,7 @@ const callAI = async (messages: any[], jsonMode: boolean = false): Promise<strin
             model: MODEL_NAME,
             messages: messages,
             temperature: 0.7,
-            max_tokens: 2048,
+            max_tokens: 4096,
         })
     });
 
@@ -182,7 +190,7 @@ let geminiQueue: Promise<void> = Promise.resolve();
 const geminiInFlight = new Map<string, Promise<string>>();
 
 const applyGeminiThrottle = async () => {
-    const minGapMs = 1100;
+    const minGapMs = 4500;
     const now = Date.now();
     const waitMs = lastGeminiCallAt + minGapMs - now;
     if (waitMs > 0) await sleep(waitMs);
@@ -224,15 +232,17 @@ const callGemini = async (prompt: string): Promise<string> => {
                         contents: [{ role: "user", parts: [{ text: prompt }] }],
                         generationConfig: {
                             temperature: 0.7,
-                            maxOutputTokens: 2048
+                            maxOutputTokens: 4096,
+                            responseMimeType: "application/json"
                         }
                     })
                 });
                 if (!response.ok) {
                     if (response.status === 429) {
                         const retryAfter = Number(response.headers.get('retry-after') || '0');
-                        const jitter = Math.floor(Math.random() * 250);
-                        const backoffMs = retryAfter > 0 ? retryAfter * 1000 : 1600 * (attempt + 1) + jitter;
+                        const jitter = Math.floor(Math.random() * 500);
+                        // If 429, wait at least 5 seconds or what the header says
+                        const backoffMs = retryAfter > 0 ? retryAfter * 1000 : 5000 * (attempt + 1) + jitter;
                         lastError = new Error(`Gemini API Error: ${response.status}`);
                         await sleep(backoffMs);
                         continue;
@@ -434,10 +444,11 @@ ${resourceHints}
 
 Requirements:
 - Return ONLY JSON: { "questions": [ ... ] }
-- 4 questions total.
+- 10 questions total.
 - Every question must be about the milestone content and the specified language.
-- Include AT LEAST ONE coding question that asks the learner to write a small code snippet.
-- For coding questions use type "SHORT_ANSWER" and provide a correctAnswer that is valid ${language} code.
+- Include AT LEAST THREE coding questions that ask the learner to write a small code snippet.
+- For questions that refer to a code example, include the code snippet IN the "question" field using Markdown code blocks (e.g. \`\`\`${language.toLowerCase()} ... \`\`\`).
+- For questions of type "SHORT_ANSWER" the correctAnswer must be valid ${language} code or a very specific technical term.
 - For multiple choice: include 4 options.
 
 Question format:

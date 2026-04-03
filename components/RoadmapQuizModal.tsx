@@ -4,6 +4,7 @@ import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { XCircleIcon } from './icons/XCircleIcon';
 import { CheckIcon } from './icons/CheckIcon';
 import { QuizQuestion, evaluateShortAnswer } from '../services/geminiService';
+import { FormattedMessage } from './FormattedMessage';
 
 interface RoadmapQuizModalProps {
     isOpen: boolean;
@@ -235,9 +236,9 @@ const RoadmapQuizModal: React.FC<RoadmapQuizModalProps> = ({ isOpen, onClose, qu
                     <span className="inline-block px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-[10px] font-bold rounded mb-2 uppercase">
                         {currentQuestion.type.replace('_', ' ')}
                     </span>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-relaxed">
-                        {currentQuestion.question}
-                    </h3>
+                    <div className="text-xl font-bold text-gray-900 dark:text-white leading-relaxed">
+                        <FormattedMessage text={currentQuestion.question} isUser={false} />
+                    </div>
                 </div>
 
                 {/* Inputs */}

@@ -58,7 +58,7 @@ const MatrixRain: React.FC = () => {
     resizeCanvas();
 
     // Added binary and matrix-like chars
-    const characters = "01ICTCLUBHUB<>/{};[]010101";
+    const characters = "01ICTCLUBHUB<>/{};[]010101HAKIM";
 
     const draw = () => {
       const { width, height } = getDimensions();
