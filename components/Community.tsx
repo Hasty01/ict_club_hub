@@ -308,14 +308,12 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
                             <p className="text-sm text-gray-500 dark:text-gray-400">Form squads for challenges and projects.</p>
                         </div>
                     </div>
-                    {currentUser.role === 'PATRON' && (
-                        <button
-                            onClick={handleCreateTeam}
-                            className="inline-flex items-center gap-2 px-3 py-2 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 transition-colors"
-                        >
-                            <PlusCircleIcon className="w-4 h-4" /> Create Team
-                        </button>
-                    )}
+                    <button
+                        onClick={handleCreateTeam}
+                        className="inline-flex items-center gap-2 px-3 py-2 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 transition-colors"
+                    >
+                        <PlusCircleIcon className="w-4 h-4" /> Create Team
+                    </button>
                 </div>
 
                 {currentUser.role === 'PATRON' && (

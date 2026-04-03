@@ -164,18 +164,46 @@ if (button) {
   });
 }`;
 
-const PublishModal: React.FC<{ isOpen: boolean, onClose: () => void, onPublish: (title: string, desc: string) => Promise<void> }> = ({ isOpen, onClose, onPublish }) => {
+const PublishModal: React.FC<{
+    isOpen: boolean,
+    onClose: () => void,
+    onPublish: (title: string, desc: string) => Promise<void>,
+    projectName?: string | null,
+    teamName?: string | null
+}> = ({ isOpen, onClose, onPublish, projectName, teamName }) => {
     const [title, setTitle] = useState('');
     const [desc, setDesc] = useState('');
     const [isPublishing, setIsPublishing] = useState(false);
+    const [includeProject, setIncludeProject] = useState(!!projectName);
+    const [showcaseAsTeam, setShowcaseAsTeam] = useState(false);
+
+    React.useEffect(() => {
+        if (isOpen) {
+            setTitle('');
+            setDesc('');
+            setIncludeProject(!!projectName);
+            setShowcaseAsTeam(false);
+        }
+    }, [isOpen, projectName]);
 
     if (!isOpen) return null;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!title || !desc) return;
+        const baseTitle = title.trim();
+        const baseDesc = desc.trim();
+        if (!baseTitle && !(includeProject && projectName)) return;
+        if (!baseDesc && !(includeProject && projectName)) return;
+
+        let finalTitle = baseTitle;
+        let finalDesc = baseDesc;
+        if (includeProject && projectName) {
+            if (!finalTitle) finalTitle = projectName;
+            const teamLine = showcaseAsTeam && teamName ? `\nTeam: ${teamName}` : '';
+            finalDesc = `${finalDesc ? `${finalDesc}\n\n` : ''}Project: ${projectName}${teamLine}`;
+        }
         setIsPublishing(true);
-        await onPublish(title, desc);
+        await onPublish(finalTitle, finalDesc);
         setIsPublishing(false);
     };
 
@@ -191,7 +219,7 @@ const PublishModal: React.FC<{ isOpen: boolean, onClose: () => void, onPublish: 
                             type="text" 
                             value={title} 
                             onChange={e => setTitle(e.target.value)} 
-                            required 
+                            required={!includeProject || !projectName}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-pink-500" 
                             placeholder="My Awesome Script"
                         />
@@ -201,12 +229,36 @@ const PublishModal: React.FC<{ isOpen: boolean, onClose: () => void, onPublish: 
                         <textarea 
                             value={desc} 
                             onChange={e => setDesc(e.target.value)} 
-                            required 
+                            required={!includeProject || !projectName}
                             rows={3}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-pink-500" 
                             placeholder="What does this code do?"
                         />
                     </div>
+                    {projectName && (
+                        <div className="space-y-2 rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900/40">
+                            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <input
+                                    type="checkbox"
+                                    checked={includeProject}
+                                    onChange={(e) => setIncludeProject(e.target.checked)}
+                                    className="rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                                />
+                                Include project details
+                            </label>
+                            {includeProject && teamName && (
+                                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                    <input
+                                        type="checkbox"
+                                        checked={showcaseAsTeam}
+                                        onChange={(e) => setShowcaseAsTeam(e.target.checked)}
+                                        className="rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                                    />
+                                    Showcase as team ({teamName})
+                                </label>
+                            )}
+                        </div>
+                    )}
                     <button 
                         type="submit" 
                         disabled={isPublishing}
@@ -2344,11 +2396,13 @@ if "${projectDir}" not in sys.path:
         isDangerous
       />
 
-      <PublishModal 
-        isOpen={isPublishModalOpen}
-        onClose={() => setIsPublishModalOpen(false)}
-        onPublish={handlePublish}
-      />
+        <PublishModal 
+          isOpen={isPublishModalOpen}
+          onClose={() => setIsPublishModalOpen(false)}
+          onPublish={handlePublish}
+          projectName={activeProject?.name || null}
+          teamName={teams.find(team => team.id === activeProject?.teamId)?.name || null}
+        />
 
       <ShareCodeModal 
         isOpen={isShareModalOpen}
