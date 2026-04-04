@@ -20,7 +20,7 @@ interface Message {
 const AiTutor: React.FC<AiTutorProps> = ({ currentUser }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
-        { role: 'model', text: `Hi ${currentUser.name.split(' ')[0]}! I'm your AI Tutor. I can help you learn coding concepts or debug issues, but I won't write the code for you! I also know what's happening in the club. What are you working on?` }
+        { role: 'model', text: `Hi ${currentUser.name.split(' ')[0]}! I'm Kevin, your AI Tutor. I can help you learn coding concepts or debug issues, but I won't write the code for you! I also know what's happening in the club. What are you working on?` }
     ]);
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -295,7 +295,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ currentUser }) => {
                                 <RobotIcon className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                                <h3 className="font-bold text-sm">AI Tutor</h3>
+                                <h3 className="font-bold text-sm">Kevin</h3>
                                 <p className="text-[10px] text-teal-100 opacity-90">Here to help, not to do.</p>
                             </div>
                         </div>
@@ -370,7 +370,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ currentUser }) => {
                     : 'bg-teal-500 hover:bg-teal-600 text-white animate-bounce-subtle'
                 }`}
                 style={{ touchAction: 'none' }} // Critical for preventing scroll on mobile while dragging
-                aria-label="Toggle AI Tutor"
+                aria-label="Toggle Kevin"
             >
                 {isOpen ? <XIcon className="w-6 h-6" /> : <RobotIcon className="w-8 h-8" />}
             </button>
