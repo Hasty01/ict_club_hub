@@ -122,6 +122,9 @@ const renderTextPart = (content: string, isUser: boolean) => {
         if (trimmed.startsWith('## ')) {
              return <h3 key={i} className="font-bold text-lg mt-4 mb-2 block border-b border-gray-200 dark:border-gray-700 pb-1">{formatInline(trimmed.substring(3), isUser)}</h3>
         }
+        if (trimmed.startsWith('# ')) {
+             return <h2 key={i} className="font-extrabold text-xl mt-4 mb-2 block">{formatInline(trimmed.substring(2), isUser)}</h2>
+        }
 
         // Empty lines
         if (!trimmed) return <div key={i} className="h-2" />;

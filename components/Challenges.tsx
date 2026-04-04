@@ -197,9 +197,9 @@ const ChallengeCard: React.FC<{
                     {challenge.title}
                 </h4>
                 
-                <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 leading-relaxed whitespace-pre-wrap">
-                    {challenge.description}
-                </p>
+                <div className="mb-4">
+                    <FormattedMessage text={challenge.description} isUser={false} />
+                </div>
             </div>
 
             <div className="pt-4 border-t border-gray-100 dark:border-gray-700 mt-auto">
