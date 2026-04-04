@@ -59,6 +59,34 @@ const CodeBlock: React.FC<{ code: string, language?: string }> = ({ code, langua
     );
 };
 
+const renderItalics = (text: string, baseKey: string) => {
+    const nodes: React.ReactNode[] = [];
+    const regex = /(\*(?!\*)([^*]+)\*|_(?!_)([^_]+)_)/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+            nodes.push(
+                <React.Fragment key={`${baseKey}-t-${lastIndex}`}>
+                    {text.slice(lastIndex, match.index)}
+                </React.Fragment>
+            );
+        }
+        const inner = match[2] || match[3] || '';
+        nodes.push(<em key={`${baseKey}-i-${match.index}`} className="italic">{inner}</em>);
+        lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) {
+        nodes.push(
+            <React.Fragment key={`${baseKey}-t-end`}>
+                {text.slice(lastIndex)}
+            </React.Fragment>
+        );
+    }
+    return nodes;
+};
+
 const formatInline = (text: string, isUser: boolean) => {
     // Split by bold (**text**)
     const boldParts = text.split(/(\*\*.*?\*\*)/g);
@@ -84,18 +112,7 @@ const formatInline = (text: string, isUser: boolean) => {
                     </code>
                 );
             }
-            // Italics (*text* or _text_)
-            const italicParts = subPart.split(/(\*(?!\*)([^*]+)\*|_(?!_)([^_]+)_)/g);
-            return italicParts.map((italicPart, k) => {
-                if (!italicPart) return null;
-                if (
-                    (italicPart.startsWith('*') && italicPart.endsWith('*') && italicPart.length > 2) ||
-                    (italicPart.startsWith('_') && italicPart.endsWith('_') && italicPart.length > 2)
-                ) {
-                    return <em key={`${i}-${j}-${k}`} className="italic">{italicPart.slice(1, -1)}</em>;
-                }
-                return <React.Fragment key={`${i}-${j}-${k}`}>{italicPart}</React.Fragment>;
-            });
+            return renderItalics(subPart, `${i}-${j}`);
         });
     });
 };
