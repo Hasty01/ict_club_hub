@@ -78,6 +78,13 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
     }, [allUsers, showcaseItems, suggestions]);
 
     const topMember = recognitionBoard[0];
+    const stats = useMemo(() => {
+        const approvedMembers = allUsers.filter(user => user.status === 'APPROVED').length;
+        const totalTeams = teams.length;
+        const totalChallenges = teamChallenges.length;
+        const totalSubmissions = teamChallenges.reduce((acc, c) => acc + Object.keys(c.submissions || {}).length, 0);
+        return { approvedMembers, totalTeams, totalChallenges, totalSubmissions };
+    }, [allUsers, teams, teamChallenges]);
 
     const handleCreateTeam = async () => {
         if (!teamForm.name.trim()) return;
@@ -215,14 +222,62 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
     return (
         <>
         <div className="max-w-6xl mx-auto space-y-8">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Community Hub</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Celebrate wins, form teams, and ship together.</p>
+            <section className="relative overflow-hidden rounded-3xl border border-gray-200/70 dark:border-gray-700/60 bg-gradient-to-br from-white via-pink-50/60 to-purple-50/50 dark:from-gray-900 dark:via-pink-900/15 dark:to-purple-900/15 p-6 md:p-8 shadow-sm">
+                <div className="absolute -top-16 -right-10 h-40 w-40 rounded-full bg-pink-300/30 blur-3xl"></div>
+                <div className="absolute -bottom-20 -left-10 h-44 w-44 rounded-full bg-purple-300/25 blur-3xl"></div>
+                <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                    <div>
+                        <p className="text-xs uppercase tracking-[0.3em] text-pink-500/80 dark:text-pink-300">Community</p>
+                        <h2 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white">Community Hub</h2>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 max-w-2xl">
+                            Celebrate wins, form teams, and ship together. This is the heartbeat of the club.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Tooltip text="Create a new team and invite members.">
+                            <button
+                                onClick={handleCreateTeam}
+                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-pink-600 text-white rounded-xl text-sm font-semibold shadow-md hover:bg-pink-700 transition-all"
+                            >
+                                <PlusCircleIcon className="w-4 h-4" /> Create Team
+                            </button>
+                        </Tooltip>
+                        {currentUser.role === 'PATRON' && (
+                            <Tooltip text="Create a team challenge for members.">
+                                <button
+                                    onClick={() => {
+                                        const firstTeam = teams[0];
+                                        if (firstTeam) setChallengeForm(prev => ({ ...prev, teamId: String(firstTeam.id) }));
+                                    }}
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold shadow-md hover:bg-gray-800 transition-all"
+                                >
+                                    <CheckCircleIcon className="w-4 h-4" /> Add Challenge
+                                </button>
+                            </Tooltip>
+                        )}
+                    </div>
                 </div>
-            </div>
+                <div className="relative z-10 mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="rounded-2xl bg-white/80 dark:bg-gray-900/70 border border-gray-200/60 dark:border-gray-700/60 p-4">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Members</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.approvedMembers}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white/80 dark:bg-gray-900/70 border border-gray-200/60 dark:border-gray-700/60 p-4">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Teams</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalTeams}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white/80 dark:bg-gray-900/70 border border-gray-200/60 dark:border-gray-700/60 p-4">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Team Challenges</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalChallenges}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white/80 dark:bg-gray-900/70 border border-gray-200/60 dark:border-gray-700/60 p-4">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Submissions</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalSubmissions}</p>
+                    </div>
+                </div>
+            </section>
 
-            <section className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-6">
+            <section className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-6">
                 <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-4">
                         <TrophyIcon />
@@ -235,64 +290,68 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
                     {recognitionBoard.length === 0 ? (
                         <p className="text-sm text-gray-500 dark:text-gray-400">No recognition data yet. Submit showcases or suggestions to appear here.</p>
                     ) : (
-                        <div className="space-y-3">
-                            {recognitionBoard.map((entry, index) => (
-                                <div key={entry.user.uid} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700/40 rounded-xl p-3">
-                                    <div className="h-8 w-8 rounded-full bg-gray-900 text-white dark:bg-white dark:text-gray-900 flex items-center justify-center text-sm font-bold">
-                                        {index + 1}
+                        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-4">
+                            <div className="rounded-2xl bg-gradient-to-br from-pink-500/10 via-purple-500/10 to-indigo-500/10 border border-pink-200/60 dark:border-pink-500/30 p-4">
+                                <p className="text-xs uppercase tracking-[0.2em] text-pink-600 dark:text-pink-300">Top Contributor</p>
+                                {topMember ? (
+                                    <div className="mt-3 flex items-center gap-4">
+                                        <img
+                                            src={topMember.user.avatarUrl || `https://i.pravatar.cc/120?u=${topMember.user.username}`}
+                                            alt={topMember.user.name}
+                                            className="w-16 h-16 rounded-full object-cover border-2 border-white/80 dark:border-gray-900 shadow-lg"
+                                        />
+                                        <div>
+                                            <p className="text-lg font-bold text-gray-900 dark:text-white">{topMember.user.name}</p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">@{topMember.user.username}</p>
+                                            <p className="text-sm font-semibold text-pink-600 dark:text-pink-300 mt-1">{topMember.score} pts</p>
+                                        </div>
                                     </div>
-                                    <img
-                                        src={entry.user.avatarUrl || `https://i.pravatar.cc/40?u=${entry.user.username}`}
-                                        alt={entry.user.name}
-                                        className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600"
-                                    />
-                                    <div className="flex-1">
-                                        <p className="font-semibold text-gray-900 dark:text-white">{entry.user.name}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">@{entry.user.username}</p>
+                                ) : (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">No spotlight yet.</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-3">
+                                {recognitionBoard.map((entry, index) => (
+                                    <div key={entry.user.uid} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700/40 rounded-xl p-3">
+                                        <div className="h-8 w-8 rounded-full bg-gray-900 text-white dark:bg-white dark:text-gray-900 flex items-center justify-center text-sm font-bold">
+                                            {index + 1}
+                                        </div>
+                                        <img
+                                            src={entry.user.avatarUrl || `https://i.pravatar.cc/40?u=${entry.user.username}`}
+                                            alt={entry.user.name}
+                                            className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600"
+                                        />
+                                        <div className="flex-1">
+                                            <p className="font-semibold text-gray-900 dark:text-white">{entry.user.name}</p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">@{entry.user.username}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-bold text-pink-600 dark:text-pink-400">{entry.score} pts</p>
+                                            <p className="text-[11px] text-gray-400">Showcases {entry.showcaseScore} • Ideas {entry.suggestionScore} • Badges {entry.badges}</p>
+                                        </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-bold text-pink-600 dark:text-pink-400">{entry.score} pts</p>
-                                        <p className="text-[11px] text-gray-400">Showcases {entry.showcaseScore} • Ideas {entry.suggestionScore} • Badges {entry.badges}</p>
-                                    </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
 
-                <div className="relative overflow-hidden bg-gradient-to-br from-pink-500/25 via-purple-500/25 to-indigo-500/20 dark:from-pink-500/35 dark:via-purple-500/35 dark:to-indigo-500/25 border border-pink-300/60 dark:border-pink-500/40 rounded-3xl p-8 shadow-[0_20px_60px_-30px_rgba(236,72,153,0.6)]">
+                <div className="relative overflow-hidden bg-gradient-to-br from-pink-500/25 via-purple-500/25 to-indigo-500/20 dark:from-pink-500/35 dark:via-purple-500/35 dark:to-indigo-500/25 border border-pink-300/60 dark:border-pink-500/40 rounded-3xl p-6 shadow-[0_20px_60px_-30px_rgba(236,72,153,0.6)]">
                     <div className="absolute -top-16 -right-12 w-48 h-48 bg-pink-400/20 blur-3xl rounded-full"></div>
                     <div className="absolute -bottom-20 -left-16 w-56 h-56 bg-purple-500/20 blur-3xl rounded-full"></div>
-                    <div className="flex items-center gap-3 mb-6 relative z-10">
+                    <div className="flex items-center gap-3 mb-4 relative z-10">
                         <SparklesIcon />
                         <div>
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Member Spotlight</h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">Top community contributor.</p>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Member Spotlight</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">Top community contributor this cycle.</p>
                         </div>
                     </div>
                     {topMember ? (
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-6 relative z-10">
-                            <div className="relative">
-                                <div className="absolute inset-0 rounded-full bg-pink-500/30 blur-xl animate-pulse"></div>
-                                <img
-                                    src={topMember.user.avatarUrl || `https://i.pravatar.cc/120?u=${topMember.user.username}`}
-                                    alt={topMember.user.name}
-                                    className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-4 border-white/80 dark:border-gray-900 shadow-xl"
-                                />
-                                <span className="absolute -bottom-1 -right-1 px-2 py-1 text-[11px] font-bold bg-gray-900 text-white dark:bg-white dark:text-gray-900 rounded-full shadow-md">
-                                    #1
-                                </span>
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">{topMember.user.name}</p>
-                                <p className="text-sm text-gray-700 dark:text-gray-300">@{topMember.user.username}</p>
-                                <p className="text-base text-pink-700 dark:text-pink-300 font-semibold mt-2">{topMember.score} points this week</p>
-                                <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
-                                    <span className="px-3 py-1 rounded-full bg-white/70 text-gray-900 shadow-sm">Showcases {topMember.showcaseScore}</span>
-                                    <span className="px-3 py-1 rounded-full bg-white/70 text-gray-900 shadow-sm">Ideas {topMember.suggestionScore}</span>
-                                    <span className="px-3 py-1 rounded-full bg-white/70 text-gray-900 shadow-sm">Badges {topMember.badges}</span>
-                                </div>
-                            </div>
+                        <div className="relative z-10">
+                            <p className="text-xl font-black text-gray-900 dark:text-white">{topMember.user.name}</p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300">@{topMember.user.username}</p>
+                            <p className="text-sm text-pink-700 dark:text-pink-200 mt-2">Showcases {topMember.showcaseScore} • Ideas {topMember.suggestionScore} • Badges {topMember.badges}</p>
                         </div>
                     ) : (
                         <p className="text-sm text-gray-500 dark:text-gray-400">No spotlight yet. Start contributing to appear here.</p>
