@@ -532,6 +532,28 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
     const connectionLabel = connectionLabels[realtimeStatus] || 'Connecting…';
     const connectionColor = connectionColors[realtimeStatus] || 'bg-amber-400';
 
+    const formatDateGroup = (value: string) => {
+        return new Date(value).toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    };
+
+    const messageSections = useMemo(() => {
+        const sections: Array<{ type: 'date'; label: string } | { type: 'message'; data: Message }> = [];
+        let lastDateLabel = '';
+        messages.forEach(msg => {
+            const label = formatDateGroup(msg.createdAt);
+            if (label !== lastDateLabel) {
+                sections.push({ type: 'date', label });
+                lastDateLabel = label;
+            }
+            sections.push({ type: 'message', data: msg });
+        });
+        return sections;
+    }, [messages]);
+
     const isUserOnline = (uid: string) => onlineUsers.includes(uid);
 
     const getHeaderStatus = () => {
@@ -1196,18 +1218,29 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-gray-50 dark:bg-gray-900">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-white via-slate-50 to-slate-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 rounded-bl-2xl">
                             {isLoadingMessages ? (
                                 <div className="text-center py-10 text-gray-500">Loading messages...</div>
-                            ) : messages.length === 0 ? (
+                            ) : !messages.length ? (
                                 <div className="text-center py-10 text-gray-500 dark:text-gray-400">
-                                    <p>No messages yet. Say hello!</p>
+                                    <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">No messages yet.</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-500">Start the conversation to see activity here.</p>
                                 </div>
                             ) : (
-                                messages.map(msg => {
+                                messageSections.map((section, index) => {
+                                    if (section.type === 'date') {
+                                        return (
+                                            <div key={`date-${section.label}-${index}`} className="flex justify-center">
+                                                <span className="px-3 py-1 text-[11px] tracking-[0.4em] text-gray-500 dark:text-gray-400 bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 rounded-full shadow-sm">
+                                                    {section.label}
+                                                </span>
+                                            </div>
+                                        );
+                                    }
+                                    const msg = section.data;
                                     const isMe = msg.senderId === currentUser.uid;
                                     const sender = allUsers.find(u => u.uid === msg.senderId);
-                                    
+
                                     return (
                                         <div key={msg.id} className={`flex group ${isMe ? 'justify-end' : 'justify-start'} relative`}>
                                             {!isMe && (
@@ -1227,9 +1260,9 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
                                             <div className="flex flex-col max-w-[85%] sm:max-w-[75%] min-w-0">
                                                 <div 
                                                     onContextMenu={(e) => handleContextMenu(e, msg)}
-                                                    className={`relative px-4 py-2 shadow-sm rounded-2xl ${
+                                                    className={`relative px-4 py-2 shadow-sm rounded-2xl transition duration-200 hover:shadow-lg ${
                                                     isMe 
-                                                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-br-none cursor-context-menu shadow-md' 
+                                                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-br-none cursor-context-menu shadow-md'
                                                     : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none border border-gray-200 dark:border-gray-600'
                                                 }`}>
                                                     {!isMe && <p className="text-xs text-pink-600 dark:text-pink-400 font-bold mb-1">{sender?.name || 'Unknown'}</p>}
