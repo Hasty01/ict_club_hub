@@ -15,45 +15,46 @@ import { useData } from '../DataContext';
 import { CursorVariant } from './CustomCursor';
 import { FormattedMessage } from './FormattedMessage';
 import Tooltip from './Tooltip';
+import NotificationSettings from './NotificationSettings';
 
 const AvatarSelectionModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  onSelect: (avatarUrl: string) => void;
+    isOpen: boolean;
+    onClose: () => void;
+    onSelect: (avatarUrl: string) => void;
 }> = ({ isOpen, onClose, onSelect }) => {
-  if (!isOpen) return null;
+    if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Choose Your Avatar</h3>
-        <div className="grid grid-cols-4 sm:grid-cols-6 gap-4 max-h-[60vh] overflow-y-auto p-2">
-          {predefinedAvatars.map((url, index) => (
-            <button
-              key={index}
-              onClick={() => onSelect(url)}
-              className="rounded-full aspect-square p-1 ring-2 ring-transparent hover:ring-pink-500 focus:ring-pink-500 focus:outline-none transition-all"
-              aria-label={`Select avatar ${index + 1}`}
-            >
-              <img src={url} alt={`Avatar ${index + 1}`} className="w-full h-full rounded-full object-cover bg-gray-200 dark:bg-gray-700" />
-            </button>
-          ))}
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose} role="dialog" aria-modal="true">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Choose Your Avatar</h3>
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-4 max-h-[60vh] overflow-y-auto p-2">
+                    {predefinedAvatars.map((url, index) => (
+                        <button
+                            key={index}
+                            onClick={() => onSelect(url)}
+                            className="rounded-full aspect-square p-1 ring-2 ring-transparent hover:ring-pink-500 focus:ring-pink-500 focus:outline-none transition-all"
+                            aria-label={`Select avatar ${index + 1}`}
+                        >
+                            <img src={url} alt={`Avatar ${index + 1}`} className="w-full h-full rounded-full object-cover bg-gray-200 dark:bg-gray-700" />
+                        </button>
+                    ))}
+                </div>
+                <div className="mt-6 text-right">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 dark:bg-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
         </div>
-        <div className="mt-6 text-right">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 dark:bg-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 
-const StatCard: React.FC<{icon: React.ReactElement<{className?: string}>, label: string, value: number, percentage: string, color: string}> = ({ icon, label, value, percentage, color }) => {
+const StatCard: React.FC<{ icon: React.ReactElement<{ className?: string }>, label: string, value: number, percentage: string, color: string }> = ({ icon, label, value, percentage, color }) => {
     const ref = useRef<HTMLDivElement>(null);
     useEffect(() => {
         const element = ref.current;
@@ -135,7 +136,7 @@ const ChangePasswordForm: React.FC<{ currentUser: User }> = ({ currentUser }) =>
         <div ref={ref} className="scroll-animate mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Change Password</h3>
             <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
-                 <div>
+                <div>
                     <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">New Password</label>
                     <div className="relative mt-1">
                         <input type={isNewPasswordVisible ? 'text' : 'password'} id="new-password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="block w-full p-2 pr-10 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500" required />
@@ -149,7 +150,7 @@ const ChangePasswordForm: React.FC<{ currentUser: User }> = ({ currentUser }) =>
                         </button>
                     </div>
                 </div>
-                 <div>
+                <div>
                     <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Confirm New Password</label>
                     <div className="relative mt-1">
                         <input type={isConfirmPasswordVisible ? 'text' : 'password'} id="confirm-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="block w-full p-2 pr-10 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500" required />
@@ -163,13 +164,13 @@ const ChangePasswordForm: React.FC<{ currentUser: User }> = ({ currentUser }) =>
                         </button>
                     </div>
                 </div>
-                
+
                 {error && <p className="text-sm text-red-500 text-center md:text-left">{error}</p>}
                 {success && <p className="text-sm text-green-600 text-center md:text-left">{success}</p>}
 
                 <div className="pt-2 text-right">
                     <button type="submit" disabled={isSubmitting} className="inline-flex items-center space-x-2 px-4 py-2 font-semibold text-white bg-purple-600 rounded-lg shadow-sm hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 dark:focus:ring-offset-gray-800">
-                       <LockClosedIcon />
+                        <LockClosedIcon />
                         <span>{isSubmitting ? 'Updating...' : 'Update Password'}</span>
                     </button>
                 </div>
@@ -229,20 +230,20 @@ const AppearanceSettings: React.FC = () => {
                 </div>
             )
         },
-        { 
-            id: 'figma', 
-            name: 'Figma Style', 
+        {
+            id: 'figma',
+            name: 'Figma Style',
             preview: (
                 <div className="relative w-12 h-12 flex items-center justify-center">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
-                        <path d="M5.65376 12.3673H5.46026L5.31717 12.4976L0.500002 16.8829L0.500002 1.1943L11.7841 12.3673H5.65376Z" fill="black" stroke="white" strokeWidth="1"/>
+                        <path d="M5.65376 12.3673H5.46026L5.31717 12.4976L0.500002 16.8829L0.500002 1.1943L11.7841 12.3673H5.65376Z" fill="black" stroke="white" strokeWidth="1" />
                     </svg>
                 </div>
             )
         },
-        { 
-            id: 'default', 
-            name: 'Modern Gradient', 
+        {
+            id: 'default',
+            name: 'Modern Gradient',
             preview: (
                 <div className="relative w-12 h-12 flex items-center justify-center">
                     <div className="w-2.5 h-2.5 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full shadow-sm z-10"></div>
@@ -250,9 +251,9 @@ const AppearanceSettings: React.FC = () => {
                 </div>
             )
         },
-        { 
-            id: 'halo', 
-            name: 'Halo', 
+        {
+            id: 'halo',
+            name: 'Halo',
             preview: (
                 <div className="relative w-12 h-12 flex items-center justify-center">
                     <div className="w-2 h-2 bg-yellow-300 rounded-full shadow-[0_0_6px_rgba(253,224,71,0.9)]"></div>
@@ -260,9 +261,9 @@ const AppearanceSettings: React.FC = () => {
                 </div>
             )
         },
-        { 
-            id: 'orbit', 
-            name: 'Orbit', 
+        {
+            id: 'orbit',
+            name: 'Orbit',
             preview: (
                 <div className="relative w-12 h-12 flex items-center justify-center">
                     <div className="w-2.5 h-2.5 bg-cyan-300 rounded-full"></div>
@@ -270,9 +271,9 @@ const AppearanceSettings: React.FC = () => {
                 </div>
             )
         },
-        { 
-            id: 'comet', 
-            name: 'Comet', 
+        {
+            id: 'comet',
+            name: 'Comet',
             preview: (
                 <div className="relative w-12 h-12 flex items-center justify-center">
                     <div className="w-2.5 h-2.5 bg-white rounded-full shadow-[0_0_6px_rgba(255,255,255,0.9)]"></div>
@@ -280,9 +281,9 @@ const AppearanceSettings: React.FC = () => {
                 </div>
             )
         },
-        { 
-            id: 'neon', 
-            name: 'Neon', 
+        {
+            id: 'neon',
+            name: 'Neon',
             preview: (
                 <div className="relative w-12 h-12 flex items-center justify-center">
                     <div className="w-2.5 h-2.5 bg-lime-300 rounded-sm shadow-[0_0_8px_rgba(190,242,100,0.9)]"></div>
@@ -290,9 +291,9 @@ const AppearanceSettings: React.FC = () => {
                 </div>
             )
         },
-        { 
-            id: 'scanner', 
-            name: 'Scanner', 
+        {
+            id: 'scanner',
+            name: 'Scanner',
             preview: (
                 <div className="relative w-12 h-12 flex items-center justify-center">
                     <div className="w-2 h-2 bg-emerald-300 rounded-full"></div>
@@ -300,9 +301,9 @@ const AppearanceSettings: React.FC = () => {
                 </div>
             )
         },
-        { 
-            id: 'glitch', 
-            name: 'Glitch', 
+        {
+            id: 'glitch',
+            name: 'Glitch',
             preview: (
                 <div className="relative w-12 h-12 flex items-center justify-center">
                     <div className="w-2.5 h-2.5 bg-pink-500"></div>
@@ -325,19 +326,19 @@ const AppearanceSettings: React.FC = () => {
             <div>
                 <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Cursor Customization</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                    Personalize your experience by choosing a custom cursor style. 
+                    Personalize your experience by choosing a custom cursor style.
                     (Only visible on desktop devices)
                 </p>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {cursors.map((cursor) => (
                         <button
                             key={cursor.id}
                             onClick={() => handleCursorSelect(cursor.id)}
                             className={`relative flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all duration-200 group
-                            ${selectedCursor === cursor.id 
-                                ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/10' 
-                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-pink-300 dark:hover:border-pink-700'}`}
+                            ${selectedCursor === cursor.id
+                                    ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/10'
+                                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-pink-300 dark:hover:border-pink-700'}`}
                         >
                             <div className="mb-4 transform group-hover:scale-110 transition-transform duration-200">
                                 {cursor.preview}
@@ -367,9 +368,9 @@ const AppearanceSettings: React.FC = () => {
                             key={font.value}
                             onClick={() => handleFontSelect(font.value)}
                             className={`relative flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all duration-200 group
-                            ${selectedFont === font.value 
-                                ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/10' 
-                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-pink-300 dark:hover:border-pink-700'}`}
+                            ${selectedFont === font.value
+                                    ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/10'
+                                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-pink-300 dark:hover:border-pink-700'}`}
                         >
                             <div className="mb-3 text-2xl" style={{ fontFamily: font.value }}>
                                 Aa
@@ -399,7 +400,7 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
     const [bio, setBio] = useState(currentUser.bio || '');
     const [isSavingBio, setIsSavingBio] = useState(false);
     const [bioStatus, setBioStatus] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'details' | 'appearance'>('details');
+    const [activeTab, setActiveTab] = useState<'details' | 'appearance' | 'notifications'>('details');
     const { fetchUsers, fetchFeedItems, fetchProjectData, showcaseItems } = useData();
     const badgesRef = useRef<HTMLDivElement>(null);
     const summaryRef = useRef<HTMLDivElement>(null);
@@ -448,7 +449,7 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
             { Present: 0, Absent: 0, Excused: 0 } as { [key in AttendanceStatus]: number }
         );
     }, [attendance]);
-    
+
     const totalActivities = attendance.length;
 
     const portfolioItems = useMemo(() => {
@@ -468,14 +469,14 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
             await api.updateUser(currentUser.uid, { avatarUrl: newAvatarUrl });
             const updatedUser = { ...currentUser, avatarUrl: newAvatarUrl };
             onUpdateUserProfile(updatedUser);
-            
+
             // Refresh all data that depends on user info (Avatar)
             await Promise.all([
-                fetchUsers(), 
+                fetchUsers(),
                 fetchFeedItems(),
                 fetchProjectData()
             ]);
-            
+
             setIsAvatarModalOpen(false);
         } catch (error: any) {
             console.error("Failed to update avatar:", error);
@@ -504,33 +505,40 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
             setTimeout(() => setBioStatus(null), 2500);
         }
     };
-    
+
     return (
         <div className="max-w-4xl mx-auto">
             <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-200 mb-6">My Profile</h2>
-            
+
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
                 {/* Navigation Tabs */}
                 <div className="flex border-b border-gray-200 dark:border-gray-700">
                     <button
                         onClick={() => setActiveTab('details')}
-                        className={`flex-1 py-4 text-sm font-medium text-center transition-colors focus:outline-none ${
-                            activeTab === 'details'
-                                ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400 bg-gray-50 dark:bg-gray-800'
-                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        }`}
+                        className={`flex-1 py-4 text-sm font-medium text-center transition-colors focus:outline-none ${activeTab === 'details'
+                            ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400 bg-gray-50 dark:bg-gray-800'
+                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
                     >
                         My Details
                     </button>
                     <button
                         onClick={() => setActiveTab('appearance')}
-                        className={`flex-1 py-4 text-sm font-medium text-center transition-colors focus:outline-none ${
-                            activeTab === 'appearance'
-                                ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400 bg-gray-50 dark:bg-gray-800'
-                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        }`}
+                        className={`flex-1 py-4 text-sm font-medium text-center transition-colors focus:outline-none ${activeTab === 'appearance'
+                            ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400 bg-gray-50 dark:bg-gray-800'
+                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
                     >
                         Appearance
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('notifications')}
+                        className={`flex-1 py-4 text-sm font-medium text-center transition-colors focus:outline-none ${activeTab === 'notifications'
+                                ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400 bg-gray-50 dark:bg-gray-800'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
+                    >
+                        Notifications
                     </button>
                 </div>
 
@@ -540,7 +548,7 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
                             <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-8">
                                 <div className="relative flex-shrink-0 group">
                                     <Tooltip text="Change your profile picture.">
-                                        <button 
+                                        <button
                                             onClick={() => setIsAvatarModalOpen(true)}
                                             className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full ring-4 ring-pink-500/50 focus:outline-none focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-900 focus:ring-pink-500 disabled:cursor-not-allowed"
                                             aria-label="Change profile picture"
@@ -694,12 +702,14 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
                             </div>
                             <ChangePasswordForm currentUser={currentUser} />
                         </>
-                    ) : (
+                    ) : activeTab === 'appearance' ? (
                         <AppearanceSettings />
+                    ) : (
+                        <NotificationSettings />
                     )}
                 </div>
             </div>
-            <AvatarSelectionModal 
+            <AvatarSelectionModal
                 isOpen={isAvatarModalOpen}
                 onClose={() => setIsAvatarModalOpen(false)}
                 onSelect={handleAvatarSelect}

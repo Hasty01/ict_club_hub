@@ -3,6 +3,13 @@ import { useData } from '../DataContext';
 import * as api from '../services/apiService';
 import { supabase } from '../services/supabaseClient';
 
+const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+};
+
 const NotificationSettings: React.FC = () => {
     const { notificationPrefs, updateNotificationPrefs } = useData();
     const [permission, setPermission] = useState(
@@ -80,11 +87,10 @@ const NotificationSettings: React.FC = () => {
                     </div>
                     <button
                         onClick={handleToggleBrowser}
-                        className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors ${
-                            notificationPrefs.browserEnabled
+                        className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors ${notificationPrefs.browserEnabled
                                 ? 'bg-green-500 text-white'
                                 : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                        }`}
+                            }`}
                     >
                         {notificationPrefs.browserEnabled ? 'Enabled' : 'Disabled'}
                     </button>
@@ -96,11 +102,10 @@ const NotificationSettings: React.FC = () => {
                     </div>
                     <button
                         onClick={() => updateNotificationPrefs({ notifyWhenAway: !notificationPrefs.notifyWhenAway })}
-                        className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors ${
-                            notificationPrefs.notifyWhenAway
+                        className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors ${notificationPrefs.notifyWhenAway
                                 ? 'bg-indigo-500 text-white'
                                 : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                        }`}
+                            }`}
                         disabled={!notificationPrefs.browserEnabled}
                     >
                         {notificationPrefs.notifyWhenAway ? 'On' : 'Off'}
@@ -115,9 +120,3 @@ const NotificationSettings: React.FC = () => {
 };
 
 export default NotificationSettings;
-    const urlBase64ToUint8Array = (base64String: string) => {
-        const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-        const rawData = window.atob(base64);
-        return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
-    };
