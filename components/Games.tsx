@@ -454,8 +454,8 @@ const Games: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     const [mathFeedback, setMathFeedback] = useState<string | null>(null);
     const [mathStreak, setMathStreak] = useState(0);
     const [mathBest, setMathBest] = useState(0);
-    const [mathDuration, setMathDuration] = useState(30);
-    const [mathTimeLeft, setMathTimeLeft] = useState(30);
+    const mathDuration = 60;
+    const [mathTimeLeft, setMathTimeLeft] = useState(60);
     const [mathIsRunning, setMathIsRunning] = useState(false);
 
     useEffect(() => {
@@ -777,9 +777,13 @@ const Games: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     const [outputFeedback, setOutputFeedback] = useState<string | null>(null);
     const [outputStreak, setOutputStreak] = useState(0);
     const [outputBest, setOutputBest] = useState(0);
+    const outputDuration = 60;
+    const [outputTimeLeft, setOutputTimeLeft] = useState(60);
+    const [outputIsRunning, setOutputIsRunning] = useState(false);
     const currentOutput = outputChallenges[outputIndex];
 
     const answerOutput = (choiceIndex: number) => {
+        if (!outputIsRunning || outputTimeLeft <= 0) return;
         if (outputSelected !== null) return;
         setOutputSelected(choiceIndex);
         const isCorrect = choiceIndex === currentOutput.answer;
@@ -802,15 +806,54 @@ const Games: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         setOutputFeedback(null);
     };
 
+    useEffect(() => {
+        setOutputTimeLeft(outputDuration);
+    }, [outputDuration]);
+
+    useEffect(() => {
+        if (!outputIsRunning) return;
+        const timer = window.setInterval(() => {
+            setOutputTimeLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    setOutputIsRunning(false);
+                    setOutputFeedback('Time is up. Start a new round to try again.');
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [outputIsRunning]);
+
+    const startOutputTimer = () => {
+        setOutputTimeLeft(outputDuration);
+        setOutputIsRunning(true);
+        setOutputFeedback(null);
+        setOutputSelected(null);
+    };
+
+    const resetOutputTimer = () => {
+        setOutputIsRunning(false);
+        setOutputTimeLeft(outputDuration);
+        setOutputFeedback('Timer reset. Press Start to play.');
+        setOutputSelected(null);
+        setOutputStreak(0);
+    };
+
     // Bug Hunt
     const [bugIndex, setBugIndex] = useState(() => randomBetween(0, bugChallenges.length - 1));
     const [bugSelected, setBugSelected] = useState<number | null>(null);
     const [bugFeedback, setBugFeedback] = useState<string | null>(null);
     const [bugStreak, setBugStreak] = useState(0);
     const [bugBest, setBugBest] = useState(0);
+    const bugDuration = 60;
+    const [bugTimeLeft, setBugTimeLeft] = useState(60);
+    const [bugIsRunning, setBugIsRunning] = useState(false);
     const currentBug = bugChallenges[bugIndex];
 
     const answerBug = (choiceIndex: number) => {
+        if (!bugIsRunning || bugTimeLeft <= 0) return;
         if (bugSelected !== null) return;
         setBugSelected(choiceIndex);
         const isCorrect = choiceIndex === currentBug.answer;
@@ -831,6 +874,41 @@ const Games: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         setBugIndex(prev => nextIndex(prev, bugChallenges.length));
         setBugSelected(null);
         setBugFeedback(null);
+    };
+
+    useEffect(() => {
+        setBugTimeLeft(bugDuration);
+    }, [bugDuration]);
+
+    useEffect(() => {
+        if (!bugIsRunning) return;
+        const timer = window.setInterval(() => {
+            setBugTimeLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    setBugIsRunning(false);
+                    setBugFeedback('Time is up. Start a new round to try again.');
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [bugIsRunning]);
+
+    const startBugTimer = () => {
+        setBugTimeLeft(bugDuration);
+        setBugIsRunning(true);
+        setBugFeedback(null);
+        setBugSelected(null);
+    };
+
+    const resetBugTimer = () => {
+        setBugIsRunning(false);
+        setBugTimeLeft(bugDuration);
+        setBugFeedback('Timer reset. Press Start to play.');
+        setBugSelected(null);
+        setBugStreak(0);
     };
 
     const submitGuess = (e: React.FormEvent) => {
@@ -1107,16 +1185,6 @@ const Games: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                             <p className="text-lg font-semibold text-gray-900 dark:text-white">{mathTimeLeft}s</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <select
-                                value={mathDuration}
-                                onChange={(e) => setMathDuration(Number(e.target.value))}
-                                className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 px-2 py-1 text-xs text-gray-700 dark:text-gray-200"
-                                disabled={mathIsRunning}
-                            >
-                                {[30, 45, 60].map(sec => (
-                                    <option key={sec} value={sec}>{sec}s</option>
-                                ))}
-                            </select>
                             <button
                                 onClick={startMathTimer}
                                 className="px-3 py-1.5 rounded-lg bg-pink-600 text-white text-xs font-semibold hover:bg-pink-700"
@@ -1569,6 +1637,27 @@ const Games: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                         </div>
                     </div>
 
+                    <div className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-3 py-2">
+                        <div>
+                            <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">Timer</p>
+                            <p className="text-lg font-semibold text-gray-900 dark:text-white">{outputTimeLeft}s</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={startOutputTimer}
+                                className="px-3 py-1.5 rounded-lg bg-pink-600 text-white text-xs font-semibold hover:bg-pink-700"
+                            >
+                                Start
+                            </button>
+                            <button
+                                onClick={resetOutputTimer}
+                                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+
                     <div className="text-xs text-gray-400 uppercase tracking-[0.2em]">{currentOutput.language}</div>
                     <pre className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60 p-4 text-xs text-gray-800 dark:text-gray-200 overflow-x-auto">
                         <code>{currentOutput.code}</code>
@@ -1586,7 +1675,11 @@ const Games: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                                     : 'border-red-400 bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-200'
                                 : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800';
                             return (
-                                <button key={option} onClick={() => answerOutput(index)} className={`${base} ${styles}`}>
+                                <button
+                                    key={option}
+                                    onClick={() => answerOutput(index)}
+                                    className={`${base} ${styles} ${(!outputIsRunning || outputTimeLeft === 0) ? 'opacity-60 pointer-events-none' : ''}`}
+                                >
                                     {option}
                                 </button>
                             );
@@ -1619,6 +1712,27 @@ const Games: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                         </div>
                     </div>
 
+                    <div className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-3 py-2">
+                        <div>
+                            <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">Timer</p>
+                            <p className="text-lg font-semibold text-gray-900 dark:text-white">{bugTimeLeft}s</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={startBugTimer}
+                                className="px-3 py-1.5 rounded-lg bg-pink-600 text-white text-xs font-semibold hover:bg-pink-700"
+                            >
+                                Start
+                            </button>
+                            <button
+                                onClick={resetBugTimer}
+                                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+
                     <div className="text-xs text-gray-400 uppercase tracking-[0.2em]">{currentBug.language}</div>
                     <pre className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60 p-4 text-xs text-gray-800 dark:text-gray-200 overflow-x-auto">
                         <code>{currentBug.code}</code>
@@ -1636,7 +1750,11 @@ const Games: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                                     : 'border-red-400 bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-200'
                                 : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800';
                             return (
-                                <button key={option} onClick={() => answerBug(index)} className={`${base} ${styles}`}>
+                                <button
+                                    key={option}
+                                    onClick={() => answerBug(index)}
+                                    className={`${base} ${styles} ${(!bugIsRunning || bugTimeLeft === 0) ? 'opacity-60 pointer-events-none' : ''}`}
+                                >
                                     {option}
                                 </button>
                             );
