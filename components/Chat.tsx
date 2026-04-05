@@ -14,6 +14,7 @@ import { XIcon } from './icons/XIcon';
 import { SendIcon } from './icons/SendIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { FaceSmileIcon } from './icons/FaceSmileIcon';
+import { SparklesIcon } from './icons/SparklesIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { PaperClipIcon } from './icons/PaperClipIcon';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
@@ -473,6 +474,10 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [realtimeStatus, setRealtimeStatus] = useState<'CONNECTING' | 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR'>('CONNECTING');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [showStickerPicker, setShowStickerPicker] = useState(false);
+    const [stickerSearchQuery, setStickerSearchQuery] = useState('');
+    const [stickerResults, setStickerResults] = useState<string[]>([]);
+    const [isSearchingStickers, setIsSearchingStickers] = useState(false);
     const [viewingImage, setViewingImage] = useState<string | null>(null);
 
     const [contextMenu, setContextMenu] = useState<{ id: string, x: number, y: number } | null>(null);
@@ -485,6 +490,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const emojiPickerRef = useRef<HTMLDivElement>(null);
+    const stickerPickerRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -596,9 +602,37 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
     }, [newMessage]);
 
     useEffect(() => {
+        if (!showStickerPicker) return;
+        const fetchStickers = async () => {
+            setIsSearchingStickers(true);
+            try {
+                const endpoint = stickerSearchQuery.trim()
+                    ? `https://g.tenor.com/v1/search?q=${encodeURIComponent(stickerSearchQuery)}&key=LIVDSRZULELA&limit=20&media_filter=minimal`
+                    : `https://g.tenor.com/v1/trending?key=LIVDSRZULELA&limit=20&media_filter=minimal`;
+                const response = await fetch(endpoint);
+                const json = await response.json();
+                if (json.results) {
+                    const urls = json.results.map((item: any) => item.media[0].tinygif.url);
+                    setStickerResults(urls);
+                }
+            } catch (err) {
+                console.error("Sticker fetch failed", err);
+            } finally {
+                setIsSearchingStickers(false);
+            }
+        };
+
+        const timeoutId = setTimeout(fetchStickers, 500);
+        return () => clearTimeout(timeoutId);
+    }, [stickerSearchQuery, showStickerPicker]);
+
+    useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
                 setShowEmojiPicker(false);
+            }
+            if (stickerPickerRef.current && !stickerPickerRef.current.contains(event.target as Node)) {
+                setShowStickerPicker(false);
             }
             setContextMenu(null);
             setRoomContextMenu(null);
@@ -1009,6 +1043,14 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
     };
 
     const renderMessageContent = (msg: Message, isMe: boolean) => {
+        if (msg.metadata && msg.metadata.type === 'sticker' && msg.metadata.url) {
+            return (
+                <div className="p-1">
+                    <img src={msg.metadata.url} alt="Sticker" className="w-24 h-24 sm:w-32 sm:h-32 object-contain" draggable="false" />
+                </div>
+            );
+        }
+
         if (msg.metadata && msg.metadata.type === 'file') {
             const isImage = msg.metadata.fileType?.startsWith('image/');
             const isPython = msg.metadata.fileName?.endsWith('.py');
@@ -1356,6 +1398,46 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
                                     />
                                 </div>
                             )}
+                            {showStickerPicker && (
+                                <div className="absolute bottom-20 left-16 z-20 shadow-2xl rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 w-80 h-80 flex flex-col overflow-hidden animate-fade-in-up" ref={stickerPickerRef}>
+                                    <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                                        <input
+                                            type="text"
+                                            placeholder="Search stickers..."
+                                            value={stickerSearchQuery}
+                                            onChange={(e) => setStickerSearchQuery(e.target.value)}
+                                            className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-pink-500 focus:outline-none placeholder-gray-400"
+                                        />
+                                    </div>
+                                    <div className="flex-1 p-3 grid grid-cols-3 gap-2 overflow-y-auto bg-white dark:bg-gray-800">
+                                        {isSearchingStickers && stickerResults.length === 0 ? (
+                                            <div className="col-span-3 flex flex-col justify-center items-center h-full text-gray-400 space-y-2">
+                                                <div className="w-5 h-5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+                                                <p className="text-xs">Searching...</p>
+                                            </div>
+                                        ) : stickerResults.map((stickerUrl, index) => (
+                                            <button
+                                                key={index}
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    if (!activeRoom || !currentUser) return;
+                                                    setShowStickerPicker(false);
+                                                    api.sendMessage(activeRoom.id, currentUser.uid, '', { type: 'sticker', url: stickerUrl });
+                                                }}
+                                                className="hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded-xl transition-colors outline-none focus:ring-2 focus:ring-pink-500 flex items-center justify-center cursor-pointer"
+                                            >
+                                                <img src={stickerUrl} alt={`Sticker ${index}`} className="h-16 w-full object-contain" />
+                                            </button>
+                                        ))}
+                                        {!isSearchingStickers && stickerResults.length === 0 && (
+                                            <div className="col-span-3 flex justify-center items-center h-full text-gray-400 text-xs text-center px-4">
+                                                No stickers found. Try another search!
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                             <form onSubmit={handleSendMessage} className="flex items-end space-x-2 max-w-4xl mx-auto">
                                 <button
                                     type="button"
@@ -1367,6 +1449,18 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
                                     aria-label="Insert Emoji"
                                 >
                                     <FaceSmileIcon />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowStickerPicker(!showStickerPicker);
+                                    }}
+                                    className="p-3 text-gray-400 dark:text-gray-500 hover:text-yellow-500 dark:hover:text-yellow-400 transition-colors rounded-full hover:bg-white dark:hover:bg-gray-800 shadow-sm border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
+                                    aria-label="Insert Sticker"
+                                >
+                                    <SparklesIcon />
                                 </button>
 
                                 <input
