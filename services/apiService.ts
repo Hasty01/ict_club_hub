@@ -337,6 +337,28 @@ export const deleteUser = async (uid: string) => {
 export const approveMember = async (uid: string) => {
     const { error } = await supabase.from('users').update({ status: 'APPROVED' }).eq('uid', uid);
     if (error) throw error;
+
+    // Auto-add safely to the "Every one" group chat
+    try {
+        const { data: everyoneRoom } = await supabase
+            .from('rooms')
+            .select('id, metadata')
+            .ilike('title', '%every%one%')
+            .limit(1)
+            .single();
+
+        if (everyoneRoom) {
+            const currentParticipants = everyoneRoom.metadata?.participants || [];
+            if (!currentParticipants.includes(uid)) {
+                await supabase.from('rooms').update({
+                    metadata: { ...everyoneRoom.metadata, participants: [...currentParticipants, uid] }
+                }).eq('id', everyoneRoom.id);
+            }
+        }
+    } catch (err) {
+        // Log but don't fail the approval if chat auto-add fails
+        console.error("Failed to auto-add user to 'Every one' room:", err);
+    }
 };
 
 export const changePassword = async (newPassword: string) => {
