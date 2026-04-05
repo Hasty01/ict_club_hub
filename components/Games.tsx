@@ -3,8 +3,48 @@ import Tooltip from './Tooltip';
 
 type ReactionState = 'idle' | 'waiting' | 'ready' | 'tooSoon' | 'done';
 type MathDifficulty = 'warmup' | 'core' | 'boss';
+type Direction = 'U' | 'D' | 'L' | 'R';
+type Position = { x: number; y: number };
 
 const randomBetween = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+const nextIndex = (current: number, length: number) => {
+    if (length <= 1) return 0;
+    let idx = current;
+    while (idx === current) {
+        idx = randomBetween(0, length - 1);
+    }
+    return idx;
+};
+const positionKey = (pos: Position) => `${pos.x},${pos.y}`;
+const directionMoves: Record<Direction, Position> = {
+    U: { x: 0, y: -1 },
+    D: { x: 0, y: 1 },
+    L: { x: -1, y: 0 },
+    R: { x: 1, y: 0 }
+};
+
+const runPath = (start: Position, commands: Direction[], size: number, obstacles: Position[]) => {
+    const obstacleSet = new Set(obstacles.map(positionKey));
+    let pos = { ...start };
+    const path = new Set<string>([positionKey(pos)]);
+    let status: 'ok' | 'wall' | 'obstacle' = 'ok';
+
+    for (const cmd of commands) {
+        const move = directionMoves[cmd];
+        const next = { x: pos.x + move.x, y: pos.y + move.y };
+        if (next.x < 0 || next.y < 0 || next.x >= size || next.y >= size) {
+            status = 'wall';
+            break;
+        }
+        if (obstacleSet.has(positionKey(next))) {
+            status = 'obstacle';
+            break;
+        }
+        pos = next;
+        path.add(positionKey(pos));
+    }
+    return { pos, path, status };
+};
 
 const generateMathQuestion = (difficulty: MathDifficulty) => {
     if (difficulty === 'warmup') {
@@ -16,11 +56,11 @@ const generateMathQuestion = (difficulty: MathDifficulty) => {
     }
 
     if (difficulty === 'core') {
-        const ops = ['+', '-', '×'];
+        const ops = ['+', '-', 'x'];
         const op = ops[randomBetween(0, ops.length - 1)];
         const a = randomBetween(4, 30);
         const b = randomBetween(2, 14);
-        const answer = op === '×' ? a * b : op === '+' ? a + b : a - b;
+        const answer = op === 'x' ? a * b : op === '+' ? a + b : a - b;
         return { text: `${a} ${op} ${b}`, answer };
     }
 
@@ -29,10 +69,238 @@ const generateMathQuestion = (difficulty: MathDifficulty) => {
     const c = randomBetween(3, 12);
     const op = Math.random() > 0.5 ? '+' : '-';
     const answer = op === '+' ? a * b + c : a * b - c;
-    return { text: `${a} × ${b} ${op} ${c}`, answer };
+    return { text: `${a} x ${b} ${op} ${c}`, answer };
 };
 
 const Games: React.FC = () => {
+    const sequencePuzzles = useMemo(() => ([
+        {
+            id: 'seq-1',
+            size: 5,
+            start: { x: 0, y: 4 },
+            goal: { x: 4, y: 0 },
+            obstacles: [{ x: 2, y: 2 }, { x: 3, y: 2 }, { x: 1, y: 1 }]
+        },
+        {
+            id: 'seq-2',
+            size: 5,
+            start: { x: 0, y: 0 },
+            goal: { x: 4, y: 4 },
+            obstacles: [{ x: 1, y: 2 }, { x: 2, y: 2 }, { x: 3, y: 1 }]
+        },
+        {
+            id: 'seq-3',
+            size: 5,
+            start: { x: 4, y: 2 },
+            goal: { x: 0, y: 2 },
+            obstacles: [{ x: 2, y: 1 }, { x: 2, y: 2 }, { x: 2, y: 3 }]
+        }
+    ]), []);
+
+    const loopPuzzles = useMemo(() => ([
+        {
+            id: 'loop-1',
+            size: 5,
+            start: { x: 0, y: 4 },
+            goal: { x: 4, y: 1 },
+            pattern: ['R', 'R', 'U'] as Direction[],
+            options: [1, 2, 3, 4],
+            answer: 2,
+            label: 'Repeat (R, R, U)'
+        },
+        {
+            id: 'loop-2',
+            size: 5,
+            start: { x: 4, y: 4 },
+            goal: { x: 1, y: 1 },
+            pattern: ['L', 'U'] as Direction[],
+            options: [1, 2, 3, 4],
+            answer: 3,
+            label: 'Repeat (L, U)'
+        },
+        {
+            id: 'loop-3',
+            size: 5,
+            start: { x: 0, y: 2 },
+            goal: { x: 4, y: 2 },
+            pattern: ['R'] as Direction[],
+            options: [2, 3, 4, 5],
+            answer: 4,
+            label: 'Repeat (R)'
+        }
+    ]), []);
+
+    const functionPuzzles = useMemo(() => ([
+        {
+            id: 'fn-1',
+            size: 5,
+            start: { x: 0, y: 4 },
+            goal: { x: 4, y: 0 },
+            obstacles: [{ x: 1, y: 2 }, { x: 2, y: 2 }],
+            functions: {
+                A: ['R', 'R', 'U'] as Direction[],
+                B: ['U', 'U', 'R'] as Direction[]
+            },
+            slots: 3
+        },
+        {
+            id: 'fn-2',
+            size: 5,
+            start: { x: 4, y: 4 },
+            goal: { x: 0, y: 1 },
+            obstacles: [{ x: 2, y: 3 }],
+            functions: {
+                A: ['L', 'L'] as Direction[],
+                B: ['U', 'L'] as Direction[]
+            },
+            slots: 3
+        }
+    ]), []);
+
+    const outputChallenges = useMemo(() => ([
+        {
+            id: 'out-js-1',
+            language: 'JavaScript',
+            prompt: 'What does this print?',
+            code: `const nums = [1, 2, 3];\nconsole.log(nums.map(n => n * 2).join('-'));`,
+            options: ['1-2-3', '2-4-6', '2-3-4', '1-4-9'],
+            answer: 1,
+            explanation: 'map doubles each value, then join uses "-".'
+        },
+        {
+            id: 'out-py-1',
+            language: 'Python',
+            prompt: 'What is the output?',
+            code: `name = "Kevin"\nprint(name[::-1])`,
+            options: ['Kevin', 'niveK', 'Knevi', 'kevin'],
+            answer: 1,
+            explanation: 'Slicing with [::-1] reverses the string.'
+        },
+        {
+            id: 'out-js-2',
+            language: 'JavaScript',
+            prompt: 'What does this print?',
+            code: `let count = 0;\nfor (let i = 0; i < 3; i++) { count += i; }\nconsole.log(count);`,
+            options: ['3', '6', '0', '2'],
+            answer: 0,
+            explanation: 'count = 0 + 1 + 2 = 3.'
+        },
+        {
+            id: 'out-py-2',
+            language: 'Python',
+            prompt: 'What is the output?',
+            code: `nums = [10, 5, 2]\nprint(sum(nums) // len(nums))`,
+            options: ['5', '6', '5.6', '4'],
+            answer: 0,
+            explanation: 'sum is 17, len is 3, integer division gives 5.'
+        },
+        {
+            id: 'out-js-3',
+            language: 'JavaScript',
+            prompt: 'What does this print?',
+            code: `console.log(Boolean(""), Boolean(" "));`,
+            options: ['false false', 'true false', 'false true', 'true true'],
+            answer: 2,
+            explanation: 'Empty string is falsey, string with a space is truthy.'
+        },
+        {
+            id: 'out-py-3',
+            language: 'Python',
+            prompt: 'What is the output?',
+            code: `def f(x, y=2):\n    return x * y\nprint(f(3))`,
+            options: ['5', '6', '9', '2'],
+            answer: 1,
+            explanation: 'Default y is 2, so 3 * 2 = 6.'
+        }
+    ]), []);
+
+    const bugChallenges = useMemo(() => ([
+        {
+            id: 'bug-js-1',
+            language: 'JavaScript',
+            prompt: 'Pick the fix that prevents the crash.',
+            code: `const user = { name: "Ada" };\nconsole.log(user.age.toUpperCase());`,
+            options: [
+                'console.log(user.name.toUpperCase());',
+                'console.log(user.age.toFixed(2));',
+                'console.log(user["age"].length);',
+                'console.log(JSON.stringify(user.age));'
+            ],
+            answer: 0,
+            explanation: 'age is undefined, but name exists.'
+        },
+        {
+            id: 'bug-py-1',
+            language: 'Python',
+            prompt: 'Which change fixes the syntax error?',
+            code: `for i in range(3)\n    print(i)`,
+            options: [
+                'Add a colon after range(3).',
+                'Indent the for loop two more spaces.',
+                'Change range(3) to range[3].',
+                'Remove the indentation on print.'
+            ],
+            answer: 0,
+            explanation: 'Python for loops require a trailing colon.'
+        },
+        {
+            id: 'bug-js-2',
+            language: 'JavaScript',
+            prompt: 'Which fix makes this log 5?',
+            code: `function add(a, b) { return a + b; }\nconsole.log(add("2", 3));`,
+            options: [
+                'console.log(add(Number("2"), 3));',
+                'console.log(add(String(2), 3));',
+                'console.log(add("2", "3"));',
+                'console.log(add(2, "3"));'
+            ],
+            answer: 0,
+            explanation: 'Convert "2" to a number before adding.'
+        },
+        {
+            id: 'bug-py-2',
+            language: 'Python',
+            prompt: 'Which fix avoids the error?',
+            code: `names = ["Ana", "Bo"]\nprint(names[2])`,
+            options: [
+                'Use print(names[1]).',
+                'Use print(names[3]).',
+                'Use print(names[-3]).',
+                'Use print(names[2].upper()).'
+            ],
+            answer: 0,
+            explanation: 'Index 2 is out of range for a 2-item list.'
+        },
+        {
+            id: 'bug-js-3',
+            language: 'JavaScript',
+            prompt: 'Pick the fix for the conditional.',
+            code: `const score = 10;\nif (score = 10) { console.log("Win"); }`,
+            options: [
+                'Replace = with ===',
+                'Remove the if statement',
+                'Set score to true',
+                'Add a semicolon after if'
+            ],
+            answer: 0,
+            explanation: 'Use === to compare instead of assigning.'
+        },
+        {
+            id: 'bug-py-3',
+            language: 'Python',
+            prompt: 'Which fix avoids the NameError?',
+            code: `total = 0\nnumbers = [1, 2, 3]\nfor n in numbers:\n    total = total + n\nprint(totals)`,
+            options: [
+                'Print total instead of totals.',
+                'Initialize totals = 0 at the top.',
+                'Use totals += n in the loop.',
+                'Use print(total, totals).'
+            ],
+            answer: 0,
+            explanation: 'The variable is named total, not totals.'
+        }
+    ]), []);
+
     // Reaction Timer
     const [reactionState, setReactionState] = useState<ReactionState>('idle');
     const [reactionTime, setReactionTime] = useState<number | null>(null);
@@ -130,6 +398,232 @@ const Games: React.FC = () => {
     const [guessAttempts, setGuessAttempts] = useState(0);
     const [bestGuess, setBestGuess] = useState<number | null>(null);
 
+    // Sequence Builder
+    const [sequenceIndex, setSequenceIndex] = useState(0);
+    const currentSequence = sequencePuzzles[sequenceIndex];
+    const [sequenceCommands, setSequenceCommands] = useState<Direction[]>([]);
+    const [sequencePath, setSequencePath] = useState<Set<string>>(new Set([positionKey(currentSequence.start)]));
+    const [sequencePos, setSequencePos] = useState<Position>(currentSequence.start);
+    const [sequenceResult, setSequenceResult] = useState<string | null>(null);
+    const [sequenceBest, setSequenceBest] = useState<number | null>(null);
+
+    useEffect(() => {
+        setSequenceCommands([]);
+        setSequencePath(new Set([positionKey(currentSequence.start)]));
+        setSequencePos(currentSequence.start);
+        setSequenceResult(null);
+    }, [currentSequence]);
+
+    const addSequenceCommand = (cmd: Direction) => {
+        setSequenceCommands(prev => (prev.length >= 10 ? prev : [...prev, cmd]));
+    };
+
+    const removeSequenceCommand = () => {
+        setSequenceCommands(prev => prev.slice(0, -1));
+    };
+
+    const resetSequence = () => {
+        setSequenceCommands([]);
+        setSequencePath(new Set([positionKey(currentSequence.start)]));
+        setSequencePos(currentSequence.start);
+        setSequenceResult(null);
+    };
+
+    const runSequence = () => {
+        if (sequenceCommands.length === 0) {
+            setSequenceResult('Add a few steps before running.');
+            return;
+        }
+        const result = runPath(currentSequence.start, sequenceCommands, currentSequence.size, currentSequence.obstacles);
+        setSequencePath(result.path);
+        setSequencePos(result.pos);
+        if (result.status === 'wall') {
+            setSequenceResult('Crashed into a wall. Try a different route.');
+            return;
+        }
+        if (result.status === 'obstacle') {
+            setSequenceResult('Hit an obstacle. Adjust the sequence.');
+            return;
+        }
+        if (result.pos.x === currentSequence.goal.x && result.pos.y === currentSequence.goal.y) {
+            setSequenceResult('Success! You reached the goal.');
+            setSequenceBest(prev => (prev === null ? sequenceCommands.length : Math.min(prev, sequenceCommands.length)));
+        } else {
+            setSequenceResult('Not quite there. Try again.');
+        }
+    };
+
+    // Loop Logic
+    const [loopIndex, setLoopIndex] = useState(0);
+    const currentLoop = loopPuzzles[loopIndex];
+    const [loopChoice, setLoopChoice] = useState<number | null>(null);
+    const [loopFeedback, setLoopFeedback] = useState<string | null>(null);
+    const [loopPath, setLoopPath] = useState<Set<string>>(new Set([positionKey(currentLoop.start)]));
+    const [loopPos, setLoopPos] = useState<Position>(currentLoop.start);
+
+    useEffect(() => {
+        setLoopChoice(null);
+        setLoopFeedback(null);
+        setLoopPath(new Set([positionKey(currentLoop.start)]));
+        setLoopPos(currentLoop.start);
+    }, [currentLoop]);
+
+    const evaluateLoop = (choice: number) => {
+        if (loopChoice !== null) return;
+        setLoopChoice(choice);
+        const commands = Array.from({ length: choice }).flatMap(() => currentLoop.pattern);
+        const result = runPath(currentLoop.start, commands, currentLoop.size, []);
+        setLoopPath(result.path);
+        setLoopPos(result.pos);
+        if (choice === currentLoop.answer) {
+            setLoopFeedback('Correct. The loop count matches the target.');
+        } else {
+            setLoopFeedback('Not quite. Try another loop count.');
+        }
+    };
+
+    const nextLoop = () => {
+        setLoopIndex(prev => nextIndex(prev, loopPuzzles.length));
+    };
+
+    // Function Calls
+    const [functionIndex, setFunctionIndex] = useState(0);
+    const currentFunction = functionPuzzles[functionIndex];
+    const [functionCalls, setFunctionCalls] = useState<string[]>(() => Array.from({ length: currentFunction.slots }, () => 'A'));
+    const [functionFeedback, setFunctionFeedback] = useState<string | null>(null);
+    const [functionPath, setFunctionPath] = useState<Set<string>>(new Set([positionKey(currentFunction.start)]));
+    const [functionPos, setFunctionPos] = useState<Position>(currentFunction.start);
+
+    useEffect(() => {
+        setFunctionCalls(Array.from({ length: currentFunction.slots }, () => 'A'));
+        setFunctionFeedback(null);
+        setFunctionPath(new Set([positionKey(currentFunction.start)]));
+        setFunctionPos(currentFunction.start);
+    }, [currentFunction]);
+
+    const updateFunctionCall = (index: number, value: string) => {
+        setFunctionCalls(prev => prev.map((call, i) => (i === index ? value : call)));
+    };
+
+    const runFunctions = () => {
+        const commands: Direction[] = [];
+        functionCalls.forEach(call => {
+            const steps = (currentFunction.functions as any)[call] as Direction[] | undefined;
+            if (steps) {
+                commands.push(...steps);
+            }
+        });
+        const result = runPath(currentFunction.start, commands, currentFunction.size, currentFunction.obstacles);
+        setFunctionPath(result.path);
+        setFunctionPos(result.pos);
+        if (result.status === 'wall') {
+            setFunctionFeedback('Oops. That sequence left the grid.');
+            return;
+        }
+        if (result.status === 'obstacle') {
+            setFunctionFeedback('Obstacle hit. Reorder your function calls.');
+            return;
+        }
+        if (result.pos.x === currentFunction.goal.x && result.pos.y === currentFunction.goal.y) {
+            setFunctionFeedback('Success! Functions combined perfectly.');
+        } else {
+            setFunctionFeedback('Close. Adjust the function order.');
+        }
+    };
+
+    const nextFunctionPuzzle = () => {
+        setFunctionIndex(prev => nextIndex(prev, functionPuzzles.length));
+    };
+
+    // Coordinate Target
+    const coordinateSize = 6;
+    const [coordTarget, setCoordTarget] = useState<Position>({ x: randomBetween(0, coordinateSize - 1), y: randomBetween(0, coordinateSize - 1) });
+    const [coordFeedback, setCoordFeedback] = useState<string | null>(null);
+    const [coordStreak, setCoordStreak] = useState(0);
+    const [coordBest, setCoordBest] = useState(0);
+
+    const resetCoordTarget = () => {
+        setCoordTarget({ x: randomBetween(0, coordinateSize - 1), y: randomBetween(0, coordinateSize - 1) });
+        setCoordFeedback(null);
+    };
+
+    const handleCoordClick = (x: number, y: number) => {
+        if (x === coordTarget.x && y === coordTarget.y) {
+            setCoordFeedback('Correct. Target acquired.');
+            setCoordStreak(prev => {
+                const next = prev + 1;
+                setCoordBest(best => Math.max(best, next));
+                return next;
+            });
+            setCoordTarget({ x: randomBetween(0, coordinateSize - 1), y: randomBetween(0, coordinateSize - 1) });
+        } else {
+            setCoordFeedback('Not quite. Try again.');
+            setCoordStreak(0);
+        }
+    };
+
+    // Output Prediction
+    const [outputIndex, setOutputIndex] = useState(() => randomBetween(0, outputChallenges.length - 1));
+    const [outputSelected, setOutputSelected] = useState<number | null>(null);
+    const [outputFeedback, setOutputFeedback] = useState<string | null>(null);
+    const [outputStreak, setOutputStreak] = useState(0);
+    const [outputBest, setOutputBest] = useState(0);
+    const currentOutput = outputChallenges[outputIndex];
+
+    const answerOutput = (choiceIndex: number) => {
+        if (outputSelected !== null) return;
+        setOutputSelected(choiceIndex);
+        const isCorrect = choiceIndex === currentOutput.answer;
+        if (isCorrect) {
+            setOutputFeedback('Correct. Keep pushing your streak.');
+            setOutputStreak(prev => {
+                const next = prev + 1;
+                setOutputBest(best => Math.max(best, next));
+                return next;
+            });
+        } else {
+            setOutputFeedback(`Not quite. ${currentOutput.explanation}`);
+            setOutputStreak(0);
+        }
+    };
+
+    const nextOutput = () => {
+        setOutputIndex(prev => nextIndex(prev, outputChallenges.length));
+        setOutputSelected(null);
+        setOutputFeedback(null);
+    };
+
+    // Bug Hunt
+    const [bugIndex, setBugIndex] = useState(() => randomBetween(0, bugChallenges.length - 1));
+    const [bugSelected, setBugSelected] = useState<number | null>(null);
+    const [bugFeedback, setBugFeedback] = useState<string | null>(null);
+    const [bugStreak, setBugStreak] = useState(0);
+    const [bugBest, setBugBest] = useState(0);
+    const currentBug = bugChallenges[bugIndex];
+
+    const answerBug = (choiceIndex: number) => {
+        if (bugSelected !== null) return;
+        setBugSelected(choiceIndex);
+        const isCorrect = choiceIndex === currentBug.answer;
+        if (isCorrect) {
+            setBugFeedback('Nice fix. Keep going.');
+            setBugStreak(prev => {
+                const next = prev + 1;
+                setBugBest(best => Math.max(best, next));
+                return next;
+            });
+        } else {
+            setBugFeedback(`Not quite. ${currentBug.explanation}`);
+            setBugStreak(0);
+        }
+    };
+
+    const nextBug = () => {
+        setBugIndex(prev => nextIndex(prev, bugChallenges.length));
+        setBugSelected(null);
+        setBugFeedback(null);
+    };
+
     const submitGuess = (e: React.FormEvent) => {
         e.preventDefault();
         const value = Number(guessValue);
@@ -182,7 +676,7 @@ const Games: React.FC = () => {
                     <p className="text-xs uppercase tracking-[0.35em] text-pink-500 font-semibold">Club Arcade</p>
                     <h2 className="text-3xl font-bold text-gray-900 dark:text-white mt-2">Games Lounge</h2>
                     <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 max-w-2xl">
-                        Short, focused games to reset your brain between deep work sessions. Scores are local to this device so you can keep things casual.
+                        Short, focused coding games to reset your brain between deep work sessions. Scores are local to this device so you can keep things casual.
                     </p>
                 </div>
             </section>
@@ -333,8 +827,384 @@ const Games: React.FC = () => {
                     </div>
                 </section>
             </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sequence Builder</h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Drag the bot with step-by-step commands.</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Best</p>
+                            <p className="text-lg font-semibold text-gray-900 dark:text-white">{sequenceBest ?? '--'}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Puzzle {sequenceIndex + 1} of {sequencePuzzles.length}</p>
+                        <button
+                            onClick={() => setSequenceIndex(prev => nextIndex(prev, sequencePuzzles.length))}
+                            className="text-xs text-pink-500 hover:text-pink-600"
+                        >
+                            New Map
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-5 gap-1 justify-center">
+                        {Array.from({ length: currentSequence.size }).map((_, y) => (
+                            Array.from({ length: currentSequence.size }).map((__, x) => {
+                                const key = `${x}-${y}`;
+                                const isStart = x === currentSequence.start.x && y === currentSequence.start.y;
+                                const isGoal = x === currentSequence.goal.x && y === currentSequence.goal.y;
+                                const isObstacle = currentSequence.obstacles.some(o => o.x === x && o.y === y);
+                                const isBot = sequencePos.x === x && sequencePos.y === y;
+                                const isVisited = sequencePath.has(positionKey({ x, y }));
+                                let className = 'h-8 w-8 rounded-md border border-gray-200 dark:border-gray-700 flex items-center justify-center text-[10px] font-semibold';
+                                if (isObstacle) className += ' bg-gray-200 dark:bg-gray-700 text-gray-500';
+                                else if (isGoal) className += ' bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600';
+                                else if (isStart) className += ' bg-blue-100 dark:bg-blue-900/40 text-blue-600';
+                                else if (isVisited) className += ' bg-pink-50 dark:bg-pink-900/20 text-pink-500';
+                                if (isBot) className += ' ring-2 ring-pink-500';
+                                return (
+                                    <div key={key} className={className}>
+                                        {isBot ? 'R' : isGoal ? 'G' : isStart ? 'S' : isObstacle ? 'X' : ''}
+                                    </div>
+                                );
+                            })
+                        ))}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                        {(['U', 'D', 'L', 'R'] as Direction[]).map(cmd => (
+                            <button
+                                key={cmd}
+                                onClick={() => addSequenceCommand(cmd)}
+                                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                                {cmd}
+                            </button>
+                        ))}
+                        <button
+                            onClick={removeSequenceCommand}
+                            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                            Undo
+                        </button>
+                        <button
+                            onClick={resetSequence}
+                            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                            Clear
+                        </button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                        {sequenceCommands.length === 0 ? (
+                            <span className="text-xs text-gray-400">No steps yet.</span>
+                        ) : (
+                            sequenceCommands.map((cmd, index) => (
+                                <span key={`${cmd}-${index}`} className="px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-xs text-gray-600 dark:text-gray-200">
+                                    {cmd}
+                                </span>
+                            ))
+                        )}
+                    </div>
+
+                    {sequenceResult && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{sequenceResult}</p>
+                    )}
+
+                    <div className="flex justify-end">
+                        <button
+                            onClick={runSequence}
+                            className="px-3 py-2 rounded-xl bg-pink-500 text-white text-sm font-semibold hover:bg-pink-600"
+                        >
+                            Run
+                        </button>
+                    </div>
+                </section>
+
+                <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Loop Logic</h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Pick how many loops reach the target.</p>
+                        </div>
+                        <button
+                            onClick={nextLoop}
+                            className="text-xs text-pink-500 hover:text-pink-600"
+                        >
+                            New Loop
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-5 gap-1 justify-center">
+                        {Array.from({ length: currentLoop.size }).map((_, y) => (
+                            Array.from({ length: currentLoop.size }).map((__, x) => {
+                                const key = `${x}-${y}`;
+                                const isStart = x === currentLoop.start.x && y === currentLoop.start.y;
+                                const isGoal = x === currentLoop.goal.x && y === currentLoop.goal.y;
+                                const isBot = loopPos.x === x && loopPos.y === y;
+                                const isVisited = loopPath.has(positionKey({ x, y }));
+                                let className = 'h-8 w-8 rounded-md border border-gray-200 dark:border-gray-700 flex items-center justify-center text-[10px] font-semibold';
+                                if (isGoal) className += ' bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600';
+                                else if (isStart) className += ' bg-blue-100 dark:bg-blue-900/40 text-blue-600';
+                                else if (isVisited) className += ' bg-purple-50 dark:bg-purple-900/20 text-purple-500';
+                                if (isBot) className += ' ring-2 ring-purple-500';
+                                return (
+                                    <div key={key} className={className}>
+                                        {isBot ? 'R' : isGoal ? 'G' : isStart ? 'S' : ''}
+                                    </div>
+                                );
+                            })
+                        ))}
+                    </div>
+
+                    <p className="text-sm text-gray-700 dark:text-gray-300">{currentLoop.label}</p>
+                    <div className="flex flex-wrap gap-2">
+                        {currentLoop.options.map(option => (
+                            <button
+                                key={option}
+                                onClick={() => evaluateLoop(option)}
+                                className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${
+                                    loopChoice === option
+                                        ? option === currentLoop.answer
+                                            ? 'border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200'
+                                            : 'border-red-400 bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-200'
+                                        : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                            >
+                                {option}x
+                            </button>
+                        ))}
+                    </div>
+
+                    {loopFeedback && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{loopFeedback}</p>
+                    )}
+                </section>
+
+                <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Function Calls</h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Combine mini-functions to reach the goal.</p>
+                        </div>
+                        <button
+                            onClick={nextFunctionPuzzle}
+                            className="text-xs text-pink-500 hover:text-pink-600"
+                        >
+                            New Puzzle
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-5 gap-1 justify-center">
+                        {Array.from({ length: currentFunction.size }).map((_, y) => (
+                            Array.from({ length: currentFunction.size }).map((__, x) => {
+                                const key = `${x}-${y}`;
+                                const isStart = x === currentFunction.start.x && y === currentFunction.start.y;
+                                const isGoal = x === currentFunction.goal.x && y === currentFunction.goal.y;
+                                const isObstacle = currentFunction.obstacles.some(o => o.x === x && o.y === y);
+                                const isBot = functionPos.x === x && functionPos.y === y;
+                                const isVisited = functionPath.has(positionKey({ x, y }));
+                                let className = 'h-8 w-8 rounded-md border border-gray-200 dark:border-gray-700 flex items-center justify-center text-[10px] font-semibold';
+                                if (isObstacle) className += ' bg-gray-200 dark:bg-gray-700 text-gray-500';
+                                else if (isGoal) className += ' bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600';
+                                else if (isStart) className += ' bg-blue-100 dark:bg-blue-900/40 text-blue-600';
+                                else if (isVisited) className += ' bg-amber-50 dark:bg-amber-900/20 text-amber-500';
+                                if (isBot) className += ' ring-2 ring-amber-500';
+                                return (
+                                    <div key={key} className={className}>
+                                        {isBot ? 'R' : isGoal ? 'G' : isStart ? 'S' : isObstacle ? 'X' : ''}
+                                    </div>
+                                );
+                            })
+                        ))}
+                    </div>
+
+                    <div className="space-y-2">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Function A: {currentFunction.functions.A.join(' ')}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Function B: {currentFunction.functions.B.join(' ')}</p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                        {functionCalls.map((call, index) => (
+                            <select
+                                key={`call-${index}`}
+                                value={call}
+                                onChange={(e) => updateFunctionCall(index, e.target.value)}
+                                className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 px-2 py-1 text-xs text-gray-700 dark:text-gray-200"
+                            >
+                                <option value="A">Call A</option>
+                                <option value="B">Call B</option>
+                            </select>
+                        ))}
+                    </div>
+
+                    {functionFeedback && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{functionFeedback}</p>
+                    )}
+
+                    <div className="flex justify-end">
+                        <button
+                            onClick={runFunctions}
+                            className="px-3 py-2 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600"
+                        >
+                            Run
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Coordinate Target</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Click the grid cell matching the coordinate.</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Streak</p>
+                        <p className="text-lg font-semibold text-gray-900 dark:text-white">{coordStreak} / {coordBest}</p>
+                    </div>
+                </div>
+
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                    Target: <span className="font-semibold">({coordTarget.x}, {coordTarget.y})</span>
+                </p>
+
+                <div className="grid grid-cols-6 gap-1 max-w-xs">
+                    {Array.from({ length: coordinateSize }).map((_, y) => (
+                        Array.from({ length: coordinateSize }).map((__, x) => (
+                            <button
+                                key={`${x}-${y}`}
+                                onClick={() => handleCoordClick(x, y)}
+                                className="h-8 w-8 rounded-md border border-gray-200 dark:border-gray-700 text-[10px] text-gray-500 hover:bg-pink-50 dark:hover:bg-pink-900/20"
+                            >
+                                {x},{y}
+                            </button>
+                        ))
+                    ))}
+                </div>
+
+                {coordFeedback && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{coordFeedback}</p>
+                )}
+
+                <div className="flex justify-end">
+                    <button
+                        onClick={resetCoordTarget}
+                        className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                        New Target
+                    </button>
+                </div>
+            </section>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Output Prediction</h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Read the snippet and pick the output.</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Streak</p>
+                            <p className="text-lg font-semibold text-gray-900 dark:text-white">{outputStreak} / {outputBest}</p>
+                        </div>
+                    </div>
+
+                    <div className="text-xs text-gray-400 uppercase tracking-[0.2em]">{currentOutput.language}</div>
+                    <pre className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60 p-4 text-xs text-gray-800 dark:text-gray-200 overflow-x-auto">
+                        <code>{currentOutput.code}</code>
+                    </pre>
+
+                    <p className="text-sm text-gray-700 dark:text-gray-300">{currentOutput.prompt}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {currentOutput.options.map((option, index) => {
+                            const isSelected = outputSelected === index;
+                            const isCorrect = outputSelected !== null && index === currentOutput.answer;
+                            const base = 'px-3 py-2 rounded-xl border text-sm text-left transition-all';
+                            const styles = isSelected
+                                ? isCorrect
+                                    ? 'border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200'
+                                    : 'border-red-400 bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-200'
+                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800';
+                            return (
+                                <button key={option} onClick={() => answerOutput(index)} className={`${base} ${styles}`}>
+                                    {option}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {outputFeedback && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{outputFeedback}</p>
+                    )}
+
+                    <div className="flex justify-end">
+                        <button
+                            onClick={nextOutput}
+                            className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                            Next Challenge
+                        </button>
+                    </div>
+                </section>
+
+                <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Bug Hunt</h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Choose the fix that makes it work.</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Streak</p>
+                            <p className="text-lg font-semibold text-gray-900 dark:text-white">{bugStreak} / {bugBest}</p>
+                        </div>
+                    </div>
+
+                    <div className="text-xs text-gray-400 uppercase tracking-[0.2em]">{currentBug.language}</div>
+                    <pre className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60 p-4 text-xs text-gray-800 dark:text-gray-200 overflow-x-auto">
+                        <code>{currentBug.code}</code>
+                    </pre>
+
+                    <p className="text-sm text-gray-700 dark:text-gray-300">{currentBug.prompt}</p>
+                    <div className="space-y-2">
+                        {currentBug.options.map((option, index) => {
+                            const isSelected = bugSelected === index;
+                            const isCorrect = bugSelected !== null && index === currentBug.answer;
+                            const base = 'w-full px-3 py-2 rounded-xl border text-sm text-left transition-all';
+                            const styles = isSelected
+                                ? isCorrect
+                                    ? 'border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200'
+                                    : 'border-red-400 bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-200'
+                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800';
+                            return (
+                                <button key={option} onClick={() => answerBug(index)} className={`${base} ${styles}`}>
+                                    {option}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {bugFeedback && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{bugFeedback}</p>
+                    )}
+
+                    <div className="flex justify-end">
+                        <button
+                            onClick={nextBug}
+                            className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                            Next Bug
+                        </button>
+                    </div>
+                </section>
+            </div>
         </div>
     );
 };
 
 export default Games;
+
