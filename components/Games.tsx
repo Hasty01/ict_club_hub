@@ -536,28 +536,45 @@ const Games: React.FC = () => {
     };
 
     // Coordinate Target
-    const coordinateSize = 6;
-    const [coordTarget, setCoordTarget] = useState<Position>({ x: randomBetween(0, coordinateSize - 1), y: randomBetween(0, coordinateSize - 1) });
+    const [coordinateSize, setCoordinateSize] = useState(6);
+    const [coordShowLabels, setCoordShowLabels] = useState(true);
+    const [coordOriginBottom, setCoordOriginBottom] = useState(false);
+    const createCoordTarget = (size: number) => ({ x: randomBetween(0, size - 1), y: randomBetween(0, size - 1) });
+    const [coordTarget, setCoordTarget] = useState<Position>(() => createCoordTarget(6));
     const [coordFeedback, setCoordFeedback] = useState<string | null>(null);
     const [coordStreak, setCoordStreak] = useState(0);
     const [coordBest, setCoordBest] = useState(0);
 
+    useEffect(() => {
+        setCoordTarget(createCoordTarget(coordinateSize));
+        setCoordFeedback(null);
+        setCoordStreak(0);
+    }, [coordinateSize, coordOriginBottom]);
+
     const resetCoordTarget = () => {
-        setCoordTarget({ x: randomBetween(0, coordinateSize - 1), y: randomBetween(0, coordinateSize - 1) });
+        setCoordTarget(createCoordTarget(coordinateSize));
         setCoordFeedback(null);
     };
 
     const handleCoordClick = (x: number, y: number) => {
-        if (x === coordTarget.x && y === coordTarget.y) {
+        const displayY = coordOriginBottom ? coordinateSize - 1 - y : y;
+        const displayX = x;
+        if (displayX === coordTarget.x && displayY === coordTarget.y) {
             setCoordFeedback('Correct. Target acquired.');
             setCoordStreak(prev => {
                 const next = prev + 1;
                 setCoordBest(best => Math.max(best, next));
                 return next;
             });
-            setCoordTarget({ x: randomBetween(0, coordinateSize - 1), y: randomBetween(0, coordinateSize - 1) });
+            setCoordTarget(createCoordTarget(coordinateSize));
         } else {
-            setCoordFeedback('Not quite. Try again.');
+            const hints = [];
+            if (displayX < coordTarget.x) hints.push('go right');
+            if (displayX > coordTarget.x) hints.push('go left');
+            if (displayY < coordTarget.y) hints.push('go up');
+            if (displayY > coordTarget.y) hints.push('go down');
+            const hintText = hints.length ? `Hint: ${hints.join(' & ')}.` : 'Try again.';
+            setCoordFeedback(`Not quite. ${hintText}`);
             setCoordStreak(0);
         }
     };
