@@ -1700,6 +1700,31 @@ export const removeTeamMember = async (teamId: string, userId: string) => {
     if (error) throw error;
 };
 
+export const deleteTeam = async (payload: { teamId: string; requesterId: string }) => {
+    try {
+        const { data: team, error: teamError } = await supabase
+            .from('teams')
+            .select('id, name, created_by')
+            .eq('id', payload.teamId)
+            .single();
+        if (teamError) throw teamError;
+
+        if (team?.created_by && team.created_by !== payload.requesterId) {
+            throw new Error("Only the team owner can delete this team.");
+        }
+
+        const { error } = await supabase
+            .from('teams')
+            .delete()
+            .eq('id', payload.teamId);
+        if (error) throw error;
+        return true;
+    } catch (error: any) {
+        console.error("Failed to delete team", error);
+        throw new Error(error?.message || "Failed to delete team.");
+    }
+};
+
 export const getTeamChallenges = async (): Promise<TeamChallenge[]> => {
     const { data, error } = await supabase
         .from('team_challenges')

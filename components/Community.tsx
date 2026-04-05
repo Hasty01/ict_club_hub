@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { User } from '../types';
+import { Team, User } from '../types';
 import { useData } from '../DataContext';
 import * as api from '../services/apiService';
 import { TrophyIcon } from './icons/TrophyIcon';
@@ -9,6 +9,7 @@ import { PlusCircleIcon } from './icons/PlusCircleIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import MemberPortfolioModal from './MemberPortfolioModal';
 import Tooltip from './Tooltip';
+import ConfirmationModal from './ConfirmationModal';
 
 interface CommunityProps {
     currentUser: User;
@@ -29,6 +30,7 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
     const [memberInvite, setMemberInvite] = useState<Record<string, string>>({});
     const [memberSearch, setMemberSearch] = useState('');
     const [selectedMember, setSelectedMember] = useState<User | null>(null);
+    const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
 
     const userMap = useMemo(() => {
         return new Map(allUsers.map(user => [user.uid, user]));
@@ -158,6 +160,20 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
         } catch (error) {
             console.error("Failed to reject request", error);
             showToast('Failed to reject request.', 'error');
+        }
+    };
+
+    const confirmDeleteTeam = async () => {
+        if (!teamToDelete) return;
+        try {
+            await api.deleteTeam({ teamId: teamToDelete.id, requesterId: currentUser.uid });
+            await fetchTeams();
+            showToast('Team deleted.', 'success');
+        } catch (error) {
+            console.error("Failed to delete team", error);
+            showToast('Failed to delete team.', 'error');
+        } finally {
+            setTeamToDelete(null);
         }
     };
 
@@ -363,7 +379,16 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
                                             <h4 className="text-md font-semibold text-gray-900 dark:text-white">{team.name}</h4>
                                             <p className="text-xs text-gray-500 dark:text-gray-400">{team.description || 'No description'}</p>
                                         </div>
-                                        {isMember ? (
+                                        {isOwner ? (
+                                            <Tooltip text="Delete this team and remove all members.">
+                                                <button
+                                                    onClick={() => setTeamToDelete(team)}
+                                                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </Tooltip>
+                                        ) : isMember ? (
                                             <button
                                                 onClick={() => handleLeaveTeam(team.id)}
                                                 className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
@@ -517,6 +542,15 @@ const Community: React.FC<CommunityProps> = ({ currentUser }) => {
             isOpen={!!selectedMember}
             user={selectedMember}
             onClose={() => setSelectedMember(null)}
+        />
+        <ConfirmationModal
+            isOpen={!!teamToDelete}
+            onClose={() => setTeamToDelete(null)}
+            onConfirm={confirmDeleteTeam}
+            title="Delete Team"
+            message={`Delete "${teamToDelete?.name}"? This will remove the team, join requests, and team challenges.`}
+            confirmText="Delete"
+            isDangerous
         />
         </>
     );
