@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useData } from '../DataContext';
-import { VotingPosition, VotingContestant, User } from '../types';
+import { VotingPosition, VotingContestant, VotingVote, User } from '../types';
 import { VoteIcon } from './icons/VoteIcon';
 import { UserIcon } from './icons/UserIcon';
 import { PlusCircleIcon as PlusIcon } from './icons/PlusCircleIcon';
@@ -47,7 +47,10 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [contestants, setContestants] = useState<VotingContestant[]>([]);
-    const [votes, setVotes] = useState<any[]>([]);
+    const [votes, setVotes] = useState<VotingVote[]>([]);
+    const [analyticsVotes, setAnalyticsVotes] = useState<VotingVote[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'upcoming' | 'closed'>('all');
 
     // Form state for creating position
     const [newPos, setNewPos] = useState({
@@ -61,6 +64,20 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     useEffect(() => {
         fetchVotingPositions();
     }, [fetchVotingPositions]);
+
+    useEffect(() => {
+        const loadAnalyticsVotes = async () => {
+            if (activeTab !== 'analytics' || votingPositions.length === 0) return;
+            try {
+                const voteCollections = await Promise.all(votingPositions.map(pos => fetchVotingVotes(pos.id)));
+                setAnalyticsVotes(voteCollections.flat());
+            } catch (error) {
+                console.error('Failed to load analytics votes', error);
+            }
+        };
+
+        loadAnalyticsVotes();
+    }, [activeTab, votingPositions, fetchVotingVotes]);
 
     const activeElections = useMemo(() =>
         votingPositions.filter(p => p.status === 'OPEN' && new Date(p.dueDate) > new Date()),
@@ -83,6 +100,27 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     const pastElections = useMemo(() =>
         votingPositions.filter(p => p.status === 'CLOSED' || new Date(p.dueDate) <= new Date()),
         [votingPositions]);
+
+    const electionStats = useMemo(() => {
+        const now = new Date();
+        const open = votingPositions.filter(p => now >= new Date(p.startDate) && now <= new Date(p.dueDate)).length;
+        const upcoming = votingPositions.filter(p => new Date(p.startDate) > now).length;
+        const closed = votingPositions.filter(p => now > new Date(p.dueDate) || p.status === 'CLOSED').length;
+        return { open, upcoming, closed };
+    }, [votingPositions]);
+
+    const filteredActiveElections = useMemo(() => {
+        const term = searchTerm.trim().toLowerCase();
+        return activeElections
+            .filter(pos => !term || pos.title.toLowerCase().includes(term) || (pos.description || '').toLowerCase().includes(term))
+            .filter((pos) => {
+                if (statusFilter === 'all') return true;
+                if (statusFilter === 'open') return isVotingOpen(pos);
+                if (statusFilter === 'upcoming') return isUpcoming(pos);
+                return !isVotingOpen(pos) && !isUpcoming(pos);
+            })
+            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    }, [activeElections, searchTerm, statusFilter]);
 
     const handleCreatePosition = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -197,6 +235,8 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         return votes.filter(v => v.contestantId === contestantId).length;
     };
 
+    const hasUserVoted = useMemo(() => votes.some(v => v.voterId === currentUser.uid), [votes, currentUser.uid]);
+
     const approvedContestants = useMemo(() => {
         // If we are looking at a specific position's results/modal, use the local 'contestants' state
         if (showResultsModal || showVoteModal) {
@@ -286,6 +326,25 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                 </div>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
+                    <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold">Open now</p>
+                    <p className="text-2xl font-extrabold text-green-600 dark:text-green-400 mt-1">{electionStats.open}</p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
+                    <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold">Upcoming</p>
+                    <p className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1">{electionStats.upcoming}</p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
+                    <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold">Closed</p>
+                    <p className="text-2xl font-extrabold text-gray-700 dark:text-gray-200 mt-1">{electionStats.closed}</p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
+                    <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold">Pending vetting</p>
+                    <p className="text-2xl font-extrabold text-pink-600 dark:text-pink-400 mt-1">{pendingContestants.length}</p>
+                </div>
+            </div>
+
             {votingError && (
                 <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 flex items-center gap-3">
                     <AlertIcon className="w-5 h-5" />
@@ -300,14 +359,35 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                     ))}
                 </div>
             ) : activeTab === 'active' ? (
+                <div className="space-y-5">
+                    <div className="flex flex-col lg:flex-row gap-3">
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search elections by title or description..."
+                            className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                        />
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+                            className="px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                        >
+                            <option value="all">All statuses</option>
+                            <option value="open">Open now</option>
+                            <option value="upcoming">Upcoming</option>
+                            <option value="closed">Closed</option>
+                        </select>
+                    </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {activeElections.length === 0 ? (
+                    {filteredActiveElections.length === 0 ? (
                         <div className="col-span-full py-20 bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center text-center px-4">
                             <VoteIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-4" />
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">No Active Elections</h3>
-                            <p className="text-gray-500 dark:text-gray-400 mt-1">Check back later or view past results.</p>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">No Matching Elections</h3>
+                            <p className="text-gray-500 dark:text-gray-400 mt-1">Try clearing your search or changing the status filter.</p>
                         </div>
-                    ) : activeElections.map(pos => (
+                    ) : filteredActiveElections.map(pos => (
                         <div key={pos.id} className="group bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-xl border border-gray-100 dark:border-gray-700 p-6 flex flex-col transition-all duration-300 hover:-translate-y-1">
                             <div className="flex justify-between items-start mb-4">
                                 <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isVotingOpen(pos) ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'}`}>
@@ -373,6 +453,7 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                             </div>
                         </div>
                     ))}
+                </div>
                 </div>
             ) : activeTab === 'past' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -492,9 +573,9 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                                 <h4 className="font-bold text-xs uppercase tracking-widest">Global Participation</h4>
                             </div>
                             <div className="text-4xl font-black text-gray-900 dark:text-white">
-                                {allUsers.length > 0 ? ((votes.length / allUsers.length) * 100).toFixed(1) : 0}%
+                                {allUsers.length > 0 ? ((analyticsVotes.length / allUsers.length) * 100).toFixed(1) : 0}%
                             </div>
-                            <p className="text-xs text-gray-500 mt-2 font-medium">{votes.length} votes cast by {allUsers.length} members</p>
+                            <p className="text-xs text-gray-500 mt-2 font-medium">{analyticsVotes.length} votes cast by {allUsers.length} members</p>
                         </div>
 
                         <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
@@ -526,8 +607,8 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                         <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-8">Vote Distribution by Position</h4>
                         <div className="space-y-6">
                             {votingPositions.slice(0, 6).map(pos => {
-                                const posVotes = votes.filter(v => v.positionId === pos.id).length;
-                                const percent = votes.length > 0 ? (posVotes / votes.length) * 100 : 0;
+                                const posVotes = analyticsVotes.filter(v => v.positionId === pos.id).length;
+                                const percent = analyticsVotes.length > 0 ? (posVotes / analyticsVotes.length) * 100 : 0;
                                 return (
                                     <div key={pos.id} className="space-y-2">
                                         <div className="flex justify-between items-end">
@@ -724,11 +805,11 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                                         "{contestant.manifesto}"
                                     </div>
                                     <button
-                                        disabled={isSubmitting}
+                                        disabled={isSubmitting || hasUserVoted}
                                         onClick={() => handleCastVote(contestant.id)}
-                                        className="w-full py-4 bg-white dark:bg-gray-700 border-2 border-pink-100 dark:border-pink-900/30 text-pink-600 dark:text-pink-400 rounded-2xl font-bold hover:bg-pink-600 hover:text-white dark:hover:bg-pink-600 dark:hover:text-white transition-all shadow-sm"
+                                        className="w-full py-4 bg-white dark:bg-gray-700 border-2 border-pink-100 dark:border-pink-900/30 text-pink-600 dark:text-pink-400 rounded-2xl font-bold hover:bg-pink-600 hover:text-white dark:hover:bg-pink-600 dark:hover:text-white transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                                     >
-                                        Cast My Vote
+                                        {hasUserVoted ? 'Vote Already Cast' : 'Cast My Vote'}
                                     </button>
                                 </div>
                             ))}
