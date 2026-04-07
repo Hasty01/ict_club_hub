@@ -39,6 +39,8 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     const [showContestModal, setShowContestModal] = useState(false);
     const [showVoteModal, setShowVoteModal] = useState(false);
     const [showResultsModal, setShowResultsModal] = useState(false);
+    const [showStatusModal, setShowStatusModal] = useState(false);
+    const [statusModalConfig, setStatusModalConfig] = useState<{ title: string, message: string, type: 'upcoming' | 'closed', date: string } | null>(null);
 
     const [manifesto, setManifesto] = useState('');
     const [criteriaAgreed, setCriteriaAgreed] = useState(false);
@@ -161,17 +163,54 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         setShowResultsModal(true);
     };
 
+    const handleActionClick = (pos: VotingPosition, action: 'contest' | 'vote') => {
+        if (isVotingOpen(pos)) {
+            setSelectedPosition(pos);
+            if (action === 'contest') {
+                setShowContestModal(true);
+            } else {
+                handleOpenVoteModal(pos);
+            }
+            return;
+        }
+
+        setSelectedPosition(pos);
+        if (isUpcoming(pos)) {
+            setStatusModalConfig({
+                title: 'Voting Not Yet Open',
+                message: `The ${action === 'contest' ? 'contest entry' : 'voting'} for this position hasn't started yet. Please check back once the window opens.`,
+                type: 'upcoming',
+                date: pos.startDate
+            });
+        } else {
+            setStatusModalConfig({
+                title: 'Voting Period Closed',
+                message: `The ${action === 'contest' ? 'contest entry' : 'voting'} period for this position has ended. You can view the final results in the Results tab.`,
+                type: 'closed',
+                date: pos.dueDate
+            });
+        }
+        setShowStatusModal(true);
+    };
+
     const getVoteCount = (contestantId: string) => {
         return votes.filter(v => v.contestantId === contestantId).length;
     };
 
-    const approvedContestants = useMemo(() =>
-        contestants.filter(c => c.status === 'APPROVED'),
-        [contestants]);
+    const approvedContestants = useMemo(() => {
+        // If we are looking at a specific position's results/modal, use the local 'contestants' state
+        if (showResultsModal || showVoteModal) {
+            return contestants.filter(c => c.status === 'APPROVED');
+        }
+        // Otherwise (for analytics), use the global 'votingContestants'
+        return votingContestants.filter(c => c.status === 'APPROVED');
+    }, [contestants, votingContestants, showResultsModal, showVoteModal]);
 
     const pendingContestants = useMemo(() =>
-        contestants.filter(c => c.status === 'PENDING'),
-        [contestants]);
+        votingContestants.filter(c => c.status === 'PENDING'),
+        [votingContestants]);
+
+    const globalContestantsCount = useMemo(() => votingContestants.length, [votingContestants]);
 
     const sortedResults = useMemo(() => {
         return [...approvedContestants].sort((a, b) => getVoteCount(b.id) - getVoteCount(a.id));
@@ -313,8 +352,8 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
 
                             <div className="grid grid-cols-2 gap-3 mt-auto">
                                 <button
-                                    onClick={() => { setSelectedPosition(pos); setShowContestModal(true); }}
-                                    disabled={!isVotingOpen(pos) || userContestantFor.has(pos.id)}
+                                    onClick={() => handleActionClick(pos, 'contest')}
+                                    disabled={userContestantFor.has(pos.id)}
                                     className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed ${userContestantFor.has(pos.id) ? 'bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
                                 >
                                     <UserIcon className="w-4 h-4" />
@@ -325,9 +364,8 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                                     ) : 'Contest'}
                                 </button>
                                 <button
-                                    onClick={() => handleOpenVoteModal(pos)}
-                                    disabled={!isVotingOpen(pos)}
-                                    className="flex items-center justify-center gap-2 py-3 px-4 bg-pink-600 text-white rounded-xl font-bold hover:bg-pink-700 shadow-lg shadow-pink-500/25 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={() => handleActionClick(pos, 'vote')}
+                                    className="flex items-center justify-center gap-2 py-3 px-4 bg-pink-600 text-white rounded-xl font-bold hover:bg-pink-700 shadow-lg shadow-pink-500/25 transition-all text-sm"
                                 >
                                     <VoteIcon className="w-4 h-4" />
                                     Vote Now
@@ -466,7 +504,7 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                                 <h4 className="font-bold text-xs uppercase tracking-widest">Election Density</h4>
                             </div>
                             <div className="text-4xl font-black text-gray-900 dark:text-white">
-                                {votingPositions.length > 0 ? (contestants.length / votingPositions.length).toFixed(1) : 0}
+                                {votingPositions.length > 0 ? (globalContestantsCount / votingPositions.length).toFixed(1) : 0}
                             </div>
                             <p className="text-xs text-gray-500 mt-2 font-medium">Average candidates per election</p>
                         </div>
@@ -478,9 +516,9 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                                 <h4 className="font-bold text-xs uppercase tracking-widest">Vetting Efficiency</h4>
                             </div>
                             <div className="text-4xl font-black text-gray-900 dark:text-white">
-                                {contestants.length > 0 ? ((approvedContestants.length / contestants.length) * 100).toFixed(0) : 0}%
+                                {globalContestantsCount > 0 ? ((approvedContestants.length / globalContestantsCount) * 100).toFixed(0) : 0}%
                             </div>
-                            <p className="text-xs text-gray-500 mt-2 font-medium">{approvedContestants.length} of {contestants.length} apps approved</p>
+                            <p className="text-xs text-gray-500 mt-2 font-medium">{approvedContestants.length} of {globalContestantsCount} apps approved</p>
                         </div>
                     </div>
 
@@ -756,6 +794,38 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Status Modal (Upcoming/Closed) */}
+            {showStatusModal && statusModalConfig && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-gray-100 dark:border-gray-700">
+                        <div className="p-8 text-center">
+                            <div className={`w-20 h-20 mx-auto rounded-3xl flex items-center justify-center mb-6 ${statusModalConfig.type === 'upcoming' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
+                                {statusModalConfig.type === 'upcoming' ? <ClockIcon className="w-10 h-10" /> : <BarChart3Icon className="w-10 h-10" />}
+                            </div>
+                            <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">{statusModalConfig.title}</h3>
+                            <p className="text-gray-500 dark:text-gray-400 leading-relaxed mb-8">
+                                {statusModalConfig.message}
+                            </p>
+
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900/40 rounded-2xl border border-gray-100 dark:border-gray-700 mb-8 inline-block mx-auto">
+                                <span className="text-sm font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                                    {statusModalConfig.type === 'upcoming' ? 'Scheduled Start' : 'Ended On'}
+                                </span>
+                                <span className="text-lg font-black text-pink-600 dark:text-pink-400">
+                                    {new Date(statusModalConfig.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                                </span>
+                            </div>
+
+                            <button
+                                onClick={() => setShowStatusModal(false)}
+                                className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-bold hover:opacity-90 transition-all shadow-xl"
+                            >
+                                Understood
+                            </button>
                         </div>
                     </div>
                 </div>

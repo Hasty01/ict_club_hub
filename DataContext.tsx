@@ -569,7 +569,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     try {
       await api.updateContestantStatus(id, status);
       showToast(`Candidate ${status.toLowerCase()} successfully.`, 'success');
-      await fetchVotingPositions();
+      await fetchAllVotingContestants();
     } catch (e: any) {
       console.error("Failed to update contestant status", e);
       showToast("Failed to update candidate status.", "error");
