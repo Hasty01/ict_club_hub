@@ -51,8 +51,8 @@ const NavLink: React.FC<{
         onClick={() => onClick(tabName)}
         title={isCollapsed ? label : undefined}
         className={`group relative flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 ease-out ${isCollapsed ? 'justify-center' : 'space-x-3'} ${isActive
-            ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-500/25'
-            : 'text-gray-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-white'
+          ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-500/25'
+          : 'text-gray-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-white'
           }`}
       >
         <div className={`relative flex items-center justify-center transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
@@ -68,8 +68,8 @@ const NavLink: React.FC<{
         )}
         {!isCollapsed && badge !== undefined && badge > 0 && (
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm ${isActive
-              ? 'bg-white/20 text-white'
-              : 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400'
+            ? 'bg-white/20 text-white'
+            : 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400'
             }`}>
             {badge > 99 ? '99+' : badge}
           </span>
@@ -124,30 +124,30 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen
     {
       title: "General",
       items: [
-        ...(featureFlags.showFeed ? [{ tab: 'feed' as Tab, label: 'Feed', icon: <HomeIcon /> }] : []),
-        ...(featureFlags.showCommunity ? [{ tab: 'community' as Tab, label: 'Community', icon: <UsersIcon /> }] : []),
-        ...(featureFlags.showChat ? [{ tab: 'chat' as Tab, label: 'Messages', icon: <ChatBubbleIcon />, badge: totalUnread }] : []),
-        ...(featureFlags.showChallenges ? [{ tab: 'challenges' as Tab, label: 'Challenges', icon: <TrophyIcon />, badge: notificationCounts['challenges'] }] : []),
-        ...(featureFlags.showSuggestions ? [{ tab: 'suggestions' as Tab, label: 'Suggestions', icon: <LightBulbIcon /> }] : []),
-        ...(featureFlags.showVoting ? [{ tab: 'voting' as Tab, label: 'Voting', icon: <VoteIcon /> }] : []),
+        ...((featureFlags.showFeed || user.role === 'PATRON') ? [{ tab: 'feed' as Tab, label: 'Feed', icon: <HomeIcon /> }] : []),
+        ...((featureFlags.showCommunity || user.role === 'PATRON') ? [{ tab: 'community' as Tab, label: 'Community', icon: <UsersIcon /> }] : []),
+        ...((featureFlags.showChat || user.role === 'PATRON') ? [{ tab: 'chat' as Tab, label: 'Messages', icon: <ChatBubbleIcon />, badge: totalUnread }] : []),
+        ...((featureFlags.showChallenges || user.role === 'PATRON') ? [{ tab: 'challenges' as Tab, label: 'Challenges', icon: <TrophyIcon />, badge: notificationCounts['challenges'] }] : []),
+        ...((featureFlags.showSuggestions || user.role === 'PATRON') ? [{ tab: 'suggestions' as Tab, label: 'Suggestions', icon: <LightBulbIcon /> }] : []),
+        ...((featureFlags.showVoting || user.role === 'PATRON') ? [{ tab: 'voting' as Tab, label: 'Voting', icon: <VoteIcon /> }] : []),
       ]
     },
     {
       title: "Manage",
       items: [
-        ...(featureFlags.showActivities ? [{ tab: 'activities' as Tab, label: 'Activities', icon: <CalendarIcon />, badge: notificationCounts['activities'] }] : []),
-        ...(featureFlags.showProjects ? [{ tab: 'projects' as Tab, label: 'Projects', icon: <ClipboardListIcon />, badge: notificationCounts['projects'] }] : []),
-        ...(featureFlags.showAttendance ? [{ tab: 'attendance' as Tab, label: 'Attendance', icon: <CheckCircleIcon /> }] : []),
+        ...((featureFlags.showActivities || user.role === 'PATRON') ? [{ tab: 'activities' as Tab, label: 'Activities', icon: <CalendarIcon />, badge: notificationCounts['activities'] }] : []),
+        ...((featureFlags.showProjects || user.role === 'PATRON') ? [{ tab: 'projects' as Tab, label: 'Projects', icon: <ClipboardListIcon />, badge: notificationCounts['projects'] }] : []),
+        ...((featureFlags.showAttendance || user.role === 'PATRON') ? [{ tab: 'attendance' as Tab, label: 'Attendance', icon: <CheckCircleIcon /> }] : []),
       ]
     },
     {
       title: "Learn & Share",
       items: [
-        ...(featureFlags.showRoadmap ? [{ tab: 'roadmap' as Tab, label: 'Roadmap', icon: <MapIcon />, badge: notificationCounts['roadmap'] }] : []),
-        ...(featureFlags.showResources ? [{ tab: 'resources' as Tab, label: 'Resources', icon: <BookOpenIcon /> }] : []),
-        ...(featureFlags.showPlayground ? [{ tab: 'playground' as Tab, label: 'Playground', icon: <CodeIcon /> }] : []),
-        ...(featureFlags.showGames ? [{ tab: 'games' as Tab, label: 'Games', icon: <GamepadIcon /> }] : []),
-        ...(featureFlags.showShowcase ? [{ tab: 'showcase' as Tab, label: 'Showcase', icon: <GlobeIcon /> }] : []),
+        ...((featureFlags.showRoadmap || user.role === 'PATRON') ? [{ tab: 'roadmap' as Tab, label: 'Roadmap', icon: <MapIcon />, badge: notificationCounts['roadmap'] }] : []),
+        ...((featureFlags.showResources || user.role === 'PATRON') ? [{ tab: 'resources' as Tab, label: 'Resources', icon: <BookOpenIcon /> }] : []),
+        ...((featureFlags.showPlayground || user.role === 'PATRON') ? [{ tab: 'playground' as Tab, label: 'Playground', icon: <CodeIcon /> }] : []),
+        ...((featureFlags.showGames || user.role === 'PATRON') ? [{ tab: 'games' as Tab, label: 'Games', icon: <GamepadIcon /> }] : []),
+        ...((featureFlags.showShowcase || user.role === 'PATRON') ? [{ tab: 'showcase' as Tab, label: 'Showcase', icon: <GlobeIcon /> }] : []),
       ]
     },
     ...(user.role === 'PATRON'

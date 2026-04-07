@@ -99,6 +99,7 @@ interface IDataContext {
   fetchVotingVotes: (positionId: string) => Promise<VotingVote[]>;
   castVote: (positionId: string, contestantId: string) => Promise<void>;
   updateContestantStatus: (id: string, status: 'APPROVED' | 'REJECTED') => Promise<void>;
+  deleteVotingPosition: (id: string) => Promise<void>;
   updateUserSkillLevel: (newLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED') => Promise<void>;
   featureFlags: FeatureFlags;
   updateFeatureFlags: (updates: Partial<FeatureFlags>) => void;
@@ -541,6 +542,18 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     }
   }, [currentUser.uid, showToast]);
 
+  const deleteVotingPosition = useCallback(async (id: string) => {
+    try {
+      await api.deleteVotingPosition(id);
+      showToast("Position deleted successfully.", "success");
+      await fetchVotingPositions();
+    } catch (e: any) {
+      console.error("Failed to delete voting position", e);
+      showToast("Failed to delete position.", "error");
+      throw e;
+    }
+  }, [showToast, fetchVotingPositions]);
+
   const updateContestantStatus = useCallback(async (id: string, status: 'APPROVED' | 'REJECTED') => {
     try {
       await api.updateContestantStatus(id, status);
@@ -861,6 +874,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     fetchVotingVotes,
     castVote,
     updateContestantStatus,
+    deleteVotingPosition,
     updateUserSkillLevel,
     featureFlags,
     updateFeatureFlags,

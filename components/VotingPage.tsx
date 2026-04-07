@@ -13,6 +13,7 @@ import { ExclamationCircleIcon as AlertIcon } from './icons/ExclamationCircleIco
 import { CheckCircleIcon as CheckIcon } from './icons/CheckCircleIcon';
 import { XIcon } from './icons/XIcon';
 import { InformationCircleIcon as InfoIcon } from './icons/InformationCircleIcon';
+import { TrashIcon } from './icons/TrashIcon';
 
 const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     const {
@@ -25,6 +26,7 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         castVote,
         fetchVotingVotes,
         updateContestantStatus,
+        deleteVotingPosition,
         isLoadingVoting,
         votingError,
         showToast,
@@ -267,6 +269,19 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                                     <ClockIcon className="w-3 h-3" />
                                     {isUpcoming(pos) ? `Starts in ${getTimeRemaining(pos.startDate)}` : getTimeRemaining(pos.dueDate)}
                                 </span>
+                                {currentUser.role === 'PATRON' && (
+                                    <button
+                                        onClick={() => {
+                                            if (window.confirm('Are you sure you want to delete this position? All candidates and votes will be permanently removed.')) {
+                                                deleteVotingPosition(pos.id);
+                                            }
+                                        }}
+                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                                        title="Delete Position"
+                                    >
+                                        <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-pink-600 transition-colors">
                                 {pos.title}
@@ -339,6 +354,19 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                                 <BarChart3Icon className="w-4 h-4" />
                                 View Results
                             </button>
+                            {currentUser.role === 'PATRON' && (
+                                <button
+                                    onClick={() => {
+                                        if (window.confirm('Are you sure you want to delete this past position? This cannot be undone.')) {
+                                            deleteVotingPosition(pos.id);
+                                        }
+                                    }}
+                                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/30 transition-all text-sm mt-3"
+                                >
+                                    <TrashIcon className="w-4 h-4" />
+                                    Delete Record
+                                </button>
+                            )}
                         </div>
                     ))}
                 </div>

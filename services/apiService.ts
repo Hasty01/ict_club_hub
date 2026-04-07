@@ -2203,3 +2203,11 @@ export const castVote = async (positionId: string, voterUid: string, contestantI
         });
     if (error) throw error;
 };
+
+export const deleteVotingPosition = async (id: string): Promise<void> => {
+    const { error } = await supabase
+        .from('voting_positions')
+        .delete()
+        .eq('id', id);
+    if (error) throw error;
+};

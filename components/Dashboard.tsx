@@ -167,6 +167,10 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
     };
 
     useEffect(() => {
+        // Redirection logic: if a tab is disabled by a feature flag, 
+        // move the user to the feed or profile, UNLESS they are a PATRON.
+        if (currentUser.role === 'PATRON') return;
+
         const disabledTabs = new Set<Tab>();
         if (!featureFlags.showFeed) disabledTabs.add('feed');
         if (!featureFlags.showActivities) disabledTabs.add('activities');
@@ -186,55 +190,55 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
         if (disabledTabs.has(activeTab)) {
             setActiveTab(featureFlags.showFeed ? 'feed' : 'profile');
         }
-    }, [activeTab, featureFlags, setActiveTab]);
+    }, [activeTab, featureFlags, setActiveTab, currentUser.role]);
 
     return (
         <div className={(activeTab === 'chat' || activeTab === 'playground') ? 'h-full' : ''}>
             <Suspense fallback={<LoadingIndicator />}>
-                <TabPanel active={activeTab === 'feed' && featureFlags.showFeed}>
+                <TabPanel active={activeTab === 'feed' && (featureFlags.showFeed || currentUser.role === 'PATRON')}>
                     <Feed currentUser={currentUser} />
                 </TabPanel>
-                <TabPanel active={activeTab === 'activities' && featureFlags.showActivities}>
+                <TabPanel active={activeTab === 'activities' && (featureFlags.showActivities || currentUser.role === 'PATRON')}>
                     <Activities currentUser={currentUser} />
                 </TabPanel>
-                <TabPanel active={activeTab === 'attendance' && featureFlags.showAttendance}>
+                <TabPanel active={activeTab === 'attendance' && (featureFlags.showAttendance || currentUser.role === 'PATRON')}>
                     <Attendance currentUser={currentUser} isVisible={activeTab === 'attendance'} />
                 </TabPanel>
-                <TabPanel active={activeTab === 'projects' && featureFlags.showProjects}>
+                <TabPanel active={activeTab === 'projects' && (featureFlags.showProjects || currentUser.role === 'PATRON')}>
                     <ProjectsBoard currentUser={currentUser} />
                 </TabPanel>
-                <TabPanel active={activeTab === 'playground' && featureFlags.showPlayground} className="h-full">
+                <TabPanel active={activeTab === 'playground' && (featureFlags.showPlayground || currentUser.role === 'PATRON')} className="h-full">
                     <CodePlayground theme={theme} currentUser={currentUser} setActiveTab={setActiveTab} />
                 </TabPanel>
-                <TabPanel active={activeTab === 'showcase' && featureFlags.showShowcase}>
+                <TabPanel active={activeTab === 'showcase' && (featureFlags.showShowcase || currentUser.role === 'PATRON')}>
                     <Showcase currentUser={currentUser} setActiveTab={setActiveTab} />
                 </TabPanel>
                 <TabPanel active={activeTab === 'profile'}>
                     <Profile currentUser={currentUser} onUpdateUserProfile={onUpdateUserProfile} />
                 </TabPanel>
-                <TabPanel active={activeTab === 'resources' && featureFlags.showResources}>
+                <TabPanel active={activeTab === 'resources' && (featureFlags.showResources || currentUser.role === 'PATRON')}>
                     <Resources currentUser={currentUser} setActiveTab={setActiveTab} />
                 </TabPanel>
-                <TabPanel active={activeTab === 'chat' && featureFlags.showChat} className="h-full">
+                <TabPanel active={activeTab === 'chat' && (featureFlags.showChat || currentUser.role === 'PATRON')} className="h-full">
                     <Chat currentUser={currentUser} setActiveTab={setActiveTab} theme={theme} />
                 </TabPanel>
-                <TabPanel active={activeTab === 'suggestions' && featureFlags.showSuggestions}>
+                <TabPanel active={activeTab === 'suggestions' && (featureFlags.showSuggestions || currentUser.role === 'PATRON')}>
                     <Suggestions currentUser={currentUser} />
                 </TabPanel>
-                <TabPanel active={activeTab === 'challenges' && featureFlags.showChallenges}>
+                <TabPanel active={activeTab === 'challenges' && (featureFlags.showChallenges || currentUser.role === 'PATRON')}>
                     <Challenges currentUser={currentUser} />
                 </TabPanel>
                 {/* FIX: Removed invalid 'bottom_roadmap' comparison as it is not a valid member of the Tab type union. */}
-                <TabPanel active={activeTab === 'roadmap' && featureFlags.showRoadmap}>
+                <TabPanel active={activeTab === 'roadmap' && (featureFlags.showRoadmap || currentUser.role === 'PATRON')}>
                     <RoadmapView currentUser={currentUser} />
                 </TabPanel>
-                <TabPanel active={activeTab === 'community' && featureFlags.showCommunity}>
+                <TabPanel active={activeTab === 'community' && (featureFlags.showCommunity || currentUser.role === 'PATRON')}>
                     <Community currentUser={currentUser} />
                 </TabPanel>
-                <TabPanel active={activeTab === 'games' && featureFlags.showGames}>
+                <TabPanel active={activeTab === 'games' && (featureFlags.showGames || currentUser.role === 'PATRON')}>
                     <Games currentUser={currentUser} />
                 </TabPanel>
-                <TabPanel active={activeTab === 'voting' && featureFlags.showVoting}>
+                <TabPanel active={activeTab === 'voting' && (featureFlags.showVoting || currentUser.role === 'PATRON')}>
                     <VotingPage currentUser={currentUser} />
                 </TabPanel>
                 {currentUser.role === 'PATRON' && (

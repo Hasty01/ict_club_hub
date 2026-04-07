@@ -60,6 +60,15 @@ USING (
     )
 );
 
+CREATE POLICY "Patrons can delete positions" 
+ON voting_positions FOR DELETE 
+USING (
+    EXISTS (
+        SELECT 1 FROM public.users 
+        WHERE uid = auth.uid()::text AND role = 'PATRON'
+    )
+);
+
 -- Voting Contestants
 ALTER TABLE voting_contestants ENABLE ROW LEVEL SECURITY;
 
