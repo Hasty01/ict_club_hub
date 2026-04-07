@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef, useId } from 'react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { AttendanceRecord, AttendanceStatus, User } from '../types';
 import * as api from '../services/apiService';
@@ -46,7 +46,7 @@ const formatDate = (dateString: string) => {
   }
 };
 
-const useScrollAnimation = (delay = 0) => {
+const useScrollAnimation = (isSectionVisible: boolean, delay = 0) => {
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -54,6 +54,11 @@ const useScrollAnimation = (delay = 0) => {
         if (!element) return;
         
         element.style.transitionDelay = `${delay}ms`;
+
+        if (isSectionVisible) {
+            element.classList.add('is-visible');
+            return;
+        }
 
         const observer = new IntersectionObserver(
             ([entry]) => {
@@ -67,7 +72,7 @@ const useScrollAnimation = (delay = 0) => {
 
         observer.observe(element);
         return () => observer.disconnect();
-    }, [delay]);
+    }, [delay, isSectionVisible]);
 
     return ref;
 };
@@ -96,6 +101,7 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
   const [isQuickCreating, setIsQuickCreating] = useState(false);
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
+  const lineGradientId = useId().replace(/:/g, '');
 
   const memberUsers = useMemo(() => 
     allUsers.filter(user => user.role === 'MEMBER' && user.status === 'APPROVED'),
@@ -118,10 +124,10 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
   const absentCount = memberUsers.length - presentCount;
 
   // Animation Refs
-  const formRef = useScrollAnimation();
-  const logRef = useScrollAnimation(100);
-  const summaryRef = useScrollAnimation(200);
-  const trendRef = useScrollAnimation(100);
+  const formRef = useScrollAnimation(isVisible);
+  const logRef = useScrollAnimation(isVisible, 100);
+  const summaryRef = useScrollAnimation(isVisible, 200);
+  const trendRef = useScrollAnimation(isVisible, 100);
 
   useEffect(() => {
     if (isVisible) {
@@ -586,7 +592,7 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={lineChartData} margin={{ top: 5, right: 20, left: -10, bottom: 50 }}>
                                 <defs>
-                                    <linearGradient id="line-color-gradient" x1="0" y1="0" x2="1" y2="0">
+                                    <linearGradient id={lineGradientId} x1="0" y1="0" x2="1" y2="0">
                                         {lineChartData.map((entry, index) => {
                                             const offsetDenominator = lineChartData.length > 1 ? lineChartData.length - 1 : 1;
                                             const offset = (index / offsetDenominator) * 100;
@@ -601,7 +607,7 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
                                 <Line 
                                 type="monotone" 
                                 dataKey="value" 
-                                stroke="url(#line-color-gradient)" 
+                                stroke={`url(#${lineGradientId})`} 
                                 strokeWidth={3} 
                                 activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2 }} 
                                 dot={{ r: 4, stroke: '#fff', strokeWidth: 1 }} 
