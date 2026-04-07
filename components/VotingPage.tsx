@@ -24,13 +24,14 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         contestPosition,
         castVote,
         fetchVotingVotes,
+        updateContestantStatus,
         isLoadingVoting,
         votingError,
         showToast,
         allUsers
     } = useData();
 
-    const [activeTab, setActiveTab] = useState<'active' | 'past' | 'create'>('active');
+    const [activeTab, setActiveTab] = useState<'active' | 'past' | 'create' | 'vetting' | 'analytics'>('active');
     const [selectedPosition, setSelectedPosition] = useState<VotingPosition | null>(null);
     const [showContestModal, setShowContestModal] = useState(false);
     const [showVoteModal, setShowVoteModal] = useState(false);
@@ -48,6 +49,7 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         title: '',
         description: '',
         criteria: '',
+        startDate: '',
         dueDate: ''
     });
 
@@ -58,6 +60,12 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     const activeElections = useMemo(() =>
         votingPositions.filter(p => p.status === 'OPEN' && new Date(p.dueDate) > new Date()),
         [votingPositions]);
+
+    const isUpcoming = (pos: VotingPosition) => new Date(pos.startDate) > new Date();
+    const isVotingOpen = (pos: VotingPosition) => {
+        const now = new Date();
+        return now >= new Date(pos.startDate) && now <= new Date(pos.dueDate);
+    };
 
     const pastElections = useMemo(() =>
         votingPositions.filter(p => p.status === 'CLOSED' || new Date(p.dueDate) <= new Date()),
@@ -75,7 +83,7 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                 ...newPos,
                 createdBy: currentUser.uid
             });
-            setNewPos({ title: '', description: '', criteria: '', dueDate: '' });
+            setNewPos({ title: '', description: '', criteria: '', startDate: '', dueDate: '' });
             setActiveTab('active');
         } catch (error) {
             console.error(error);
@@ -146,9 +154,17 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         return votes.filter(v => v.contestantId === contestantId).length;
     };
 
+    const approvedContestants = useMemo(() =>
+        contestants.filter(c => c.status === 'APPROVED'),
+        [contestants]);
+
+    const pendingContestants = useMemo(() =>
+        contestants.filter(c => c.status === 'PENDING'),
+        [contestants]);
+
     const sortedResults = useMemo(() => {
-        return [...contestants].sort((a, b) => getVoteCount(b.id) - getVoteCount(a.id));
-    }, [contestants, votes]);
+        return [...approvedContestants].sort((a, b) => getVoteCount(b.id) - getVoteCount(a.id));
+    }, [approvedContestants, votes]);
 
     const getTimeRemaining = (dueDate: string) => {
         const total = Date.parse(dueDate) - Date.parse(new Date().toString());
@@ -193,7 +209,28 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                             onClick={() => setActiveTab('create')}
                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'create' ? 'bg-white dark:bg-gray-600 text-pink-600 dark:text-pink-300 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
                         >
-                            Post Position
+                            Manage
+                        </button>
+                    )}
+                    {currentUser.role === 'PATRON' && (
+                        <button
+                            onClick={() => setActiveTab('vetting')}
+                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all relative ${activeTab === 'vetting' ? 'bg-white dark:bg-gray-600 text-pink-600 dark:text-pink-300 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
+                        >
+                            Vetting
+                            {pendingContestants.length > 0 && (
+                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-pink-500 text-white text-[10px] flex items-center justify-center rounded-full animate-pulse">
+                                    {pendingContestants.length}
+                                </span>
+                            )}
+                        </button>
+                    )}
+                    {currentUser.role === 'PATRON' && (
+                        <button
+                            onClick={() => setActiveTab('analytics')}
+                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'analytics' ? 'bg-white dark:bg-gray-600 text-pink-600 dark:text-pink-300 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
+                        >
+                            Analytics
                         </button>
                     )}
                 </div>
@@ -223,12 +260,12 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                     ) : activeElections.map(pos => (
                         <div key={pos.id} className="group bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-xl border border-gray-100 dark:border-gray-700 p-6 flex flex-col transition-all duration-300 hover:-translate-y-1">
                             <div className="flex justify-between items-start mb-4">
-                                <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-bold uppercase tracking-wider">
-                                    Open
+                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isVotingOpen(pos) ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'}`}>
+                                    {isVotingOpen(pos) ? 'Open' : isUpcoming(pos) ? 'Upcoming' : 'Closed'}
                                 </span>
                                 <span className="text-xs text-gray-400 flex items-center gap-1 font-medium">
                                     <ClockIcon className="w-3 h-3" />
-                                    {getTimeRemaining(pos.dueDate)}
+                                    {isUpcoming(pos) ? `Starts in ${getTimeRemaining(pos.startDate)}` : getTimeRemaining(pos.dueDate)}
                                 </span>
                             </div>
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-pink-600 transition-colors">
@@ -253,14 +290,16 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                             <div className="grid grid-cols-2 gap-3 mt-auto">
                                 <button
                                     onClick={() => { setSelectedPosition(pos); setShowContestModal(true); }}
-                                    className="flex items-center justify-center gap-2 py-3 px-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all text-sm"
+                                    disabled={!isVotingOpen(pos)}
+                                    className="flex items-center justify-center gap-2 py-3 px-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <UserIcon className="w-4 h-4" />
                                     Contest
                                 </button>
                                 <button
                                     onClick={() => handleOpenVoteModal(pos)}
-                                    className="flex items-center justify-center gap-2 py-3 px-4 bg-pink-600 text-white rounded-xl font-bold hover:bg-pink-700 shadow-lg shadow-pink-500/25 transition-all text-sm"
+                                    disabled={!isVotingOpen(pos)}
+                                    className="flex items-center justify-center gap-2 py-3 px-4 bg-pink-600 text-white rounded-xl font-bold hover:bg-pink-700 shadow-lg shadow-pink-500/25 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <VoteIcon className="w-4 h-4" />
                                     Vote Now
@@ -303,6 +342,134 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                         </div>
                     ))}
                 </div>
+            ) : activeTab === 'vetting' ? (
+                <div className="space-y-6">
+                    <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700">
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Contestant Vetting</h3>
+                                <p className="text-gray-500 text-sm mt-1">Review manifestos and approve candidates for the ballot.</p>
+                            </div>
+                            <div className="px-4 py-2 bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 rounded-xl text-xs font-bold uppercase tracking-widest">
+                                {pendingContestants.length} Pending
+                            </div>
+                        </div>
+
+                        {pendingContestants.length === 0 ? (
+                            <div className="text-center py-20 bg-gray-50 dark:bg-gray-900/20 rounded-2xl border-2 border-dashed border-gray-100 dark:border-gray-800">
+                                <CheckIcon className="w-16 h-16 text-green-200 dark:text-green-900/40 mx-auto mb-4" />
+                                <h4 className="text-lg font-bold text-gray-900 dark:text-white">All Caught Up!</h4>
+                                <p className="text-gray-500 mt-1">No candidates are currently waiting for approval.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {pendingContestants.map(c => {
+                                    const pos = votingPositions.find(p => p.id === c.positionId);
+                                    return (
+                                        <div key={c.id} className="group bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
+                                            <div className="flex items-center gap-4 mb-4">
+                                                <img
+                                                    src={c.userAvatarUrl || `https://i.pravatar.cc/100?u=${c.userId}`}
+                                                    className="w-12 h-12 rounded-2xl object-cover border-2 border-white dark:border-gray-700 shadow-sm"
+                                                />
+                                                <div>
+                                                    <h4 className="font-bold text-gray-900 dark:text-white">{c.userName}</h4>
+                                                    <span className="text-[10px] font-black text-pink-500 uppercase tracking-tighter bg-pink-50 dark:bg-pink-900/20 px-2 py-0.5 rounded">
+                                                        For {pos?.title || 'Unknown Position'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl mb-6 text-sm text-gray-700 dark:text-gray-300 italic leading-relaxed">
+                                                "{c.manifesto}"
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <button
+                                                    onClick={() => updateContestantStatus(c.id, 'APPROVED')}
+                                                    className="flex-1 py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-all shadow-lg shadow-green-500/20"
+                                                >
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    onClick={() => updateContestantStatus(c.id, 'REJECTED')}
+                                                    className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
+                                                >
+                                                    Reject
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ) : activeTab === 'analytics' ? (
+                <div className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
+                            <div className="absolute -right-4 -top-4 w-24 h-24 bg-pink-500/5 rounded-full group-hover:scale-150 transition-transform duration-700" />
+                            <div className="flex items-center gap-3 text-pink-600 mb-4">
+                                <BarChart3Icon className="w-6 h-6" />
+                                <h4 className="font-bold text-xs uppercase tracking-widest">Global Participation</h4>
+                            </div>
+                            <div className="text-4xl font-black text-gray-900 dark:text-white">
+                                {allUsers.length > 0 ? ((votes.length / allUsers.length) * 100).toFixed(1) : 0}%
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2 font-medium">{votes.length} votes cast by {allUsers.length} members</p>
+                        </div>
+
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
+                            <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/5 rounded-full group-hover:scale-150 transition-transform duration-700" />
+                            <div className="flex items-center gap-3 text-blue-600 mb-4">
+                                <UserIcon className="w-6 h-6" />
+                                <h4 className="font-bold text-xs uppercase tracking-widest">Election Density</h4>
+                            </div>
+                            <div className="text-4xl font-black text-gray-900 dark:text-white">
+                                {votingPositions.length > 0 ? (contestants.length / votingPositions.length).toFixed(1) : 0}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2 font-medium">Average candidates per election</p>
+                        </div>
+
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
+                            <div className="absolute -right-4 -top-4 w-24 h-24 bg-green-500/5 rounded-full group-hover:scale-150 transition-transform duration-700" />
+                            <div className="flex items-center gap-3 text-green-600 mb-4">
+                                <CheckIcon className="w-6 h-6" />
+                                <h4 className="font-bold text-xs uppercase tracking-widest">Vetting Efficiency</h4>
+                            </div>
+                            <div className="text-4xl font-black text-gray-900 dark:text-white">
+                                {contestants.length > 0 ? ((approvedContestants.length / contestants.length) * 100).toFixed(0) : 0}%
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2 font-medium">{approvedContestants.length} of {contestants.length} apps approved</p>
+                        </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700">
+                        <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-8">Vote Distribution by Position</h4>
+                        <div className="space-y-6">
+                            {votingPositions.slice(0, 6).map(pos => {
+                                const posVotes = votes.filter(v => v.positionId === pos.id).length;
+                                const percent = votes.length > 0 ? (posVotes / votes.length) * 100 : 0;
+                                return (
+                                    <div key={pos.id} className="space-y-2">
+                                        <div className="flex justify-between items-end">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-2 h-2 rounded-full bg-pink-500" />
+                                                <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{pos.title}</span>
+                                            </div>
+                                            <span className="text-sm font-black text-gray-900 dark:text-white">{posVotes} <span className="text-[10px] text-gray-400 font-normal uppercase ml-1">Votes</span></span>
+                                        </div>
+                                        <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden p-[2px]">
+                                            <div
+                                                className="h-full bg-gradient-to-r from-pink-500 to-purple-600 rounded-full transition-all duration-1000 ease-out"
+                                                style={{ width: `${percent}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
             ) : (
                 <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700">
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Create New Position</h3>
@@ -336,15 +503,27 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                                 onChange={e => setNewPos({ ...newPos, criteria: e.target.value })}
                             />
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Voting Deadline</label>
-                            <input
-                                type="datetime-local"
-                                required
-                                className="w-full p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-pink-500 outline-none transition-all dark:text-white"
-                                value={newPos.dueDate}
-                                onChange={e => setNewPos({ ...newPos, dueDate: e.target.value })}
-                            />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Voting Starts</label>
+                                <input
+                                    type="datetime-local"
+                                    required
+                                    className="w-full p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-pink-500 outline-none transition-all dark:text-white"
+                                    value={newPos.startDate}
+                                    onChange={e => setNewPos({ ...newPos, startDate: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Voting Ends (Deadline)</label>
+                                <input
+                                    type="datetime-local"
+                                    required
+                                    className="w-full p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-pink-500 outline-none transition-all dark:text-white"
+                                    value={newPos.dueDate}
+                                    onChange={e => setNewPos({ ...newPos, dueDate: e.target.value })}
+                                />
+                            </div>
                         </div>
                         <button
                             disabled={isSubmitting}
@@ -447,9 +626,9 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                             {contestants.length === 0 ? (
                                 <div className="text-center py-10">
                                     <UserIcon className="w-12 h-12 text-gray-200 dark:text-gray-700 mx-auto mb-4" />
-                                    <p className="text-gray-500">No one has contested for this position yet.</p>
+                                    <p className="text-gray-500">No approved candidates available yet.</p>
                                 </div>
-                            ) : contestants.map(contestant => (
+                            ) : approvedContestants.map(contestant => (
                                 <div key={contestant.id} className="p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-3xl shadow-sm hover:shadow-md transition-all">
                                     <div className="flex items-center gap-4 mb-4">
                                         <img

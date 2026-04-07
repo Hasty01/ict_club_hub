@@ -2081,6 +2081,7 @@ export const getVotingPositions = async (): Promise<VotingPosition[]> => {
         title: row.title,
         description: row.description,
         criteria: row.criteria,
+        startDate: row.start_date,
         dueDate: row.due_date,
         status: row.status as 'OPEN' | 'CLOSED',
         createdBy: row.created_by,
@@ -2107,6 +2108,7 @@ export const addVotingPosition = async (position: Omit<VotingPosition, 'id' | 'c
         title: data.title,
         description: data.description,
         criteria: data.criteria,
+        startDate: data.start_date,
         dueDate: data.due_date,
         status: data.status as 'OPEN' | 'CLOSED',
         createdBy: data.created_by,
@@ -2121,6 +2123,7 @@ export const updateVotingPosition = async (id: string, updates: Partial<VotingPo
             title: updates.title,
             description: updates.description,
             criteria: updates.criteria,
+            start_date: updates.startDate,
             due_date: updates.dueDate,
             status: updates.status
         })
@@ -2139,6 +2142,7 @@ export const getVotingContestants = async (positionId: string): Promise<VotingCo
         positionId: row.position_id.toString(),
         userId: row.user_uid,
         manifesto: row.manifesto,
+        status: row.status as 'PENDING' | 'APPROVED' | 'REJECTED',
         createdAt: row.created_at,
         userName: row.users?.name || 'Unknown',
         userAvatarUrl: row.users?.avatar_url
@@ -2161,8 +2165,17 @@ export const contestPosition = async (positionId: string, userId: string, manife
         positionId: data.position_id.toString(),
         userId: data.user_uid,
         manifesto: data.manifesto,
+        status: data.status as 'PENDING' | 'APPROVED' | 'REJECTED',
         createdAt: data.created_at
     };
+};
+
+export const updateContestantStatus = async (id: string, status: 'APPROVED' | 'REJECTED'): Promise<void> => {
+    const { error } = await supabase
+        .from('voting_contestants')
+        .update({ status })
+        .eq('id', id);
+    if (error) throw error;
 };
 
 export const getVotingVotes = async (positionId: string): Promise<VotingVote[]> => {

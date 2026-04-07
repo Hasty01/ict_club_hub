@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS voting_positions (
     description TEXT,
     criteria TEXT, -- Eligibility criteria for contesting
     status TEXT DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'CLOSED')),
+    start_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     due_date TIMESTAMP WITH TIME ZONE NOT NULL,
     created_by UUID REFERENCES auth.users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -17,6 +18,7 @@ CREATE TABLE IF NOT EXISTS voting_contestants (
     position_id UUID REFERENCES voting_positions(id) ON DELETE CASCADE,
     user_uid TEXT NOT NULL REFERENCES public.users(uid) ON DELETE CASCADE,
     manifesto TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(position_id, user_uid) -- One entry per member per position
 );
@@ -95,5 +97,15 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                    WHERE table_name='feature_flags' AND column_name='show_voting') THEN 
         ALTER TABLE public.feature_flags ADD COLUMN show_voting BOOLEAN NOT NULL DEFAULT FALSE;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name='voting_positions' AND column_name='start_date') THEN 
+        ALTER TABLE public.voting_positions ADD COLUMN start_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW();
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name='voting_contestants' AND column_name='status') THEN 
+        ALTER TABLE public.voting_contestants ADD COLUMN status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED'));
     END IF;
 END $$;

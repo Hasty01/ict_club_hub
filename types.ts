@@ -381,6 +381,7 @@ export interface VotingPosition {
   description: string;
   criteria?: string;
   status: 'OPEN' | 'CLOSED';
+  startDate: string;
   dueDate: string;
   createdBy: string;
   createdAt: string;
@@ -391,6 +392,7 @@ export interface VotingContestant {
   positionId: string;
   userId: string;
   manifesto: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
   userName?: string;
   userAvatarUrl?: string;
   createdAt: string;

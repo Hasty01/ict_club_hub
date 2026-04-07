@@ -98,6 +98,7 @@ interface IDataContext {
   contestPosition: (positionId: string, manifesto: string) => Promise<void>;
   fetchVotingVotes: (positionId: string) => Promise<VotingVote[]>;
   castVote: (positionId: string, contestantId: string) => Promise<void>;
+  updateContestantStatus: (id: string, status: 'APPROVED' | 'REJECTED') => Promise<void>;
   updateUserSkillLevel: (newLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED') => Promise<void>;
   featureFlags: FeatureFlags;
   updateFeatureFlags: (updates: Partial<FeatureFlags>) => void;
@@ -540,6 +541,18 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     }
   }, [currentUser.uid, showToast]);
 
+  const updateContestantStatus = useCallback(async (id: string, status: 'APPROVED' | 'REJECTED') => {
+    try {
+      await api.updateContestantStatus(id, status);
+      showToast(`Candidate ${status.toLowerCase()} successfully.`, 'success');
+      await fetchVotingPositions();
+    } catch (e: any) {
+      console.error("Failed to update contestant status", e);
+      showToast("Failed to update candidate status.", "error");
+      throw e;
+    }
+  }, [showToast, fetchVotingPositions]);
+
   const clearUnreadCount = useCallback((roomId: string) => {
     setUnreadMessageCounts(prev => {
       if (!prev[roomId]) return prev;
@@ -847,6 +860,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     contestPosition,
     fetchVotingVotes,
     castVote,
+    updateContestantStatus,
     updateUserSkillLevel,
     featureFlags,
     updateFeatureFlags,
