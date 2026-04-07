@@ -1,6 +1,6 @@
 
 
-export type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'profile' | 'members' | 'playground' | 'resources' | 'chat' | 'showcase' | 'suggestions' | 'challenges' | 'roadmap' | 'community' | 'games' | 'admin';
+export type Tab = 'feed' | 'activities' | 'attendance' | 'projects' | 'profile' | 'members' | 'playground' | 'resources' | 'chat' | 'showcase' | 'suggestions' | 'challenges' | 'roadmap' | 'community' | 'games' | 'admin' | 'voting';
 
 export interface FeatureFlags {
   showFeed: boolean;
@@ -16,6 +16,7 @@ export interface FeatureFlags {
   showCommunity: boolean;
   showPlayground: boolean;
   showGames: boolean;
+  showVoting: boolean;
 }
 
 export interface Team {
@@ -371,4 +372,34 @@ export interface GameLeaderboardEntry {
   gameKey: string;
   bestValue: number;
   updatedAt: string;
+}
+
+// Voting Types
+export interface VotingPosition {
+  id: string;
+  title: string;
+  description: string;
+  criteria?: string;
+  status: 'OPEN' | 'CLOSED';
+  dueDate: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface VotingContestant {
+  id: string;
+  positionId: string;
+  userId: string;
+  manifesto: string;
+  userName?: string;
+  userAvatarUrl?: string;
+  createdAt: string;
+}
+
+export interface VotingVote {
+  id: string;
+  positionId: string;
+  contestantId: string;
+  voterId: string;
+  createdAt: string;
 }

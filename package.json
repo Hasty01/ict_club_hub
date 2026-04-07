@@ -22,6 +22,7 @@
     "@supabase/supabase-js": "^2.43.4",
     "emmet-monaco-es": "^5.7.0",
     "emoji-picker-react": "^4.9.2",
+    "lucide-react": "^1.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^2.12.7",

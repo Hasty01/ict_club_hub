@@ -24,7 +24,7 @@ const insertNotifications = async (notifications: Array<{ user_uid: string; mess
     }
 };
 
-const notifyAllUsers = async (message: string, linkTo: Tab, excludeUid?: string) => {
+export const notifyAllUsers = async (message: string, linkTo: Tab, excludeUid?: string) => {
     const { data: users } = await supabase.from('users').select('uid');
     if (!users) return;
 
@@ -51,7 +51,7 @@ const notifyAllUsers = async (message: string, linkTo: Tab, excludeUid?: string)
     }
 };
 
-const notifyUsers = async (userIds: string[], message: string, linkTo: Tab, excludeUid?: string) => {
+export const notifyUsers = async (userIds: string[], message: string, linkTo: Tab, excludeUid?: string) => {
     const uniqueIds = Array.from(new Set(userIds.filter(uid => uid && uid !== excludeUid)));
     if (uniqueIds.length === 0) return;
     const notifications = uniqueIds.map(uid => ({
@@ -2065,4 +2065,126 @@ export const getGameLeaderboard = async (gameKey: string, lowerIsBetter = true):
         bestValue: row.best_value,
         updatedAt: row.updated_at
     }));
+};
+
+// --- Voting ---
+export const getVotingPositions = async (): Promise<VotingPosition[]> => {
+    const { data, error } = await supabase
+        .from('voting_positions')
+        .select('*')
+        .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map((row: any) => ({
+        id: row.id.toString(),
+        title: row.title,
+        description: row.description,
+        criteria: row.criteria,
+        dueDate: row.due_date,
+        status: row.status as 'OPEN' | 'CLOSED',
+        createdBy: row.created_by,
+        createdAt: row.created_at
+    }));
+};
+
+export const addVotingPosition = async (position: Omit<VotingPosition, 'id' | 'createdAt' | 'status'>): Promise<VotingPosition> => {
+    const { data, error } = await supabase
+        .from('voting_positions')
+        .insert({
+            title: position.title,
+            description: position.description,
+            criteria: position.criteria,
+            due_date: position.dueDate,
+            created_by: position.createdBy,
+            status: 'OPEN'
+        })
+        .select()
+        .single();
+    if (error) throw error;
+    return {
+        id: data.id.toString(),
+        title: data.title,
+        description: data.description,
+        criteria: data.criteria,
+        dueDate: data.due_date,
+        status: data.status as 'OPEN' | 'CLOSED',
+        createdBy: data.created_by,
+        createdAt: data.created_at
+    };
+};
+
+export const updateVotingPosition = async (id: string, updates: Partial<VotingPosition>): Promise<void> => {
+    const { error } = await supabase
+        .from('voting_positions')
+        .update({
+            title: updates.title,
+            description: updates.description,
+            criteria: updates.criteria,
+            due_date: updates.dueDate,
+            status: updates.status
+        })
+        .eq('id', id);
+    if (error) throw error;
+};
+
+export const getVotingContestants = async (positionId: string): Promise<VotingContestant[]> => {
+    const { data, error } = await supabase
+        .from('voting_contestants')
+        .select('*, users ( name, avatar_url )')
+        .eq('position_id', positionId);
+    if (error) throw error;
+    return (data || []).map((row: any) => ({
+        id: row.id.toString(),
+        positionId: row.position_id.toString(),
+        userId: row.user_uid,
+        manifesto: row.manifesto,
+        createdAt: row.created_at,
+        userName: row.users?.name || 'Unknown',
+        userAvatarUrl: row.users?.avatar_url
+    }));
+};
+
+export const contestPosition = async (positionId: string, userId: string, manifesto: string): Promise<VotingContestant> => {
+    const { data, error } = await supabase
+        .from('voting_contestants')
+        .insert({
+            position_id: positionId,
+            user_uid: userId,
+            manifesto: manifesto
+        })
+        .select()
+        .single();
+    if (error) throw error;
+    return {
+        id: data.id.toString(),
+        positionId: data.position_id.toString(),
+        userId: data.user_uid,
+        manifesto: data.manifesto,
+        createdAt: data.created_at
+    };
+};
+
+export const getVotingVotes = async (positionId: string): Promise<VotingVote[]> => {
+    const { data, error } = await supabase
+        .from('voting_votes')
+        .select('*')
+        .eq('position_id', positionId);
+    if (error) throw error;
+    return (data || []).map((row: any) => ({
+        id: row.id.toString(),
+        positionId: row.position_id.toString(),
+        voterUid: row.voter_uid,
+        contestantId: row.contestant_id.toString(),
+        createdAt: row.created_at
+    }));
+};
+
+export const castVote = async (positionId: string, voterUid: string, contestantId: string): Promise<void> => {
+    const { error } = await supabase
+        .from('voting_votes')
+        .insert({
+            position_id: positionId,
+            voter_uid: voterUid,
+            contestant_id: contestantId
+        });
+    if (error) throw error;
 };

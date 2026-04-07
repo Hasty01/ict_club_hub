@@ -1,7 +1,7 @@
 
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
-import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType, Roadmap, FeatureFlags, Team, TeamChallenge, NotificationPrefs } from './types';
+import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType, Roadmap, FeatureFlags, Team, TeamChallenge, NotificationPrefs, VotingPosition, VotingContestant, VotingVote } from './types';
 import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
 
@@ -24,7 +24,10 @@ interface IDataContext {
   roadmaps: Roadmap[];
   teams: Team[];
   teamChallenges: TeamChallenge[];
-  
+  votingPositions: VotingPosition[];
+  votingContestants: VotingContestant[];
+  votingVotes: VotingVote[];
+
   // Toasts
   toasts: Toast[];
   showToast: (message: string, type?: ToastType) => void;
@@ -53,6 +56,7 @@ interface IDataContext {
   isLoadingRoadmaps: boolean;
   isLoadingTeams: boolean;
   isLoadingTeamChallenges: boolean;
+  isLoadingVoting: boolean;
   isInitialLoading: boolean;
 
   // Error states
@@ -70,6 +74,7 @@ interface IDataContext {
   roadmapsError: string | null;
   teamsError: string | null;
   teamChallengesError: string | null;
+  votingError: string | null;
 
   // Refetch functions
   fetchActivities: () => Promise<void>;
@@ -86,6 +91,13 @@ interface IDataContext {
   fetchRoadmaps: () => Promise<void>;
   fetchTeams: () => Promise<void>;
   fetchTeamChallenges: () => Promise<void>;
+  fetchVotingPositions: () => Promise<void>;
+  createVotingPosition: (position: Omit<VotingPosition, 'id' | 'createdAt' | 'status'>) => Promise<void>;
+  updateVotingPosition: (id: string, updates: Partial<VotingPosition>) => Promise<void>;
+  fetchVotingContestants: (positionId: string) => Promise<VotingContestant[]>;
+  contestPosition: (positionId: string, manifesto: string) => Promise<void>;
+  fetchVotingVotes: (positionId: string) => Promise<VotingVote[]>;
+  castVote: (positionId: string, contestantId: string) => Promise<void>;
   updateUserSkillLevel: (newLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED') => Promise<void>;
   featureFlags: FeatureFlags;
   updateFeatureFlags: (updates: Partial<FeatureFlags>) => void;
@@ -109,7 +121,8 @@ const defaultFeatureFlags: FeatureFlags = {
   showRoadmap: true,
   showCommunity: true,
   showPlayground: true,
-  showGames: true
+  showGames: true,
+  showVoting: true
 };
 
 const defaultNotificationPrefs: NotificationPrefs = {
@@ -136,20 +149,23 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamChallenges, setTeamChallenges] = useState<TeamChallenge[]>([]);
+  const [votingPositions, setVotingPositions] = useState<VotingPosition[]>([]);
+  const [votingContestants, setVotingContestants] = useState<VotingContestant[]>([]);
+  const [votingVotes, setVotingVotes] = useState<VotingVote[]>([]);
   const [unreadMessageCounts, setUnreadMessageCounts] = useState<Record<string, number>>({});
   const [featureFlags, setFeatureFlags] = useState<FeatureFlags>(defaultFeatureFlags);
   const [notificationPrefs, setNotificationPrefs] = useState<NotificationPrefs>(() => {
-      if (typeof window === 'undefined') return defaultNotificationPrefs;
-      try {
-          const raw = localStorage.getItem(NOTIFICATION_PREFS_KEY);
-          if (!raw) return defaultNotificationPrefs;
-          const parsed = JSON.parse(raw) as Partial<NotificationPrefs>;
-          return { ...defaultNotificationPrefs, ...parsed };
-      } catch {
-          return defaultNotificationPrefs;
-      }
+    if (typeof window === 'undefined') return defaultNotificationPrefs;
+    try {
+      const raw = localStorage.getItem(NOTIFICATION_PREFS_KEY);
+      if (!raw) return defaultNotificationPrefs;
+      const parsed = JSON.parse(raw) as Partial<NotificationPrefs>;
+      return { ...defaultNotificationPrefs, ...parsed };
+    } catch {
+      return defaultNotificationPrefs;
+    }
   });
-  
+
   // Toast State
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -167,6 +183,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [isLoadingRoadmaps, setIsLoadingRoadmaps] = useState(true);
   const [isLoadingTeams, setIsLoadingTeams] = useState(true);
   const [isLoadingTeamChallenges, setIsLoadingTeamChallenges] = useState(true);
+  const [isLoadingVoting, setIsLoadingVoting] = useState(true);
 
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
@@ -182,10 +199,11 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   const [roadmapsError, setRoadmapsError] = useState<string | null>(null);
   const [teamsError, setTeamsError] = useState<string | null>(null);
   const [teamChallengesError, setTeamChallengesError] = useState<string | null>(null);
+  const [votingError, setVotingError] = useState<string | null>(null);
 
   // Sync initialUser prop to state if it changes (e.g. re-login)
   useEffect(() => {
-      setCurrentUser(initialUser);
+    setCurrentUser(initialUser);
   }, [initialUser]);
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
@@ -198,38 +216,38 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   }, []);
 
   const updateNotificationPrefs = useCallback((updates: Partial<NotificationPrefs>) => {
-      setNotificationPrefs(prev => {
-          const next = { ...prev, ...updates };
-          localStorage.setItem(NOTIFICATION_PREFS_KEY, JSON.stringify(next));
-          return next;
-      });
+    setNotificationPrefs(prev => {
+      const next = { ...prev, ...updates };
+      localStorage.setItem(NOTIFICATION_PREFS_KEY, JSON.stringify(next));
+      return next;
+    });
   }, []);
 
   const showBrowserNotification = useCallback((title: string, body: string) => {
-      if (typeof window === 'undefined') return;
-      if (!notificationPrefs.browserEnabled) return;
-      if (!('Notification' in window)) return;
-      if (Notification.permission !== 'granted') return;
-      if (notificationPrefs.notifyWhenAway) {
-          const isVisible = document.visibilityState === 'visible';
-          const hasFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : false;
-          if (isVisible && hasFocus) return;
-      }
-      new Notification(title, {
-          body,
-          icon: '/favicon.svg'
-      });
+    if (typeof window === 'undefined') return;
+    if (!notificationPrefs.browserEnabled) return;
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    if (notificationPrefs.notifyWhenAway) {
+      const isVisible = document.visibilityState === 'visible';
+      const hasFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : false;
+      if (isVisible && hasFocus) return;
+    }
+    new Notification(title, {
+      body,
+      icon: '/favicon.svg'
+    });
   }, [notificationPrefs]);
 
   // Helper to extract error messages safely
   const getErrorMessage = (error: any) => {
-      if (typeof error === 'string') return error;
-      if (error && typeof error.message === 'string') return error.message;
-      try {
-          return JSON.stringify(error);
-      } catch (e) {
-          return "An unknown error occurred";
-      }
+    if (typeof error === 'string') return error;
+    if (error && typeof error.message === 'string') return error.message;
+    try {
+      return JSON.stringify(error);
+    } catch (e) {
+      return "An unknown error occurred";
+    }
   };
 
   const fetchActivities = useCallback(async () => {
@@ -259,7 +277,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
       setIsLoadingAttendance(false);
     }
   }, [currentUser.uid]);
-  
+
   const fetchFeedItems = useCallback(async () => {
     setIsLoadingFeed(true);
     setFeedItemsError(null);
@@ -287,7 +305,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
       setIsLoadingProjects(false);
     }
   }, []);
-  
+
   const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
     setAllUsersError(null);
@@ -311,7 +329,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     } catch (e: any) {
       console.error("Failed to fetch resources", e);
       setResourcesError(getErrorMessage(e));
-      setIsLoadingResources(false); 
+      setIsLoadingResources(false);
     }
   }, []);
 
@@ -319,13 +337,13 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     setIsLoadingNotifications(true);
     setNotificationsError(null);
     try {
-        const data = await api.getNotifications(currentUser.uid);
-        setNotifications(data);
+      const data = await api.getNotifications(currentUser.uid);
+      setNotifications(data);
     } catch (e: any) {
-        console.error("Failed to fetch notifications", e);
-        setNotificationsError(getErrorMessage(e));
+      console.error("Failed to fetch notifications", e);
+      setNotificationsError(getErrorMessage(e));
     } finally {
-        setIsLoadingNotifications(false);
+      setIsLoadingNotifications(false);
     }
   }, [currentUser.uid]);
 
@@ -333,13 +351,13 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     setIsLoadingRooms(true);
     setRoomsError(null);
     try {
-        const data = await api.getRooms(currentUser.uid);
-        setRooms(data);
+      const data = await api.getRooms(currentUser.uid);
+      setRooms(data);
     } catch (e: any) {
-        console.error("Failed to fetch rooms", e);
-        setRoomsError(getErrorMessage(e));
+      console.error("Failed to fetch rooms", e);
+      setRoomsError(getErrorMessage(e));
     } finally {
-        setIsLoadingRooms(false);
+      setIsLoadingRooms(false);
     }
   }, [currentUser.uid]);
 
@@ -347,13 +365,13 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     setIsLoadingShowcase(true);
     setShowcaseError(null);
     try {
-        const data = await api.getShowcaseItems();
-        setShowcaseItems(data);
+      const data = await api.getShowcaseItems();
+      setShowcaseItems(data);
     } catch (e: any) {
-        console.error("Failed to fetch showcase items", e);
-        setShowcaseError(getErrorMessage(e));
+      console.error("Failed to fetch showcase items", e);
+      setShowcaseError(getErrorMessage(e));
     } finally {
-        setIsLoadingShowcase(false);
+      setIsLoadingShowcase(false);
     }
   }, []);
 
@@ -361,13 +379,13 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     setIsLoadingSuggestions(true);
     setSuggestionsError(null);
     try {
-        const data = await api.getSuggestions();
-        setSuggestions(data);
+      const data = await api.getSuggestions();
+      setSuggestions(data);
     } catch (e: any) {
-        console.error("Failed to fetch suggestions", e);
-        setSuggestionsError(getErrorMessage(e));
+      console.error("Failed to fetch suggestions", e);
+      setSuggestionsError(getErrorMessage(e));
     } finally {
-        setIsLoadingSuggestions(false);
+      setIsLoadingSuggestions(false);
     }
   }, []);
 
@@ -375,13 +393,13 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     setIsLoadingChallenges(true);
     setChallengesError(null);
     try {
-        const data = await api.getChallenges();
-        setChallenges(data);
+      const data = await api.getChallenges();
+      setChallenges(data);
     } catch (e: any) {
-        console.error("Failed to fetch challenges", e);
-        setChallengesError(getErrorMessage(e));
+      console.error("Failed to fetch challenges", e);
+      setChallengesError(getErrorMessage(e));
     } finally {
-        setIsLoadingChallenges(false);
+      setIsLoadingChallenges(false);
     }
   }, []);
 
@@ -389,13 +407,13 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     setIsLoadingRoadmaps(true);
     setRoadmapsError(null);
     try {
-        const data = await api.getRoadmaps();
-        setRoadmaps(data);
+      const data = await api.getRoadmaps();
+      setRoadmaps(data);
     } catch (e: any) {
-        console.error("Failed to fetch roadmaps", e);
-        setRoadmapsError(getErrorMessage(e));
+      console.error("Failed to fetch roadmaps", e);
+      setRoadmapsError(getErrorMessage(e));
     } finally {
-        setIsLoadingRoadmaps(false);
+      setIsLoadingRoadmaps(false);
     }
   }, []);
 
@@ -426,97 +444,193 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
       setIsLoadingTeamChallenges(false);
     }
   }, []);
-  
+
+  const fetchVotingPositions = useCallback(async () => {
+    setIsLoadingVoting(true);
+    setVotingError(null);
+    try {
+      const data = await api.getVotingPositions();
+      setVotingPositions(data);
+    } catch (e: any) {
+      console.error("Failed to fetch voting positions", e);
+      setVotingError(getErrorMessage(e));
+    } finally {
+      setIsLoadingVoting(false);
+    }
+  }, []);
+
+  const createVotingPosition = useCallback(async (position: Omit<VotingPosition, 'id' | 'createdAt' | 'status'>) => {
+    try {
+      const newPos = await api.addVotingPosition(position);
+      setVotingPositions(prev => [newPos, ...prev]);
+      showToast('Voting position created successfully', 'success');
+      // Notify all users about new position
+      await api.notifyAllUsers(`New voting position posted: ${newPos.title}`, 'voting', currentUser.uid);
+    } catch (e: any) {
+      console.error("Failed to create voting position", e);
+      showToast('Failed to create voting position', 'error');
+      throw e;
+    }
+  }, [currentUser.uid, showToast]);
+
+  const updateVotingPosition = useCallback(async (id: string, updates: Partial<VotingPosition>) => {
+    try {
+      await api.updateVotingPosition(id, updates);
+      setVotingPositions(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+      showToast('Voting position updated successfully', 'success');
+    } catch (e: any) {
+      console.error("Failed to update voting position", e);
+      showToast('Failed to update voting position', 'error');
+      throw e;
+    }
+  }, [showToast]);
+
+  const fetchVotingContestants = useCallback(async (positionId: string) => {
+    try {
+      return await api.getVotingContestants(positionId);
+    } catch (e: any) {
+      console.error("Failed to fetch voting contestants", e);
+      showToast('Failed to fetch contestants', 'error');
+      return [];
+    }
+  }, [showToast]);
+
+  const contestPosition = useCallback(async (positionId: string, manifesto: string) => {
+    try {
+      const newContestant = await api.contestPosition(positionId, currentUser.uid, manifesto);
+      showToast('You have successfully entered the contest!', 'success');
+      // Notify patrons about new contestant
+      const patrons = allUsers.filter(u => u.role === 'PATRON').map(u => u.uid);
+      const pos = votingPositions.find(p => p.id === positionId);
+      await api.notifyUsers(patrons, `${currentUser.name} is contesting for ${pos?.title || 'a position'}`, 'voting', currentUser.uid);
+    } catch (e: any) {
+      console.error("Failed to contest position", e);
+      const msg = getErrorMessage(e);
+      if (msg.includes('unique constraint')) {
+        showToast('You are already contesting for this position', 'warning');
+      } else {
+        showToast('Failed to enter contest', 'error');
+      }
+      throw e;
+    }
+  }, [currentUser.uid, currentUser.name, allUsers, votingPositions, showToast]);
+
+  const fetchVotingVotes = useCallback(async (positionId: string) => {
+    try {
+      return await api.getVotingVotes(positionId);
+    } catch (e: any) {
+      console.error("Failed to fetch voting votes", e);
+      return [];
+    }
+  }, []);
+
+  const castVote = useCallback(async (positionId: string, contestantId: string) => {
+    try {
+      await api.castVote(positionId, currentUser.uid, contestantId);
+      showToast('Vote cast successfully!', 'success');
+    } catch (e: any) {
+      console.error("Failed to cast vote", e);
+      const msg = getErrorMessage(e);
+      if (msg.includes('unique constraint')) {
+        showToast('You have already voted for this position', 'warning');
+      } else {
+        showToast('Failed to cast vote', 'error');
+      }
+      throw e;
+    }
+  }, [currentUser.uid, showToast]);
+
   const clearUnreadCount = useCallback((roomId: string) => {
     setUnreadMessageCounts(prev => {
-        if (!prev[roomId]) return prev;
-        const next = { ...prev };
-        delete next[roomId];
-        return next;
+      if (!prev[roomId]) return prev;
+      const next = { ...prev };
+      delete next[roomId];
+      return next;
     });
   }, []);
 
   const updateUserSkillLevel = useCallback(async (newLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED') => {
-      try {
-          await api.updateUserSkillLevel(currentUser.uid, newLevel);
-          setCurrentUser(prev => ({ ...prev, skillLevel: newLevel }));
-          showToast(`Congratulations! You've been promoted to ${newLevel}.`, 'success');
-      } catch (e: any) {
-          console.error("Failed to update skill level", e);
-          showToast("Failed to update skill level.", "error");
-      }
+    try {
+      await api.updateUserSkillLevel(currentUser.uid, newLevel);
+      setCurrentUser(prev => ({ ...prev, skillLevel: newLevel }));
+      showToast(`Congratulations! You've been promoted to ${newLevel}.`, 'success');
+    } catch (e: any) {
+      console.error("Failed to update skill level", e);
+      showToast("Failed to update skill level.", "error");
+    }
   }, [currentUser.uid, showToast]);
 
   const fetchFeatureFlags = useCallback(async () => {
-      try {
-          const flags = await api.getFeatureFlags();
-          setFeatureFlags({ ...defaultFeatureFlags, ...flags });
-      } catch (e) {
-          console.warn('Failed to fetch feature flags, using defaults', e);
-          setFeatureFlags(defaultFeatureFlags);
-      }
+    try {
+      const flags = await api.getFeatureFlags();
+      setFeatureFlags({ ...defaultFeatureFlags, ...flags });
+    } catch (e) {
+      console.warn('Failed to fetch feature flags, using defaults', e);
+      setFeatureFlags(defaultFeatureFlags);
+    }
   }, []);
 
   const updateFeatureFlags = useCallback(async (updates: Partial<FeatureFlags>) => {
-      setFeatureFlags(prev => ({ ...prev, ...updates }));
-      try {
-          const updated = await api.setFeatureFlags(updates);
-          setFeatureFlags({ ...defaultFeatureFlags, ...updated });
-      } catch (e) {
-          console.error('Failed to update feature flags', e);
-      }
+    setFeatureFlags(prev => ({ ...prev, ...updates }));
+    try {
+      const updated = await api.setFeatureFlags(updates);
+      setFeatureFlags({ ...defaultFeatureFlags, ...updated });
+    } catch (e) {
+      console.error('Failed to update feature flags', e);
+    }
   }, []);
 
   const resetFeatureFlags = useCallback(async () => {
-      setFeatureFlags(defaultFeatureFlags);
-      try {
-          const updated = await api.setFeatureFlags(defaultFeatureFlags);
-          setFeatureFlags({ ...defaultFeatureFlags, ...updated });
-      } catch (e) {
-          console.error('Failed to reset feature flags', e);
-      }
+    setFeatureFlags(defaultFeatureFlags);
+    try {
+      const updated = await api.setFeatureFlags(defaultFeatureFlags);
+      setFeatureFlags({ ...defaultFeatureFlags, ...updated });
+    } catch (e) {
+      console.error('Failed to reset feature flags', e);
+    }
   }, []);
 
   useEffect(() => {
-      fetchFeatureFlags();
+    fetchFeatureFlags();
 
-      const mapFlags = (row: any): FeatureFlags => ({
-          showFeed: row.show_feed,
-          showActivities: row.show_activities,
-          showAttendance: row.show_attendance,
-          showProjects: row.show_projects,
-          showResources: row.show_resources,
-          showChat: row.show_chat,
-          showShowcase: row.show_showcase,
-          showSuggestions: row.show_suggestions,
-          showChallenges: row.show_challenges,
-          showRoadmap: row.show_roadmap,
-          showCommunity: row.show_community,
-          showPlayground: row.show_playground,
-          showGames: row.show_games ?? defaultFeatureFlags.showGames
-      });
+    const mapFlags = (row: any): FeatureFlags => ({
+      showFeed: row.show_feed,
+      showActivities: row.show_activities,
+      showAttendance: row.show_attendance,
+      showProjects: row.show_projects,
+      showResources: row.show_resources,
+      showChat: row.show_chat,
+      showShowcase: row.show_showcase,
+      showSuggestions: row.show_suggestions,
+      showChallenges: row.show_challenges,
+      showRoadmap: row.show_roadmap,
+      showCommunity: row.show_community,
+      showPlayground: row.show_playground,
+      showGames: row.show_games ?? defaultFeatureFlags.showGames,
+      showVoting: row.show_voting ?? defaultFeatureFlags.showVoting
+    });
 
-      const channel = supabase.channel('feature_flags_listener')
-          .on(
-              'postgres_changes',
-              { event: 'UPDATE', schema: 'public', table: 'feature_flags' },
-              (payload) => {
-                  if (payload.new) {
-                      setFeatureFlags({ ...defaultFeatureFlags, ...mapFlags(payload.new) });
-                  }
-              }
-          )
-          .subscribe();
+    const channel = supabase.channel('feature_flags_listener')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'feature_flags' },
+        (payload) => {
+          if (payload.new) {
+            setFeatureFlags({ ...defaultFeatureFlags, ...mapFlags(payload.new) });
+          }
+        }
+      )
+      .subscribe();
 
-      return () => {
-          supabase.removeChannel(channel);
-      };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchFeatureFlags]);
 
   // Effect to perform the client-side join for resources
   useEffect(() => {
-    if (isLoadingUsers || resourcesError) { 
-      return; 
+    if (isLoadingUsers || resourcesError) {
+      return;
     }
 
     const userMap: Map<string, User> = new Map(allUsers.map(user => [user.uid, user]));
@@ -529,11 +643,11 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         uploaderAvatarUrl: uploader?.avatarUrl,
       };
     });
-    
+
     setResources(enrichedResources);
-    setIsLoadingResources(false); 
+    setIsLoadingResources(false);
   }, [rawResources, allUsers, isLoadingUsers, resourcesError]);
-  
+
   // Realtime Presence for Online Users
   useEffect(() => {
     if (!currentUser) return;
@@ -569,70 +683,70 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
   // Realtime subscription for global messages (unread counts) and notifications
   useEffect(() => {
     if (!currentUser) return;
-    
+
     const messageChannel = supabase.channel('global_messages_listener')
-        .on(
-            'postgres_changes',
-            { 
-                event: 'INSERT', 
-                schema: 'public', 
-                table: 'messages' 
-            },
-            (payload) => {
-                const newMsg = payload.new as any;
-                if (newMsg.sender_id === currentUser.uid) return;
-                const isRelevantRoom = rooms.some(r => r.id === newMsg.room_id);
-                if (isRelevantRoom) {
-                    setUnreadMessageCounts(prev => ({
-                        ...prev,
-                        [newMsg.room_id]: (prev[newMsg.room_id] || 0) + 1
-                    }));
-                    const room = rooms.find(r => r.id === newMsg.room_id);
-                    const title = room?.title ? `New message in ${room.title}` : 'New message';
-                    const body = typeof newMsg.content === 'string' && newMsg.content.length > 0
-                        ? (newMsg.content.length > 80 ? `${newMsg.content.slice(0, 80)}…` : newMsg.content)
-                        : 'You received a new message.';
-                    showBrowserNotification(title, body);
-                }
-            }
-        )
-        .subscribe();
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        (payload) => {
+          const newMsg = payload.new as any;
+          if (newMsg.sender_id === currentUser.uid) return;
+          const isRelevantRoom = rooms.some(r => r.id === newMsg.room_id);
+          if (isRelevantRoom) {
+            setUnreadMessageCounts(prev => ({
+              ...prev,
+              [newMsg.room_id]: (prev[newMsg.room_id] || 0) + 1
+            }));
+            const room = rooms.find(r => r.id === newMsg.room_id);
+            const title = room?.title ? `New message in ${room.title}` : 'New message';
+            const body = typeof newMsg.content === 'string' && newMsg.content.length > 0
+              ? (newMsg.content.length > 80 ? `${newMsg.content.slice(0, 80)}…` : newMsg.content)
+              : 'You received a new message.';
+            showBrowserNotification(title, body);
+          }
+        }
+      )
+      .subscribe();
 
     const notificationChannel = supabase.channel(`notifications:${currentUser.uid}`)
-        .on(
-            'postgres_changes',
-            { 
-                event: 'INSERT', 
-                schema: 'public', 
-                table: 'notifications', 
-                // Uses user_uid column
-                filter: `user_uid=eq.${currentUser.uid}` 
-            },
-            (payload) => {
-                const newNotifRaw = payload.new as any;
-                const newNotif: AppNotification = {
-                    id: newNotifRaw.id.toString(),
-                    message: newNotifRaw.message,
-                    isRead: newNotifRaw.is_read,
-                    createdAt: new Date(newNotifRaw.created_at).toLocaleString('en-US', { timeZone: 'Africa/Kampala' }),
-                    linkTo: newNotifRaw.link_to,
-                    // Uses user_uid column
-                    userId: newNotifRaw.user_uid,
-                };
-                setNotifications(prev => [newNotif, ...prev]);
-                
-                // Trigger Toast for new notification
-                showToast(newNotif.message, 'info');
-                showBrowserNotification('ClubHub Notification', newNotif.message);
-            }
-        )
-        .subscribe();
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          // Uses user_uid column
+          filter: `user_uid=eq.${currentUser.uid}`
+        },
+        (payload) => {
+          const newNotifRaw = payload.new as any;
+          const newNotif: AppNotification = {
+            id: newNotifRaw.id.toString(),
+            message: newNotifRaw.message,
+            isRead: newNotifRaw.is_read,
+            createdAt: new Date(newNotifRaw.created_at).toLocaleString('en-US', { timeZone: 'Africa/Kampala' }),
+            linkTo: newNotifRaw.link_to,
+            // Uses user_uid column
+            userId: newNotifRaw.user_uid,
+          };
+          setNotifications(prev => [newNotif, ...prev]);
+
+          // Trigger Toast for new notification
+          showToast(newNotif.message, 'info');
+          showBrowserNotification('ClubHub Notification', newNotif.message);
+        }
+      )
+      .subscribe();
 
     return () => {
-        supabase.removeChannel(messageChannel);
-        supabase.removeChannel(notificationChannel);
+      supabase.removeChannel(messageChannel);
+      supabase.removeChannel(notificationChannel);
     };
-  }, [currentUser, rooms, showToast, showBrowserNotification]); 
+  }, [currentUser, rooms, showToast, showBrowserNotification]);
 
 
   // Fetch all data when the provider mounts
@@ -652,11 +766,12 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
         fetchRoadmaps(),
         fetchTeams(),
         fetchTeamChallenges(),
+        fetchVotingPositions(),
       ]).then(() => {
         fetchResources();
       });
     }
-  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources, fetchNotifications, fetchRooms, fetchShowcaseItems, fetchSuggestions, fetchChallenges, fetchRoadmaps, fetchTeams, fetchTeamChallenges]);
+  }, [currentUser, fetchActivities, fetchAttendance, fetchFeedItems, fetchProjectData, fetchUsers, fetchResources, fetchNotifications, fetchRooms, fetchShowcaseItems, fetchSuggestions, fetchChallenges, fetchRoadmaps, fetchTeams, fetchTeamChallenges, fetchVotingPositions]);
 
   const value = {
     activities,
@@ -675,6 +790,9 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     roadmaps,
     teams,
     teamChallenges,
+    votingPositions,
+    votingContestants,
+    votingVotes,
     unreadMessageCounts,
     clearUnreadCount,
     isLoadingActivities,
@@ -691,6 +809,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     isLoadingRoadmaps,
     isLoadingTeams,
     isLoadingTeamChallenges,
+    isLoadingVoting,
     activitiesError,
     attendanceError,
     feedItemsError,
@@ -705,7 +824,8 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     roadmapsError,
     teamsError,
     teamChallengesError,
-    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources || isLoadingNotifications || isLoadingRooms || isLoadingShowcase || isLoadingSuggestions || isLoadingChallenges || isLoadingRoadmaps || isLoadingTeams || isLoadingTeamChallenges,
+    votingError,
+    isInitialLoading: isLoadingActivities || isLoadingAttendance || isLoadingFeed || isLoadingProjects || isLoadingUsers || isLoadingResources || isLoadingNotifications || isLoadingRooms || isLoadingShowcase || isLoadingSuggestions || isLoadingChallenges || isLoadingRoadmaps || isLoadingTeams || isLoadingTeamChallenges || isLoadingVoting,
     fetchActivities,
     fetchAttendance,
     fetchFeedItems,
@@ -720,13 +840,20 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     fetchRoadmaps,
     fetchTeams,
     fetchTeamChallenges,
+    fetchVotingPositions,
+    createVotingPosition,
+    updateVotingPosition,
+    fetchVotingContestants,
+    contestPosition,
+    fetchVotingVotes,
+    castVote,
     updateUserSkillLevel,
     featureFlags,
     updateFeatureFlags,
     resetFeatureFlags,
     notificationPrefs,
     updateNotificationPrefs,
-    
+
     // New Toast exports
     toasts,
     showToast,

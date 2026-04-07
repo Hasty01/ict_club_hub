@@ -1423,7 +1423,7 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
                                                     e.preventDefault();
                                                     if (!activeRoom || !currentUser) return;
                                                     setShowStickerPicker(false);
-                                                    api.sendMessage(activeRoom.id, currentUser.uid, '', { type: 'sticker', url: stickerUrl });
+                                                    api.sendMessage(activeRoom.id, currentUser.uid, '[Sticker]', { type: 'sticker', url: stickerUrl });
                                                 }}
                                                 className="hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded-xl transition-colors outline-none focus:ring-2 focus:ring-pink-500 flex items-center justify-center cursor-pointer"
                                             >

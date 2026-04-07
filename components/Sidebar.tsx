@@ -19,6 +19,7 @@ import { LightBulbIcon } from './icons/LightBulbIcon';
 import { TrophyIcon } from './icons/TrophyIcon';
 import { MapIcon } from './icons/MapIcon';
 import { GamepadIcon } from './icons/GamepadIcon';
+import { VoteIcon } from './icons/VoteIcon';
 import { useData } from '../DataContext';
 import MatrixRain from './MatrixRain';
 
@@ -34,50 +35,48 @@ interface SidebarProps {
 }
 
 const NavLink: React.FC<{
-    tabName: Tab;
-    label: string;
-    icon: React.ReactNode;
-    activeTab: Tab;
-    onClick: (tab: Tab) => void;
-    isCollapsed: boolean;
-    badge?: number;
-  }> = ({ tabName, label, icon, activeTab, onClick, isCollapsed, badge }) => {
-    const isActive = activeTab === tabName;
-    
-    return (
+  tabName: Tab;
+  label: string;
+  icon: React.ReactNode;
+  activeTab: Tab;
+  onClick: (tab: Tab) => void;
+  isCollapsed: boolean;
+  badge?: number;
+}> = ({ tabName, label, icon, activeTab, onClick, isCollapsed, badge }) => {
+  const isActive = activeTab === tabName;
+
+  return (
     <li>
       <button
         onClick={() => onClick(tabName)}
         title={isCollapsed ? label : undefined}
-        className={`group relative flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 ease-out ${isCollapsed ? 'justify-center' : 'space-x-3'} ${
-          isActive
+        className={`group relative flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 ease-out ${isCollapsed ? 'justify-center' : 'space-x-3'} ${isActive
             ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-500/25'
             : 'text-gray-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-white'
-        }`}
+          }`}
       >
         <div className={`relative flex items-center justify-center transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
-            {icon}
-            {isCollapsed && badge !== undefined && badge > 0 && (
-                 <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[16px] h-4 text-[9px] font-bold text-white bg-pink-500 rounded-full border border-white dark:border-gray-800 px-0.5 shadow-sm">
-                    {badge > 9 ? '!' : badge}
-                </span>
-            )}
+          {icon}
+          {isCollapsed && badge !== undefined && badge > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[16px] h-4 text-[9px] font-bold text-white bg-pink-500 rounded-full border border-white dark:border-gray-800 px-0.5 shadow-sm">
+              {badge > 9 ? '!' : badge}
+            </span>
+          )}
         </div>
         {!isCollapsed && (
-            <span className="whitespace-nowrap flex-1 text-left tracking-wide">{label}</span>
+          <span className="whitespace-nowrap flex-1 text-left tracking-wide">{label}</span>
         )}
         {!isCollapsed && badge !== undefined && badge > 0 && (
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm ${
-                isActive 
-                ? 'bg-white/20 text-white' 
-                : 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400'
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm ${isActive
+              ? 'bg-white/20 text-white'
+              : 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400'
             }`}>
-                {badge > 99 ? '99+' : badge}
-            </span>
+            {badge > 99 ? '99+' : badge}
+          </span>
         )}
       </button>
     </li>
-    );
+  );
 };
 
 const ClubHubLogo = () => (
@@ -88,7 +87,7 @@ const ClubHubLogo = () => (
         <stop offset="100%" stopColor="#8B5CF6" />
       </linearGradient>
     </defs>
-    <circle cx="32" cy="32" r="30" fill="url(#sidebar_logo_grad)"/>
+    <circle cx="32" cy="32" r="30" fill="url(#sidebar_logo_grad)" />
     <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" fontFamily="monospace, sans-serif" fontSize="28" fontWeight="bold" fill="white" letterSpacing="-1">
       ICH
     </text>
@@ -97,19 +96,19 @@ const ClubHubLogo = () => (
 
 const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen, onClose, isCollapsed, onToggleCollapse }) => {
   const { unreadMessageCounts, notifications, featureFlags } = useData();
-  
+
   const totalUnread = useMemo(() => {
-      return Object.values(unreadMessageCounts).reduce((acc: number, count: number) => acc + count, 0);
+    return Object.values(unreadMessageCounts).reduce((acc: number, count: number) => acc + count, 0);
   }, [unreadMessageCounts]);
 
   const notificationCounts = useMemo(() => {
-      const counts: Record<string, number> = {};
-      notifications.forEach(n => {
-          if (!n.isRead && n.linkTo) {
-              counts[n.linkTo] = (counts[n.linkTo] || 0) + 1;
-          }
-      });
-      return counts;
+    const counts: Record<string, number> = {};
+    notifications.forEach(n => {
+      if (!n.isRead && n.linkTo) {
+        counts[n.linkTo] = (counts[n.linkTo] || 0) + 1;
+      }
+    });
+    return counts;
   }, [notifications]);
 
   const handleNavClick = (tab: Tab) => {
@@ -122,54 +121,55 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen
 
   // Grouped Navigation Structure
   const navGroups = [
-      {
-          title: "General",
-          items: [
-              ...(featureFlags.showFeed ? [{ tab: 'feed' as Tab, label: 'Feed', icon: <HomeIcon /> }] : []),
-              ...(featureFlags.showCommunity ? [{ tab: 'community' as Tab, label: 'Community', icon: <UsersIcon /> }] : []),
-              ...(featureFlags.showChat ? [{ tab: 'chat' as Tab, label: 'Messages', icon: <ChatBubbleIcon />, badge: totalUnread }] : []),
-              ...(featureFlags.showChallenges ? [{ tab: 'challenges' as Tab, label: 'Challenges', icon: <TrophyIcon />, badge: notificationCounts['challenges'] }] : []),
-              ...(featureFlags.showSuggestions ? [{ tab: 'suggestions' as Tab, label: 'Suggestions', icon: <LightBulbIcon /> }] : []),
-          ]
-      },
-      {
-          title: "Manage",
-          items: [
-              ...(featureFlags.showActivities ? [{ tab: 'activities' as Tab, label: 'Activities', icon: <CalendarIcon />, badge: notificationCounts['activities'] }] : []),
-              ...(featureFlags.showProjects ? [{ tab: 'projects' as Tab, label: 'Projects', icon: <ClipboardListIcon />, badge: notificationCounts['projects'] }] : []),
-              ...(featureFlags.showAttendance ? [{ tab: 'attendance' as Tab, label: 'Attendance', icon: <CheckCircleIcon /> }] : []),
-          ]
-      },
-      {
-          title: "Learn & Share",
-          items: [
-              ...(featureFlags.showRoadmap ? [{ tab: 'roadmap' as Tab, label: 'Roadmap', icon: <MapIcon />, badge: notificationCounts['roadmap'] }] : []),
-              ...(featureFlags.showResources ? [{ tab: 'resources' as Tab, label: 'Resources', icon: <BookOpenIcon /> }] : []),
-              ...(featureFlags.showPlayground ? [{ tab: 'playground' as Tab, label: 'Playground', icon: <CodeIcon /> }] : []),
-              ...(featureFlags.showGames ? [{ tab: 'games' as Tab, label: 'Games', icon: <GamepadIcon /> }] : []),
-              ...(featureFlags.showShowcase ? [{ tab: 'showcase' as Tab, label: 'Showcase', icon: <GlobeIcon /> }] : []),
-          ]
-      },
-      ...(user.role === 'PATRON'
-          ? [{
-              title: "Admin",
-              items: [
-                  { tab: 'members' as Tab, label: 'Members', icon: <UsersIcon /> },
-                  { tab: 'admin' as Tab, label: 'Admin Tools', icon: <ClipboardListIcon /> }
-              ]
-          }]
-          : []),
-      {
-          title: "Account",
-          items: [
-              { tab: 'profile' as Tab, label: 'Profile', icon: <IdentificationIcon /> },
-          ]
-      }
+    {
+      title: "General",
+      items: [
+        ...(featureFlags.showFeed ? [{ tab: 'feed' as Tab, label: 'Feed', icon: <HomeIcon /> }] : []),
+        ...(featureFlags.showCommunity ? [{ tab: 'community' as Tab, label: 'Community', icon: <UsersIcon /> }] : []),
+        ...(featureFlags.showChat ? [{ tab: 'chat' as Tab, label: 'Messages', icon: <ChatBubbleIcon />, badge: totalUnread }] : []),
+        ...(featureFlags.showChallenges ? [{ tab: 'challenges' as Tab, label: 'Challenges', icon: <TrophyIcon />, badge: notificationCounts['challenges'] }] : []),
+        ...(featureFlags.showSuggestions ? [{ tab: 'suggestions' as Tab, label: 'Suggestions', icon: <LightBulbIcon /> }] : []),
+        ...(featureFlags.showVoting ? [{ tab: 'voting' as Tab, label: 'Voting', icon: <VoteIcon /> }] : []),
+      ]
+    },
+    {
+      title: "Manage",
+      items: [
+        ...(featureFlags.showActivities ? [{ tab: 'activities' as Tab, label: 'Activities', icon: <CalendarIcon />, badge: notificationCounts['activities'] }] : []),
+        ...(featureFlags.showProjects ? [{ tab: 'projects' as Tab, label: 'Projects', icon: <ClipboardListIcon />, badge: notificationCounts['projects'] }] : []),
+        ...(featureFlags.showAttendance ? [{ tab: 'attendance' as Tab, label: 'Attendance', icon: <CheckCircleIcon /> }] : []),
+      ]
+    },
+    {
+      title: "Learn & Share",
+      items: [
+        ...(featureFlags.showRoadmap ? [{ tab: 'roadmap' as Tab, label: 'Roadmap', icon: <MapIcon />, badge: notificationCounts['roadmap'] }] : []),
+        ...(featureFlags.showResources ? [{ tab: 'resources' as Tab, label: 'Resources', icon: <BookOpenIcon /> }] : []),
+        ...(featureFlags.showPlayground ? [{ tab: 'playground' as Tab, label: 'Playground', icon: <CodeIcon /> }] : []),
+        ...(featureFlags.showGames ? [{ tab: 'games' as Tab, label: 'Games', icon: <GamepadIcon /> }] : []),
+        ...(featureFlags.showShowcase ? [{ tab: 'showcase' as Tab, label: 'Showcase', icon: <GlobeIcon /> }] : []),
+      ]
+    },
+    ...(user.role === 'PATRON'
+      ? [{
+        title: "Admin",
+        items: [
+          { tab: 'members' as Tab, label: 'Members', icon: <UsersIcon /> },
+          { tab: 'admin' as Tab, label: 'Admin Tools', icon: <ClipboardListIcon /> }
+        ]
+      }]
+      : []),
+    {
+      title: "Account",
+      items: [
+        { tab: 'profile' as Tab, label: 'Profile', icon: <IdentificationIcon /> },
+      ]
+    }
   ];
 
   const filteredGroups = navGroups
-      .map(group => ({ ...group, items: group.items.filter(Boolean) }))
-      .filter(group => group.items.length > 0);
+    .map(group => ({ ...group, items: group.items.filter(Boolean) }))
+    .filter(group => group.items.length > 0);
 
   return (
     <>
@@ -182,68 +182,68 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen
 
       {/* Sidebar Container */}
       <aside className={`bg-white/80 dark:bg-gray-900/80 border-r border-gray-200 dark:border-gray-800 flex flex-col h-screen transform transition-all md:transition-all duration-300 ease-in-out md:sticky md:top-0 ${isCollapsed ? 'md:w-[5.5rem]' : 'w-72'} ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} fixed inset-y-0 left-0 z-30 shadow-2xl md:shadow-none overflow-hidden`}>
-        
+
         {/* Matrix Rain Background inside Sidebar */}
         <MatrixRain />
 
         {/* Header */}
         <div className={`flex items-center h-20 flex-shrink-0 px-6 relative z-10 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
           <div className={`flex items-center gap-3 overflow-hidden transition-all duration-300 ${isCollapsed ? 'justify-center w-full' : ''}`}>
-             <ClubHubLogo />
-             {!isCollapsed && (
-                 <div className="flex flex-col">
-                    <span className="text-xl font-black tracking-tight text-gray-900 dark:text-white leading-none">
-                        Club<span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600">Hub</span>
-                    </span>
-                    <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium tracking-widest uppercase mt-0.5">Naggalama</span>
-                 </div>
-             )}
+            <ClubHubLogo />
+            {!isCollapsed && (
+              <div className="flex flex-col">
+                <span className="text-xl font-black tracking-tight text-gray-900 dark:text-white leading-none">
+                  Club<span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600">Hub</span>
+                </span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium tracking-widest uppercase mt-0.5">Naggalama</span>
+              </div>
+            )}
           </div>
           {!isCollapsed && (
-              <button onClick={onClose} className="p-1.5 rounded-lg md:hidden text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Close menu">
-                <XIcon />
-              </button>
+            <button onClick={onClose} className="p-1.5 rounded-lg md:hidden text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Close menu">
+              <XIcon />
+            </button>
           )}
         </div>
-        
+
         {/* Navigation */}
         <nav className="flex-1 px-4 py-4 overflow-y-auto overflow-x-hidden custom-scrollbar space-y-6 relative z-10">
-            {filteredGroups.map((group, groupIndex) => (
-                <div key={group.title}>
-                    {!isCollapsed && (
-                        <h3 className="px-3 mb-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                            {group.title}
-                        </h3>
-                    )}
-                    {isCollapsed && groupIndex > 0 && <div className="h-px bg-gray-200 dark:bg-gray-800 mx-2 my-2"></div>}
-                    
-                    <ul className="space-y-1">
-                        {group.items.map(item => (
-                            <NavLink 
-                                key={item.tab}
-                                tabName={item.tab} 
-                                label={item.label} 
-                                icon={item.icon} 
-                                activeTab={activeTab} 
-                                onClick={handleNavClick} 
-                                isCollapsed={isCollapsed}
-                                badge={item.badge}
-                            />
-                        ))}
-                    </ul>
-                </div>
-            ))}
+          {filteredGroups.map((group, groupIndex) => (
+            <div key={group.title}>
+              {!isCollapsed && (
+                <h3 className="px-3 mb-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  {group.title}
+                </h3>
+              )}
+              {isCollapsed && groupIndex > 0 && <div className="h-px bg-gray-200 dark:bg-gray-800 mx-2 my-2"></div>}
+
+              <ul className="space-y-1">
+                {group.items.map(item => (
+                  <NavLink
+                    key={item.tab}
+                    tabName={item.tab}
+                    label={item.label}
+                    icon={item.icon}
+                    activeTab={activeTab}
+                    onClick={handleNavClick}
+                    isCollapsed={isCollapsed}
+                    badge={item.badge}
+                  />
+                ))}
+              </ul>
+            </div>
+          ))}
         </nav>
 
         {/* Footer with Collapse only */}
         <div className="p-4 relative z-10 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800">
           <div className="hidden md:flex justify-end">
             <button
-                onClick={onToggleCollapse}
-                className="p-1.5 text-gray-500 hover:text-pink-600 dark:text-gray-400 dark:hover:text-pink-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 w-full flex justify-center"
-                title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+              onClick={onToggleCollapse}
+              className="p-1.5 text-gray-500 hover:text-pink-600 dark:text-gray-400 dark:hover:text-pink-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 w-full flex justify-center"
+              title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             >
-                {isCollapsed ? <ChevronsRightIcon /> : <ChevronsLeftIcon />}
+              {isCollapsed ? <ChevronsRightIcon /> : <ChevronsLeftIcon />}
             </button>
           </div>
         </div>
