@@ -592,6 +592,7 @@ export const getFeedItems = async (): Promise<FeedItem[]> => {
         timestamp: new Date(item.created_at).toLocaleString(),
         title: item.title,
         message: item.message,
+        imageUrl: item.image_url,
         commentCount: item.feed_comments[0]?.count || 0,
         pollOptions: item.poll_options ? item.poll_options.map((opt: any) => ({
             id: opt.id,
@@ -607,11 +608,12 @@ export const getFeedItems = async (): Promise<FeedItem[]> => {
     }));
 };
 
-export const addFeedItem = async (item: { title: string, message: string, type: FeedItemType, pollOptions?: string[] }, userId: string) => {
+export const addFeedItem = async (item: { title: string, message: string, type: FeedItemType, imageUrl?: string, pollOptions?: string[] }, userId: string) => {
     const { data: newItem, error } = await supabase.from('feed_items').insert({
         type: item.type,
         title: item.title,
         message: item.message,
+        image_url: item.imageUrl,
         author_uid: userId,
     }).select().single();
 

@@ -8,7 +8,7 @@ import { CheckCircleIcon } from './icons/CheckCircleIcon';
 
 interface AddAnnouncementProps {
     currentUser: User;
-    onAddAnnouncement: (data: { title: string, message: string, type: FeedItemType, pollOptions?: string[] }) => Promise<void>;
+    onAddAnnouncement: (data: { title: string, message: string, type: FeedItemType, imageUrl?: string, pollOptions?: string[] }) => Promise<void>;
 }
 
 const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnnouncement }) => {
@@ -16,6 +16,7 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
     const [message, setMessage] = useState('');
     const [type, setType] = useState<FeedItemType>('NEWS_UPDATE');
     const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+    const [imageUrl, setImageUrl] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -29,7 +30,7 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMsg(null);
-        
+
         // Validation
         if (!message.trim()) {
             setErrorMsg('Please enter a message or question.');
@@ -47,17 +48,19 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
                 return;
             }
         }
-        
+
         setIsSubmitting(true);
         try {
-            await onAddAnnouncement({ 
-                title, 
-                message, 
-                type, 
-                pollOptions: type === 'POLL' ? validPollOptions : undefined 
+            await onAddAnnouncement({
+                title,
+                message,
+                type,
+                imageUrl: imageUrl.trim() || undefined,
+                pollOptions: type === 'POLL' ? validPollOptions : undefined
             });
             setTitle('');
             setMessage('');
+            setImageUrl('');
             setType('NEWS_UPDATE');
             setPollOptions(['', '']);
         } catch (error) {
@@ -107,11 +110,10 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
                                 key={pill.id}
                                 type="button"
                                 onClick={() => setType(pill.id as FeedItemType)}
-                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                                    type === pill.id
+                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${type === pill.id
                                         ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow'
                                         : 'text-gray-600 dark:text-gray-400 hover:bg-white/70 dark:hover:bg-gray-700/70'
-                                }`}
+                                    }`}
                             >
                                 {pill.label}
                             </button>
@@ -119,7 +121,7 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
                     </div>
 
                     {type !== 'POLL' && (
-                        <div className="space-y-1">
+                        <div className="space-y-3">
                             <input
                                 id="announcement-title"
                                 type="text"
@@ -131,9 +133,18 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
                             {isTitleRequired && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Title is required for news and event announcements.</p>
                             )}
+
+                            <input
+                                id="announcement-image"
+                                type="text"
+                                placeholder="Image URL (optional)"
+                                value={imageUrl}
+                                onChange={(e) => setImageUrl(e.target.value)}
+                                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                            />
                         </div>
                     )}
-                    
+
                     <div className="space-y-1">
                         <textarea
                             id="announcement-message"
@@ -161,8 +172,8 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
                                         className="flex-grow px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent text-sm"
                                     />
                                     {pollOptions.length > 2 && (
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             onClick={() => removeOption(index)}
                                             className="text-gray-400 hover:text-red-500 p-1"
                                             aria-label="Remove option"
@@ -172,8 +183,8 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
                                     )}
                                 </div>
                             ))}
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 onClick={addOption}
                                 className="w-full border border-dashed border-gray-300 dark:border-gray-600 rounded-lg py-2 text-xs font-semibold text-purple-600 hover:text-purple-700 hover:border-purple-300 flex items-center justify-center gap-1"
                             >
@@ -188,7 +199,7 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
                             <span>{errorMsg}</span>
                         </div>
                     )}
-                    
+
                     <div className="flex items-center justify-between pt-2">
                         <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
                             {isValid ? <CheckCircleIcon className="w-4 h-4 text-emerald-500" /> : null}

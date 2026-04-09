@@ -355,6 +355,21 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
                         </>
                     )}
 
+                    {/* Attached Image */}
+                    {item.imageUrl && (
+                        <div className="mt-4 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 shadow-sm transition-transform hover:scale-[1.01] duration-300">
+                            <img
+                                src={item.imageUrl}
+                                alt={item.title || "Attached image"}
+                                className="w-full h-auto object-cover max-h-[500px]"
+                                loading="lazy"
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).parentElement!.style.display = 'none';
+                                }}
+                            />
+                        </div>
+                    )}
+
                     {/* Poll Options */}
                     {item.type === 'POLL' && pollOptions.length > 0 && (
                         <div className="space-y-2 mt-4">
@@ -366,18 +381,18 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
                                     <div
                                         key={option.id}
                                         className={`relative overflow-hidden rounded-lg border cursor-pointer transition-all duration-200 group/poll ${option.isVoted
-                                                ? 'border-purple-500 dark:border-purple-400 ring-1 ring-purple-500/20'
-                                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                                            ? 'border-purple-500 dark:border-purple-400 ring-1 ring-purple-500/20'
+                                            : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                                             }`}
                                         onClick={() => handleVote(option.id)}
                                     >
                                         {/* Progress Bar Layer */}
                                         <div
                                             className={`absolute top-0 left-0 h-full transition-all duration-500 ease-out ${option.isVoted
-                                                    ? 'bg-purple-100/80 dark:bg-purple-900/30'
-                                                    : isWinner && totalVotes > 0
-                                                        ? 'bg-gray-100/80 dark:bg-gray-700/50'
-                                                        : 'bg-gray-50/80 dark:bg-gray-800/50'
+                                                ? 'bg-purple-100/80 dark:bg-purple-900/30'
+                                                : isWinner && totalVotes > 0
+                                                    ? 'bg-gray-100/80 dark:bg-gray-700/50'
+                                                    : 'bg-gray-50/80 dark:bg-gray-800/50'
                                                 }`}
                                             style={{ width: `${percent}%` }}
                                         />
@@ -386,8 +401,8 @@ const FeedItemCard: React.FC<FeedItemCardProps> = ({ item, currentUser, onDelete
                                         <div className="relative z-10 flex items-center justify-between p-3">
                                             <div className="flex items-center gap-3 min-w-0">
                                                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${option.isVoted
-                                                        ? 'border-purple-500 bg-purple-500 text-white'
-                                                        : 'border-gray-300 dark:border-gray-500 group-hover/poll:border-purple-400'
+                                                    ? 'border-purple-500 bg-purple-500 text-white'
+                                                    : 'border-gray-300 dark:border-gray-500 group-hover/poll:border-purple-400'
                                                     }`}>
                                                     {option.isVoted && <CheckIcon className="w-3 h-3 text-white" />}
                                                 </div>

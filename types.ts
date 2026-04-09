@@ -155,6 +155,7 @@ export interface FeedItem {
   timestamp: string; // This will be handled by Supabase server timestamps
   title?: string;
   message: string; // For Polls, this is the Question
+  imageUrl?: string;
   commentCount?: number;
   pollOptions?: PollOption[];
 }
