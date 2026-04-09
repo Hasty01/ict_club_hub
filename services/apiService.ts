@@ -632,6 +632,24 @@ export const addFeedItem = async (item: { title: string, message: string, type: 
     await notifyAllUsers(`New post: ${headline}`, 'feed', userId);
 };
 
+export const uploadFeedImage = async (file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+    const filePath = `feed/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('feed_images')
+        .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+        .from('feed_images')
+        .getPublicUrl(filePath);
+
+    return publicUrl;
+};
+
 export const deleteFeedItem = async (id: string) => {
     const { error } = await supabase.from('feed_items').delete().eq('id', id);
     if (error) throw error;

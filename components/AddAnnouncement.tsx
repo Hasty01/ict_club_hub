@@ -5,6 +5,9 @@ import { User, FeedItemType } from '../types';
 import { PlusCircleIcon } from './icons/PlusCircleIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
+import { CameraIcon } from './icons/CameraIcon';
+import { XIcon } from './icons/XIcon';
+import * as api from '../services/apiService';
 
 interface AddAnnouncementProps {
     currentUser: User;
@@ -17,6 +20,8 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
     const [type, setType] = useState<FeedItemType>('NEWS_UPDATE');
     const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
     const [imageUrl, setImageUrl] = useState('');
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -51,16 +56,24 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
 
         setIsSubmitting(true);
         try {
+            let finalImageUrl = imageUrl.trim() || undefined;
+
+            if (selectedFile) {
+                finalImageUrl = await api.uploadFeedImage(selectedFile);
+            }
+
             await onAddAnnouncement({
                 title,
                 message,
                 type,
-                imageUrl: imageUrl.trim() || undefined,
+                imageUrl: finalImageUrl,
                 pollOptions: type === 'POLL' ? validPollOptions : undefined
             });
             setTitle('');
             setMessage('');
             setImageUrl('');
+            setSelectedFile(null);
+            setPreviewUrl(null);
             setType('NEWS_UPDATE');
             setPollOptions(['', '']);
         } catch (error) {
@@ -111,8 +124,8 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
                                 type="button"
                                 onClick={() => setType(pill.id as FeedItemType)}
                                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${type === pill.id
-                                        ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow'
-                                        : 'text-gray-600 dark:text-gray-400 hover:bg-white/70 dark:hover:bg-gray-700/70'
+                                    ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow'
+                                    : 'text-gray-600 dark:text-gray-400 hover:bg-white/70 dark:hover:bg-gray-700/70'
                                     }`}
                             >
                                 {pill.label}
@@ -137,11 +150,55 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
                             <input
                                 id="announcement-image"
                                 type="text"
-                                placeholder="Image URL (optional)"
+                                placeholder="Or Paste Image URL"
                                 value={imageUrl}
-                                onChange={(e) => setImageUrl(e.target.value)}
+                                onChange={(e) => {
+                                    setImageUrl(e.target.value);
+                                    if (e.target.value) {
+                                        setSelectedFile(null);
+                                        setPreviewUrl(null);
+                                    }
+                                }}
                                 className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                             />
+
+                            <div className="flex flex-col gap-3">
+                                <label className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border border-dashed border-gray-300 dark:border-gray-500 rounded-xl cursor-pointer transition-colors text-sm font-medium text-gray-600 dark:text-gray-300">
+                                    <CameraIcon className="w-5 h-5 text-gray-400" />
+                                    <span>{selectedFile ? 'Change Image' : 'Upload Image'}</span>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                setSelectedFile(file);
+                                                setImageUrl('');
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => setPreviewUrl(reader.result as string);
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }}
+                                    />
+                                </label>
+
+                                {previewUrl && (
+                                    <div className="relative inline-block mt-2 group">
+                                        <img src={previewUrl} alt="Preview" className="w-24 h-24 object-cover rounded-xl border-2 border-pink-500/50 shadow-md" />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedFile(null);
+                                                setPreviewUrl(null);
+                                            }}
+                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 transition-colors"
+                                        >
+                                            <XIcon className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
 
