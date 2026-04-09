@@ -584,12 +584,12 @@ export const getFeedItems = async (): Promise<FeedItem[]> => {
     const { data: { session } } = await supabase.auth.getSession();
     const currentUserId = session?.user?.id;
 
-    return data.map((item: any) => ({
+    const mapped = data.map((item: any) => ({
         id: String(item.id),
         type: item.type,
         author: item.users?.name || 'Unknown',
         authorAvatarUrl: item.users?.avatar_url,
-        timestamp: new Date(item.created_at).toLocaleString(),
+        timestamp: item.created_at,
         title: item.title,
         message: item.message,
         imageUrl: item.image_url,
@@ -606,6 +606,8 @@ export const getFeedItems = async (): Promise<FeedItem[]> => {
             })) : []
         })) : []
     }));
+
+    return mapped;
 };
 
 export const addFeedItem = async (item: { title: string, message: string, type: FeedItemType, imageUrl?: string, pollOptions?: string[] }, userId: string) => {

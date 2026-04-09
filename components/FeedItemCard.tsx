@@ -41,24 +41,27 @@ const badgeConfig: { [key in FeedItemType]: {
 };
 
 const getRelativeTime = (dateString: string) => {
-    const date = new Date(dateString);
+    // Supabase returns ISO strings; normalise space separator just in case
+    const date = new Date(dateString.replace(' ', 'T'));
     const now = new Date();
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
+    if (isNaN(seconds) || seconds < 5) return "Just now";
+
     let interval = seconds / 31536000;
-    if (interval > 1) return Math.floor(interval) + "y ago";
+    if (interval >= 1) return Math.floor(interval) + "y ago";
 
     interval = seconds / 2592000;
-    if (interval > 1) return Math.floor(interval) + "mo ago";
+    if (interval >= 1) return Math.floor(interval) + "mo ago";
 
     interval = seconds / 86400;
-    if (interval > 1) return Math.floor(interval) + "d ago";
+    if (interval >= 1) return Math.floor(interval) + "d ago";
 
     interval = seconds / 3600;
-    if (interval > 1) return Math.floor(interval) + "h ago";
+    if (interval >= 1) return Math.floor(interval) + "h ago";
 
     interval = seconds / 60;
-    if (interval > 1) return Math.floor(interval) + "m ago";
+    if (interval >= 1) return Math.floor(interval) + "m ago";
 
     return "Just now";
 };
