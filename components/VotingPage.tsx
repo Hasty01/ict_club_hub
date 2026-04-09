@@ -78,6 +78,12 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         };
 
         loadAnalyticsVotes();
+
+        // Auto-refresh every 30 seconds when on analytics tab
+        if (activeTab === 'analytics') {
+            const interval = setInterval(loadAnalyticsVotes, 30000);
+            return () => clearInterval(interval);
+        }
     }, [activeTab, votingPositions, fetchVotingVotes]);
 
     const activeElections = useMemo(() =>
@@ -458,19 +464,21 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-2 gap-3 mt-auto">
-                                    <button
-                                        onClick={() => handleActionClick(pos, 'contest')}
-                                        disabled={userContestantFor.has(pos.id)}
-                                        className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed ${userContestantFor.has(pos.id) ? 'bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                                    >
-                                        <UserIcon className="w-4 h-4" />
-                                        {userContestantFor.has(pos.id) ? (
-                                            getContestantStatus(pos.id) === 'APPROVED' ? 'Approved Candidate' :
-                                                getContestantStatus(pos.id) === 'REJECTED' ? 'Application Rejected' :
-                                                    'Applied (Pending)'
-                                        ) : 'Contest'}
-                                    </button>
+                                <div className={`grid gap-3 mt-auto ${currentUser.role === 'PATRON' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                    {currentUser.role === 'PATRON' && (
+                                        <button
+                                            onClick={() => handleActionClick(pos, 'contest')}
+                                            disabled={userContestantFor.has(pos.id)}
+                                            className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed ${userContestantFor.has(pos.id) ? 'bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                                        >
+                                            <UserIcon className="w-4 h-4" />
+                                            {userContestantFor.has(pos.id) ? (
+                                                getContestantStatus(pos.id) === 'APPROVED' ? 'Approved Candidate' :
+                                                    getContestantStatus(pos.id) === 'REJECTED' ? 'Application Rejected' :
+                                                        'Applied (Pending)'
+                                            ) : 'Add Candidate'}
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => handleActionClick(pos, 'vote')}
                                         className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all text-sm shadow-lg ${isVotingOpen(pos)
@@ -637,30 +645,106 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                     </div>
 
                     <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700">
-                        <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-8">Vote Distribution by Position</h4>
-                        <div className="space-y-6">
-                            {votingPositions.slice(0, 6).map(pos => {
-                                const posVotes = analyticsVotes.filter(v => v.positionId === pos.id).length;
-                                const percent = analyticsVotes.length > 0 ? (posVotes / analyticsVotes.length) * 100 : 0;
-                                return (
-                                    <div key={pos.id} className="space-y-2">
-                                        <div className="flex justify-between items-end">
-                                            <div className="flex items-center gap-2">
-                                                <span className="w-2 h-2 rounded-full bg-pink-500" />
-                                                <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{pos.title}</span>
-                                            </div>
-                                            <span className="text-sm font-black text-gray-900 dark:text-white">{posVotes} <span className="text-[10px] text-gray-400 font-normal uppercase ml-1">Votes</span></span>
-                                        </div>
-                                        <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden p-[2px]">
-                                            <div
-                                                className="h-full bg-gradient-to-r from-pink-500 to-purple-600 rounded-full transition-all duration-1000 ease-out"
-                                                style={{ width: `${percent}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                        <div className="flex items-center justify-between mb-8">
+                            <h4 className="text-xl font-bold text-gray-900 dark:text-white">Live Vote Breakdown</h4>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const voteCollections = await Promise.all(votingPositions.map(pos => fetchVotingVotes(pos.id)));
+                                        setAnalyticsVotes(voteCollections.flat());
+                                    } catch (e) {
+                                        console.error('Refresh failed', e);
+                                    }
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 rounded-xl text-sm font-bold hover:bg-pink-100 dark:hover:bg-pink-900/40 transition-all"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                Refresh
+                            </button>
                         </div>
+
+                        {votingPositions.length === 0 ? (
+                            <div className="text-center py-16 text-gray-400">No elections to display.</div>
+                        ) : (
+                            <div className="space-y-8">
+                                {votingPositions.map(pos => {
+                                    const posContestants = votingContestants
+                                        .filter(c => c.positionId === pos.id && c.status === 'APPROVED');
+                                    const posVotes = analyticsVotes.filter(v => v.positionId === pos.id);
+                                    const totalPosVotes = posVotes.length;
+                                    const ranked = [...posContestants].sort((a, b) =>
+                                        posVotes.filter(v => v.contestantId === b.id).length -
+                                        posVotes.filter(v => v.contestantId === a.id).length
+                                    );
+                                    const medals = ['🥇', '🥈', '🥉'];
+                                    const statusLabel = isVotingOpen(pos) ? 'LIVE' : isUpcoming(pos) ? 'Upcoming' : 'Closed';
+
+                                    return (
+                                        <div key={pos.id} className="border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden">
+                                            {/* Position Header */}
+                                            <div className="flex items-center justify-between px-6 py-4 bg-gray-50 dark:bg-gray-900/30">
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isVotingOpen(pos) ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 animate-pulse' :
+                                                        isUpcoming(pos) ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
+                                                            'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                                                        }`}>{statusLabel}</span>
+                                                    <h5 className="font-bold text-gray-900 dark:text-white">{pos.title}</h5>
+                                                </div>
+                                                <span className="text-sm font-black text-gray-500 dark:text-gray-400">
+                                                    {totalPosVotes} vote{totalPosVotes !== 1 ? 's' : ''}
+                                                </span>
+                                            </div>
+
+                                            {/* Candidate Leaderboard */}
+                                            <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
+                                                {ranked.length === 0 ? (
+                                                    <div className="px-6 py-5 text-sm text-gray-400 italic">No approved candidates yet.</div>
+                                                ) : ranked.map((contestant, idx) => {
+                                                    const cVotes = posVotes.filter(v => v.contestantId === contestant.id).length;
+                                                    const pct = totalPosVotes > 0 ? (cVotes / totalPosVotes) * 100 : 0;
+                                                    const isLeading = idx === 0 && cVotes > 0;
+
+                                                    return (
+                                                        <div key={contestant.id} className={`px-6 py-4 flex items-center gap-4 ${isLeading ? 'bg-yellow-50/50 dark:bg-yellow-900/10' : ''}`}>
+                                                            {/* Rank / Medal */}
+                                                            <div className="w-8 text-center text-lg flex-shrink-0">
+                                                                {idx < 3 && cVotes > 0 ? medals[idx] : <span className="text-sm font-bold text-gray-400">#{idx + 1}</span>}
+                                                            </div>
+
+                                                            {/* Avatar */}
+                                                            <img
+                                                                src={contestant.userAvatarUrl || `https://i.pravatar.cc/60?u=${contestant.userId}`}
+                                                                alt={contestant.userName}
+                                                                className="w-9 h-9 rounded-xl object-cover border-2 border-white dark:border-gray-700 shadow-sm flex-shrink-0"
+                                                            />
+
+                                                            {/* Name + Bar */}
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center justify-between mb-1.5">
+                                                                    <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{contestant.userName}</span>
+                                                                    <span className="text-sm font-black text-gray-700 dark:text-gray-200 ml-3 flex-shrink-0">
+                                                                        {cVotes} <span className="text-[11px] font-medium text-gray-400">({pct.toFixed(0)}%)</span>
+                                                                    </span>
+                                                                </div>
+                                                                <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className={`h-full rounded-full transition-all duration-700 ease-out ${isLeading
+                                                                            ? 'bg-gradient-to-r from-yellow-400 to-pink-500'
+                                                                            : 'bg-gradient-to-r from-pink-400 to-purple-500'
+                                                                            }`}
+                                                                        style={{ width: `${pct}%` }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 </div>
             ) : (
