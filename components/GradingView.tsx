@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ProjectData, User, ProjectTask } from '../types';
+import { useData } from '../DataContext';
 import * as api from '../services/apiService';
 import StarRating from './StarRating';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
@@ -26,12 +27,13 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
     });
 
     // State for Code Runner Modal
-    const [runnerState, setRunnerState] = useState<{isOpen: boolean, code: string, title: string}>({
+    const [runnerState, setRunnerState] = useState<{ isOpen: boolean, code: string, title: string }>({
         isOpen: false, code: '', title: ''
     });
 
-    // Local state for feedback input (map of taskId-userId -> feedback string)
+    // State for local feedback input
     const [feedbackInputs, setFeedbackInputs] = useState<Record<string, string>>({});
+    const { showAlert } = useData();
 
     // Update feedbackInputs when data changes
     useEffect(() => {
@@ -47,7 +49,7 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
                     });
                 }
             });
-            setFeedbackInputs(prev => ({...prev, ...newInputs}));
+            setFeedbackInputs(prev => ({ ...prev, ...newInputs }));
         }
     }, [data]);
 
@@ -63,7 +65,7 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
     const tasksWithSubmissions = Object.values(data.tasks)
         .filter((task: ProjectTask) => task.submissions && Object.keys(task.submissions).length > 0)
         .sort((a: ProjectTask, b: ProjectTask) => (a.dueDate || '').localeCompare(b.dueDate || ''));
-        
+
     const userMap = new Map<string, User>();
     if (allUsers) {
         allUsers.forEach(user => userMap.set(user.uid, user));
@@ -79,17 +81,21 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
             setRunnerState({ isOpen: true, code: text, title: `Submission: ${userName}` });
         } catch (error) {
             console.error("Run error:", error);
-            alert("Failed to load code.");
+            showAlert({
+                title: 'Load Failed',
+                message: 'Failed to load code.',
+                type: 'error'
+            });
         }
     };
 
     const handleAiGradeClick = async (task: ProjectTask, submission: any, userId: string) => {
         if (!submission.filePath) return;
-        
+
         try {
             // Get public URL
             const url = api.getSubmissionPublicUrl(submission.filePath);
-            
+
             // Fetch content
             const response = await fetch(url);
             if (!response.ok) throw new Error("Failed to fetch submission file.");
@@ -105,7 +111,11 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
 
         } catch (error) {
             console.error("Error preparing AI grading:", error);
-            alert("Could not load submission file for AI analysis. Ensure it is a text/code file.");
+            showAlert({
+                title: 'Load Failed',
+                message: 'Could not load submission file for AI analysis. Ensure it is a text/code file.',
+                type: 'error'
+            });
         }
     };
 
@@ -113,7 +123,7 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
         // Update local feedback state
         const key = `${aiModal.taskId}-${aiModal.userId}`;
         setFeedbackInputs(prev => ({ ...prev, [key]: feedback }));
-        
+
         // Save to DB
         onGrade(aiModal.taskId, aiModal.userId, grade, feedback);
         setAiModal(prev => ({ ...prev, isOpen: false }));
@@ -129,7 +139,7 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
         const currentGrade = grade || 0;
         const feedback = feedbackInputs[`${taskId}-${userId}`];
         if (feedback !== undefined) {
-             onGrade(taskId, userId, currentGrade, feedback);
+            onGrade(taskId, userId, currentGrade, feedback);
         }
     };
 
@@ -141,7 +151,7 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
             </div>
         );
     }
-    
+
     return (
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-8">
             {tasksWithSubmissions.map((task: ProjectTask) => (
@@ -152,7 +162,7 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
                             Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}
                         </p>
                     </div>
-                    
+
                     <div className="divide-y divide-gray-100 dark:divide-gray-700">
                         {Object.entries(task.submissions || {}).map(([userId, submission]: [string, any]) => {
                             const user = userMap.get(userId);
@@ -162,12 +172,12 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
                             const fileName = submission?.filePath ? submission.filePath.split('/').pop() : 'File';
                             const isPythonFile = fileName.endsWith('.py');
                             const feedbackKey = `${task.id}-${userId}`;
-                            
+
                             return (
                                 <div key={userId} className="p-4 flex flex-col gap-4 hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
                                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                                         <div className="flex items-center gap-3 flex-1 w-full md:w-auto">
-                                            <img 
+                                            <img
                                                 src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`}
                                                 alt={user.name}
                                                 className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600"
@@ -193,14 +203,14 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
                                                     </a>
                                                     {isPythonFile && (
                                                         <>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => handleRunCode(submission, user.name)}
                                                                 className="p-1.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full shadow-sm hover:shadow-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
                                                                 title="Run Code"
                                                             >
                                                                 <PlayIcon className="w-3 h-3" />
                                                             </button>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => handleAiGradeClick(task, submission, userId)}
                                                                 className="p-1.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-full shadow-sm hover:shadow-md hover:scale-105 transition-all"
                                                                 title="Auto-Grade with AI"
@@ -214,21 +224,21 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
                                                 <p className="text-sm text-gray-400 italic">No file attached</p>
                                             )}
                                         </div>
-                                        
+
                                         <div className="w-full md:w-auto flex justify-end">
-                                            <StarRating 
+                                            <StarRating
                                                 rating={submission.grade}
                                                 onRate={(newGrade) => onGrade(task.id, userId, newGrade, feedbackInputs[feedbackKey])}
                                             />
                                         </div>
                                     </div>
-                                    
+
                                     {/* Feedback Section */}
                                     <div className="w-full">
                                         <label htmlFor={`feedback-${feedbackKey}`} className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                                             Patron Feedback
                                         </label>
-                                        <textarea 
+                                        <textarea
                                             id={`feedback-${feedbackKey}`}
                                             value={feedbackInputs[feedbackKey] || ''}
                                             onChange={(e) => handleFeedbackChange(task.id, userId, e.target.value)}
@@ -244,7 +254,7 @@ const GradingView: React.FC<GradingViewProps> = ({ data, allUsers, onGrade }) =>
                 </div>
             ))}
 
-            <AiGradingModal 
+            <AiGradingModal
                 isOpen={aiModal.isOpen}
                 onClose={() => setAiModal(prev => ({ ...prev, isOpen: false }))}
                 taskContent={aiModal.taskContent}

@@ -38,7 +38,7 @@ const DifficultyBadge: React.FC<{ difficulty?: string }> = ({ difficulty }) => {
 const RankAvatar: React.FC<{ user: User, rank: number, className?: string }> = ({ user, rank, className }) => {
     let ringColor = 'border-gray-200 dark:border-gray-700';
     let badgeColor = 'bg-gray-500';
-    
+
     if (rank === 1) { ringColor = 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]'; badgeColor = 'bg-yellow-400 text-yellow-900'; }
     else if (rank === 2) { ringColor = 'border-slate-300 shadow-[0_0_10px_rgba(203,213,225,0.4)]'; badgeColor = 'bg-slate-300 text-slate-900'; }
     else if (rank === 3) { ringColor = 'border-amber-600 shadow-[0_0_10px_rgba(217,119,6,0.4)]'; badgeColor = 'bg-amber-600 text-amber-100'; }
@@ -46,10 +46,10 @@ const RankAvatar: React.FC<{ user: User, rank: number, className?: string }> = (
     return (
         <div className={`relative flex flex-col items-center ${className}`}>
             <div className="relative">
-                <img 
-                    src={user.avatarUrl || `https://i.pravatar.cc/80?u=${user.username}`} 
+                <img
+                    src={user.avatarUrl || `https://i.pravatar.cc/80?u=${user.username}`}
                     className={`rounded-full object-cover border-4 ${ringColor} transition-transform hover:scale-105 ${rank === 1 ? 'w-20 h-20 md:w-24 md:h-24' : 'w-16 h-16 md:w-20 md:h-20'}`}
-                    alt={user.name} 
+                    alt={user.name}
                 />
                 <div className={`absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm font-bold border-2 border-white dark:border-gray-800 ${badgeColor}`}>
                     {rank}
@@ -79,22 +79,20 @@ const Leaderboard: React.FC<{ users: User[] }> = ({ users }) => {
     const topThree = rankedUsers.slice(0, 3);
     const runnersUp = rankedUsers.slice(3);
 
-    // Rearrange top three for podium display: 2nd, 1st, 3rd
     const podiumOrder = [];
-    if (topThree[1]) podiumOrder.push({ user: topThree[1], rank: 2 }); // 2nd Place
-    if (topThree[0]) podiumOrder.push({ user: topThree[0], rank: 1 }); // 1st Place
-    if (topThree[2]) podiumOrder.push({ user: topThree[2], rank: 3 }); // 3rd Place
+    if (topThree[1]) podiumOrder.push({ user: topThree[1], rank: 2 });
+    if (topThree[0]) podiumOrder.push({ user: topThree[0], rank: 1 });
+    if (topThree[2]) podiumOrder.push({ user: topThree[2], rank: 3 });
 
     return (
         <div className="mb-10 bg-gradient-to-br from-gray-900 to-gray-800 dark:from-black dark:to-gray-900 rounded-3xl p-6 md:p-8 text-white shadow-2xl relative overflow-hidden border border-gray-800">
-            {/* Abstract Background Shapes */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/20 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-pink-600/20 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
-            
+
             <div className="relative z-10">
                 <div className="flex items-center justify-between mb-8">
                     <h3 className="text-2xl font-bold flex items-center gap-2">
-                        <TrophyIcon className="h-7 w-7 text-yellow-400" /> 
+                        <TrophyIcon className="h-7 w-7 text-yellow-400" />
                         <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-200 to-yellow-500">
                             Hall of Fame
                         </span>
@@ -104,19 +102,17 @@ const Leaderboard: React.FC<{ users: User[] }> = ({ users }) => {
                     </span>
                 </div>
 
-                {/* Podium */}
                 <div className="flex justify-center items-end gap-4 md:gap-8 mb-10 min-h-[160px]">
                     {podiumOrder.map((item) => (
-                        <RankAvatar 
-                            key={item.user.uid} 
-                            user={item.user} 
-                            rank={item.rank} 
-                            className={item.rank === 1 ? '-mt-8 z-10' : ''} 
+                        <RankAvatar
+                            key={item.user.uid}
+                            user={item.user}
+                            rank={item.rank}
+                            className={item.rank === 1 ? '-mt-8 z-10' : ''}
                         />
                     ))}
                 </div>
 
-                {/* Runners Up List */}
                 {runnersUp.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white/5 rounded-2xl p-4 backdrop-blur-sm border border-white/5">
                         {runnersUp.map((user, index) => (
@@ -124,10 +120,10 @@ const Leaderboard: React.FC<{ users: User[] }> = ({ users }) => {
                                 <div className="w-8 h-8 flex items-center justify-center font-bold text-white/50 text-sm">
                                     #{index + 4}
                                 </div>
-                                <img 
-                                    src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`} 
+                                <img
+                                    src={user.avatarUrl || `https://i.pravatar.cc/40?u=${user.username}`}
                                     className="w-10 h-10 rounded-full border border-white/10"
-                                    alt={user.name} 
+                                    alt={user.name}
                                 />
                                 <div className="min-w-0 flex-1">
                                     <p className="text-sm font-semibold truncate">{user.name}</p>
@@ -157,8 +153,7 @@ const ChallengeCard: React.FC<{
     const today = new Date();
     const deadline = new Date(challenge.deadline);
     const isExpired = deadline < today;
-    
-    // Calculate days left
+
     const timeDiff = deadline.getTime() - today.getTime();
     const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
 
@@ -173,11 +168,11 @@ const ChallengeCard: React.FC<{
         statusText = "Expired";
     } else if (challenge.status === 'ACTIVE') {
         if (daysLeft <= 3) {
-             statusColor = "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
-             statusText = `${daysLeft} Day${daysLeft !== 1 ? 's' : ''} Left`;
+            statusColor = "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
+            statusText = `${daysLeft} Day${daysLeft !== 1 ? 's' : ''} Left`;
         } else {
-             statusColor = "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
-             statusText = "Active";
+            statusColor = "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
+            statusText = "Active";
         }
     }
 
@@ -193,11 +188,11 @@ const ChallengeCard: React.FC<{
                     </div>
                     {hasBadge && <div className="bg-green-100 dark:bg-green-900/30 p-1.5 rounded-full text-green-600 dark:text-green-400"><BadgeCheckIcon className="w-5 h-5" /></div>}
                 </div>
-                
+
                 <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2 group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors">
                     {challenge.title}
                 </h4>
-                
+
                 <div className="mb-4">
                     <FormattedMessage text={challenge.description} isUser={false} />
                 </div>
@@ -213,7 +208,7 @@ const ChallengeCard: React.FC<{
 
                 {isPatron ? (
                     <Tooltip text="Review member submissions and approve badges.">
-                        <button 
+                        <button
                             onClick={() => onOpenReview(challenge.id, challenge.title)}
                             className="w-full py-2.5 rounded-xl text-sm font-semibold bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:hover:bg-purple-900/30 transition-colors flex items-center justify-center gap-2"
                         >
@@ -223,7 +218,7 @@ const ChallengeCard: React.FC<{
                 ) : (
                     !hasBadge && challenge.status === 'ACTIVE' && !isExpired ? (
                         <Tooltip text="Submit your solution to earn a badge.">
-                            <button 
+                            <button
                                 onClick={() => onOpenSubmission(challenge.id)}
                                 className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                             >
@@ -231,12 +226,12 @@ const ChallengeCard: React.FC<{
                             </button>
                         </Tooltip>
                     ) : (
-                       <button 
-                            disabled 
+                        <button
+                            disabled
                             className="w-full py-2.5 rounded-xl text-sm font-semibold bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {hasBadge ? 'Badge Earned' : 'Challenge Closed'}
-                        </button> 
+                        </button>
                     )
                 )}
             </div>
@@ -244,9 +239,9 @@ const ChallengeCard: React.FC<{
     );
 };
 
-const CreateChallengeModal: React.FC<{ 
-    isOpen: boolean, 
-    onClose: () => void, 
+const CreateChallengeModal: React.FC<{
+    isOpen: boolean,
+    onClose: () => void,
     onSubmit: (title: string, desc: string, date: string, diff: any) => Promise<void>,
     prefill?: { title: string, description: string, difficulty: any } | null
 }> = ({ isOpen, onClose, onSubmit, prefill }) => {
@@ -296,8 +291,8 @@ const CreateChallengeModal: React.FC<{
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Difficulty</label>
-                            <select 
-                                value={difficulty} 
+                            <select
+                                value={difficulty}
                                 onChange={e => setDifficulty(e.target.value as any)}
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-pink-500"
                             >
@@ -318,15 +313,16 @@ const CreateChallengeModal: React.FC<{
     );
 };
 
-const GenerateAIChallengeModal: React.FC<{ 
-    isOpen: boolean, 
-    onClose: () => void, 
-    onGenerated: (title: string, desc: string, difficulty: any) => void 
+const GenerateAIChallengeModal: React.FC<{
+    isOpen: boolean,
+    onClose: () => void,
+    onGenerated: (title: string, desc: string, difficulty: any) => void
 }> = ({ isOpen, onClose, onGenerated }) => {
     const [concepts, setConcepts] = useState('');
     const [skillLevel, setSkillLevel] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'>('BEGINNER');
     const [language, setLanguage] = useState('Python');
     const [isGenerating, setIsGenerating] = useState(false);
+    const { showAlert } = useData();
 
     if (!isOpen) return null;
 
@@ -341,7 +337,11 @@ const GenerateAIChallengeModal: React.FC<{
             onClose();
         } catch (error) {
             console.error(error);
-            alert("Failed to generate challenge. Please try again.");
+            showAlert({
+                title: 'Generation Failed',
+                message: 'Failed to generate challenge. Please try again.',
+                type: 'error'
+            });
         } finally {
             setIsGenerating(false);
         }
@@ -351,7 +351,7 @@ const GenerateAIChallengeModal: React.FC<{
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-md w-full p-8 relative border border-gray-200 dark:border-gray-700">
                 <button onClick={onClose} className="absolute top-6 right-6 text-gray-500 hover:text-gray-700 dark:text-gray-400 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"><XIcon /></button>
-                
+
                 <div className="flex items-center gap-3 mb-6">
                     <div className="p-2.5 bg-pink-100 dark:bg-pink-900/30 rounded-xl">
                         <SparklesIcon className="w-6 h-6 text-pink-600 dark:text-pink-400" />
@@ -362,21 +362,21 @@ const GenerateAIChallengeModal: React.FC<{
                 <form onSubmit={handleGenerate} className="space-y-5">
                     <div>
                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Concepts to include</label>
-                        <textarea 
-                            value={concepts} 
-                            onChange={e => setConcepts(e.target.value)} 
-                            required 
-                            rows={3} 
-                            className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl dark:bg-gray-900 dark:text-white focus:ring-2 focus:ring-pink-500 transition-all outline-none" 
-                            placeholder="e.g. For loops, lists, string manipulation..." 
+                        <textarea
+                            value={concepts}
+                            onChange={e => setConcepts(e.target.value)}
+                            required
+                            rows={3}
+                            className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl dark:bg-gray-900 dark:text-white focus:ring-2 focus:ring-pink-500 transition-all outline-none"
+                            placeholder="e.g. For loops, lists, string manipulation..."
                         />
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Skill Level</label>
-                            <select 
-                                value={skillLevel} 
+                            <select
+                                value={skillLevel}
                                 onChange={e => setSkillLevel(e.target.value as any)}
                                 className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl dark:bg-gray-900 dark:text-white focus:ring-2 focus:ring-pink-500 outline-none"
                             >
@@ -387,8 +387,8 @@ const GenerateAIChallengeModal: React.FC<{
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Language</label>
-                            <select 
-                                value={language} 
+                            <select
+                                value={language}
                                 onChange={e => setLanguage(e.target.value)}
                                 className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl dark:bg-gray-900 dark:text-white focus:ring-2 focus:ring-pink-500 outline-none"
                             >
@@ -398,9 +398,9 @@ const GenerateAIChallengeModal: React.FC<{
                         </div>
                     </div>
 
-                    <button 
-                        type="submit" 
-                        disabled={isGenerating} 
+                    <button
+                        type="submit"
+                        disabled={isGenerating}
                         className="w-full py-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-xl font-bold hover:from-pink-700 hover:to-purple-700 disabled:opacity-50 shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                     >
                         {isGenerating ? (
@@ -439,7 +439,7 @@ const SubmitSolutionModal: React.FC<{ isOpen: boolean, onClose: () => void, onSu
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-md w-full p-6 relative border border-gray-200 dark:border-gray-700">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400"><XIcon /></button>
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Submit Solution</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -454,10 +454,10 @@ const SubmitSolutionModal: React.FC<{ isOpen: boolean, onClose: () => void, onSu
     );
 };
 
-const AnalysisModal: React.FC<{ 
-    isOpen: boolean, 
-    onClose: () => void, 
-    content: string, 
+const AnalysisModal: React.FC<{
+    isOpen: boolean,
+    onClose: () => void,
+    content: string,
     isLoading: boolean,
     title?: string,
     subtitle?: string
@@ -467,7 +467,7 @@ const AnalysisModal: React.FC<{
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[80vh]">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded-full transition-colors"><XIcon /></button>
-                
+
                 <div className="flex items-center gap-4 mb-6">
                     <div className="p-3 bg-pink-100 dark:bg-pink-900/30 rounded-xl">
                         <SparklesIcon className="w-8 h-8 text-pink-600 dark:text-pink-400" />
@@ -490,10 +490,10 @@ const AnalysisModal: React.FC<{
                         <FormattedMessage text={content} isUser={false} />
                     )}
                 </div>
-                
+
                 <div className="mt-6 flex justify-end">
-                    <button 
-                        onClick={onClose} 
+                    <button
+                        onClick={onClose}
                         className="px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:opacity-90 transition-opacity"
                     >
                         Close
@@ -504,15 +504,16 @@ const AnalysisModal: React.FC<{
     );
 }
 
-const ReviewSubmissionsModal: React.FC<{ 
-    isOpen: boolean, 
-    onClose: () => void, 
+const ReviewSubmissionsModal: React.FC<{
+    isOpen: boolean,
+    onClose: () => void,
     challengeId: string,
     challengeTitle: string,
 }> = ({ isOpen, onClose, challengeId, challengeTitle }) => {
     const [submissions, setSubmissions] = useState<ChallengeSubmission[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    
+    const { showAlert } = useData();
+
     // Runner State
     const [runnerOpen, setRunnerOpen] = useState(false);
     const [runnerCode, setRunnerCode] = useState('');
@@ -540,11 +541,14 @@ const ReviewSubmissionsModal: React.FC<{
     const handleReview = async (subId: string, status: 'APPROVED' | 'REJECTED', userId: string) => {
         try {
             await api.reviewSubmission(subId, status, challengeTitle, userId);
-            // Update local list
             setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status } : s));
         } catch (error) {
             console.error(error);
-            alert("Failed to update submission status.");
+            showAlert({
+                title: 'Update Failed',
+                message: 'Failed to update submission status.',
+                type: 'error'
+            });
         }
     };
 
@@ -572,7 +576,7 @@ const ReviewSubmissionsModal: React.FC<{
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[80vh]">
                     <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400"><XIcon /></button>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Submissions: {challengeTitle}</h3>
-                    
+
                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
                         {isLoading ? (
                             <p className="text-center text-gray-500">Loading submissions...</p>
@@ -595,14 +599,14 @@ const ReviewSubmissionsModal: React.FC<{
                                     </div>
                                     <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600 mb-3 relative group">
                                         <div className="absolute top-2 right-2 flex gap-1">
-                                            <button 
+                                            <button
                                                 onClick={() => handleAnalyze(sub)}
                                                 className="p-1.5 bg-gray-100 hover:bg-purple-100 hover:text-purple-600 dark:bg-gray-700 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 rounded-md text-gray-500 dark:text-gray-400 transition-all shadow-sm border border-gray-200 dark:border-gray-600"
                                                 title="Analyze with AI"
                                             >
                                                 <SparklesIcon className="w-4 h-4" />
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => handleRunCode(sub.content, sub.userName)}
                                                 className="p-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md text-gray-500 dark:text-gray-400 transition-all shadow-sm border border-gray-200 dark:border-gray-600"
                                                 title="Run Code"
@@ -628,13 +632,13 @@ const ReviewSubmissionsModal: React.FC<{
                     </div>
                 </div>
             </div>
-            <CodeRunnerModal 
+            <CodeRunnerModal
                 isOpen={runnerOpen}
                 onClose={() => setRunnerOpen(false)}
                 code={runnerCode}
                 title={runnerTitle}
             />
-            <AnalysisModal 
+            <AnalysisModal
                 isOpen={analysis.isOpen}
                 content={analysis.content}
                 isLoading={analysis.isLoading}
@@ -658,11 +662,8 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
         isLoading: false,
         title: 'AI Feedback'
     });
-    
-    // For pre-filling create modal from AI
-    const [prefillData, setPrefillData] = useState<{ title: string, description: string, difficulty: any } | null>(null);
 
-    // Filter State
+    const [prefillData, setPrefillData] = useState<{ title: string, description: string, difficulty: any } | null>(null);
     const [activeTab, setActiveTab] = useState<'ACTIVE' | 'COMPLETED' | 'ALL'>('ACTIVE');
 
     const isPatron = currentUser.role === 'PATRON';
@@ -722,7 +723,7 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
             if (activeTab === 'COMPLETED') {
                 return hasBadge;
             }
-            return true; // ALL
+            return true;
         });
     }, [challenges, activeTab, currentUser.badges]);
 
@@ -732,7 +733,7 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
             <p>Loading challenges...</p>
         </div>
     );
-    
+
     if (challengesError) return <div className="text-center p-8 text-red-500">Error: {challengesError}</div>;
 
     return (
@@ -749,7 +750,7 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
                 {isPatron && (
                     <div className="flex flex-col sm:flex-row gap-3">
                         <Tooltip text="Describe concepts and let AI craft a scenario-based challenge.">
-                            <button 
+                            <button
                                 onClick={() => setIsAIModalOpen(true)}
                                 className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
                             >
@@ -757,7 +758,7 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
                             </button>
                         </Tooltip>
                         <Tooltip text="Post a custom challenge with title, description, and deadline.">
-                            <button 
+                            <button
                                 onClick={() => { setPrefillData(null); setIsCreateModalOpen(true); }}
                                 className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
                             >
@@ -792,7 +793,7 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
                     </button>
                 </div>
             </div>
-            
+
             {filteredChallenges.length === 0 ? (
                 <div className="text-center py-20 bg-gray-50 dark:bg-gray-800/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                     <div className="w-20 h-20 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -802,15 +803,15 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
                         {activeTab === 'COMPLETED' ? "No badges earned yet" : "No challenges found"}
                     </h3>
                     <p className="text-gray-500 dark:text-gray-400">
-                        {activeTab === 'COMPLETED' 
-                            ? "Participate in active challenges to start earning badges!" 
+                        {activeTab === 'COMPLETED'
+                            ? "Participate in active challenges to start earning badges!"
                             : "Check back later for new challenges."}
                     </p>
                 </div>
             ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {filteredChallenges.map(challenge => (
-                        <ChallengeCard 
+                        <ChallengeCard
                             key={challenge.id}
                             challenge={challenge}
                             currentUser={currentUser}
@@ -821,26 +822,26 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
                 </div>
             )}
 
-            <CreateChallengeModal 
-                isOpen={isCreateModalOpen} 
-                onClose={() => setIsCreateModalOpen(false)} 
-                onSubmit={handleCreateChallenge} 
+            <CreateChallengeModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+                onSubmit={handleCreateChallenge}
                 prefill={prefillData}
             />
 
-            <SubmitSolutionModal 
-                isOpen={isSubmitModalOpen} 
-                onClose={() => setIsSubmitModalOpen(false)} 
-                onSubmit={handleSubmitSolution} 
+            <SubmitSolutionModal
+                isOpen={isSubmitModalOpen}
+                onClose={() => setIsSubmitModalOpen(false)}
+                onSubmit={handleSubmitSolution}
             />
 
-            <GenerateAIChallengeModal 
+            <GenerateAIChallengeModal
                 isOpen={isAIModalOpen}
                 onClose={() => setIsAIModalOpen(false)}
                 onGenerated={handleAIChallengeGenerated}
             />
 
-            <AnalysisModal 
+            <AnalysisModal
                 isOpen={autoFeedback.isOpen}
                 content={autoFeedback.content}
                 isLoading={autoFeedback.isLoading}
@@ -850,7 +851,7 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
             />
 
             {selectedReviewChallenge && (
-                <ReviewSubmissionsModal 
+                <ReviewSubmissionsModal
                     isOpen={isReviewModalOpen}
                     onClose={() => setIsReviewModalOpen(false)}
                     challengeId={selectedReviewChallenge.id}

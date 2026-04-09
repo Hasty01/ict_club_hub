@@ -462,7 +462,7 @@ const RoomDetailsModal: React.FC<{
 };
 
 const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
-    const { rooms, allUsers, isLoadingRooms, fetchRooms, unreadMessageCounts, clearUnreadCount, onlineUsers } = useData();
+    const { rooms, allUsers, isLoadingRooms, fetchRooms, unreadMessageCounts, clearUnreadCount, onlineUsers, showAlert } = useData();
     const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
 
@@ -690,7 +690,11 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
             setMessages(prev => prev.filter(m => m.id !== messageToDelete));
         } catch (error) {
             console.error("Failed to delete message:", error);
-            alert("Failed to delete message.");
+            showAlert({
+                title: 'Error',
+                message: 'Failed to delete message.',
+                type: 'error'
+            });
         } finally {
             setMessageToDelete(null);
         }
@@ -706,7 +710,11 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
             await fetchRooms();
         } catch (error: any) {
             console.error("Failed to delete room:", error);
-            alert("Failed to delete room: " + error.message);
+            showAlert({
+                title: 'Error',
+                message: "Failed to delete room: " + error.message,
+                type: 'error'
+            });
         } finally {
             setRoomToDelete(null);
         }
@@ -718,7 +726,11 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
             await fetchRooms();
         } catch (error: any) {
             console.error("Failed to remove member:", error);
-            alert("Failed to remove member: " + error.message);
+            showAlert({
+                title: 'Error',
+                message: "Failed to remove member: " + error.message,
+                type: 'error'
+            });
         }
     };
 
@@ -728,7 +740,11 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
             await fetchRooms();
         } catch (error: any) {
             console.error("Failed to add members:", error);
-            alert("Failed to add members: " + error.message);
+            showAlert({
+                title: 'Error',
+                message: "Failed to add members: " + error.message,
+                type: 'error'
+            });
         }
     };
 
@@ -738,7 +754,11 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
             await fetchRooms();
         } catch (error: any) {
             console.error("Failed to rename group:", error);
-            alert("Failed to rename group: " + error.message);
+            showAlert({
+                title: 'Error',
+                message: "Failed to rename group: " + error.message,
+                type: 'error'
+            });
         }
     };
 
@@ -910,7 +930,11 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
                 scrollToBottom('smooth');
             } catch (error) {
                 console.error("Failed to send message", error);
-                alert("Failed to send message");
+                showAlert({
+                    title: 'Error',
+                    message: "Failed to send message",
+                    type: 'error'
+                });
                 setNewMessage(content);
             }
         }
@@ -944,7 +968,11 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
             if (window.innerWidth < 768) setIsSidebarOpen(false);
         } catch (error) {
             console.error("Error creating room:", error);
-            alert("Could not create chat.");
+            showAlert({
+                title: 'Error',
+                message: "Could not create chat.",
+                type: 'error'
+            });
         }
     };
 
@@ -955,7 +983,11 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
         event.target.value = '';
 
         if (file.size > 2 * 1024 * 1024) {
-            alert("File size must be less than 2MB.");
+            showAlert({
+                title: 'File Too Large',
+                message: "File size must be less than 2MB.",
+                type: 'warning'
+            });
             return;
         }
 
@@ -984,7 +1016,11 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
 
         } catch (error: any) {
             console.error("Upload failed", error);
-            alert("Failed to upload file: " + error.message);
+            showAlert({
+                title: 'Upload Failed',
+                message: "Failed to upload file: " + error.message,
+                type: 'error'
+            });
         }
     };
 
@@ -1021,7 +1057,11 @@ const Chat: React.FC<ChatProps> = ({ currentUser, setActiveTab, theme }) => {
             setActiveTab('playground');
         } catch (error) {
             console.error("Error opening file:", error);
-            alert("Could not open file in playground.");
+            showAlert({
+                title: 'Error',
+                message: "Could not open file in playground.",
+                type: 'error'
+            });
         }
     };
 

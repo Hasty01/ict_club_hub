@@ -20,9 +20,9 @@ const statusColors: { [key in AttendanceStatus]: string } = {
 };
 
 const chartColors = {
-    'Present': '#EC4899', // Pink-500
-    'Absent': '#EF4444', // Red-500
-    'Excused': '#F59E0B', // Amber-500
+  'Present': '#EC4899', // Pink-500
+  'Absent': '#EF4444', // Red-500
+  'Excused': '#F59E0B', // Amber-500
 };
 
 const formatDate = (dateString: string) => {
@@ -32,9 +32,9 @@ const formatDate = (dateString: string) => {
     // or use the string directly if it already has time
     const dateToParse = dateString.includes('T') ? dateString : `${dateString}T12:00:00`;
     const date = new Date(dateToParse);
-    
+
     if (isNaN(date.getTime())) return dateString;
-    
+
     return new Intl.DateTimeFormat('en-US', {
       weekday: 'long',
       year: 'numeric',
@@ -47,50 +47,51 @@ const formatDate = (dateString: string) => {
 };
 
 const useScrollAnimation = (isSectionVisible: boolean, delay = 0) => {
-    const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const element = ref.current;
-        if (!element) return;
-        
-        element.style.transitionDelay = `${delay}ms`;
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
 
-        if (isSectionVisible) {
-            element.classList.add('is-visible');
-            return;
+    element.style.transitionDelay = `${delay}ms`;
+
+    if (isSectionVisible) {
+      element.classList.add('is-visible');
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          element.classList.add('is-visible');
+          observer.unobserve(element);
         }
+      },
+      { threshold: 0.1 }
+    );
 
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting) {
-                    element.classList.add('is-visible');
-                    observer.unobserve(element);
-                }
-            },
-            { threshold: 0.1 }
-        );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [delay, isSectionVisible]);
 
-        observer.observe(element);
-        return () => observer.disconnect();
-    }, [delay, isSectionVisible]);
-
-    return ref;
+  return ref;
 };
 
 const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
-  const { 
-    attendance: attendanceRecords, 
-    activities, 
-    isLoadingAttendance, 
-    isLoadingActivities, 
+  const {
+    attendance: attendanceRecords,
+    activities,
+    isLoadingAttendance,
+    isLoadingActivities,
     attendanceError,
     activitiesError,
     fetchAttendance,
     fetchActivities,
     allUsers,
-    isLoadingUsers
+    isLoadingUsers,
+    showAlert
   } = useData();
-  
+
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [selectedActivityId, setSelectedActivityId] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<AttendanceStatus>('Present');
@@ -103,10 +104,10 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
   const [memberSearch, setMemberSearch] = useState('');
   const lineGradientId = useId().replace(/:/g, '');
 
-  const memberUsers = useMemo(() => 
+  const memberUsers = useMemo(() =>
     allUsers.filter(user => user.role === 'MEMBER' && user.status === 'APPROVED'),
-  [allUsers]);
-  
+    [allUsers]);
+
   const filteredMembers = useMemo(() => {
     const term = memberSearch.trim().toLowerCase();
     if (!term) return memberUsers;
@@ -117,10 +118,10 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
     });
   }, [memberUsers, memberSearch]);
 
-  const presentCount = useMemo(() => 
+  const presentCount = useMemo(() =>
     memberUsers.reduce((count, user) => count + (attendanceChecklist[user.uid] ? 1 : 0), 0),
-  [memberUsers, attendanceChecklist]);
-  
+    [memberUsers, attendanceChecklist]);
+
   const absentCount = memberUsers.length - presentCount;
 
   // Animation Refs
@@ -152,8 +153,8 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
     });
   }, [patronActivityId, memberUsers]);
 
-  const unrecordedActivities = useMemo(() => 
-    activities.filter(activity => 
+  const unrecordedActivities = useMemo(() =>
+    activities.filter(activity =>
       !attendanceRecords.some(record => record.activityId === activity.id)
     ), [activities, attendanceRecords]);
 
@@ -171,42 +172,42 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
   })), [attendanceSummary]);
 
   const hasPieData = pieChartData.some((entry) => Number(entry.value) > 0);
-  
+
   const lineChartData = useMemo(() => {
     const statusToValue = (status: AttendanceStatus): number => {
-        if (status === 'Present') return 2;
-        if (status === 'Excused') return 1;
-        return 0; // Absent
+      if (status === 'Present') return 2;
+      if (status === 'Excused') return 1;
+      return 0; // Absent
     };
     // Sort by date ascending for the chart
     const sorted = [...attendanceRecords].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
+
     return sorted.map(rec => ({
-        date: rec.date,
-        name: rec.activityTitle,
-        value: statusToValue(rec.status),
-        status: rec.status,
+      date: rec.date,
+      name: rec.activityTitle,
+      value: statusToValue(rec.status),
+      status: rec.status,
     }));
   }, [attendanceRecords]);
 
   const yAxisTickFormatter = (value: number) => {
-      if (value === 2) return 'Present';
-      if (value === 1) return 'Excused';
-      return 'Absent';
+    if (value === 2) return 'Present';
+    if (value === 1) return 'Excused';
+    return 'Absent';
   };
 
   const CustomTooltip = ({ active, payload, label }: any) => {
-      if (active && payload && payload.length) {
-          const data = payload[0].payload;
-          return (
-              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg">
-                  <p className="font-bold text-gray-800 dark:text-gray-200">{data.name}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{`Date: ${formatDate(data.date)}`}</p>
-                  <p className="text-sm font-semibold" style={{ color: chartColors[data.status as AttendanceStatus] }}>{`Status: ${data.status}`}</p>
-              </div>
-          );
-      }
-      return null;
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg">
+          <p className="font-bold text-gray-800 dark:text-gray-200">{data.name}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{`Date: ${formatDate(data.date)}`}</p>
+          <p className="text-sm font-semibold" style={{ color: chartColors[data.status as AttendanceStatus] }}>{`Status: ${data.status}`}</p>
+        </div>
+      );
+    }
+    return null;
   };
 
   const handleRecordAttendance = async (newRecordData: Omit<AttendanceRecord, 'id' | 'userId'>) => {
@@ -229,7 +230,11 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
       setPatronActivityId(newActivity.id);
     } catch (err: any) {
       console.error("Failed to create quick attendance activity:", err);
-      alert(`Failed to create quick attendance: ${err.message || 'Unknown error'}`);
+      showAlert({
+        title: 'Error',
+        message: `Failed to create quick attendance: ${err.message || 'Unknown error'}`,
+        type: 'error'
+      });
     } finally {
       setIsQuickCreating(false);
     }
@@ -244,31 +249,51 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
 
   const handleBulkSubmit = async () => {
     if (!patronActivityId) {
-      alert("Please select an activity.");
+      showAlert({
+        title: 'Selection Required',
+        message: "Please select an activity.",
+        type: 'warning'
+      });
       return;
     }
     const activity = activities.find(a => a.id === patronActivityId);
     if (!activity) {
-      alert("Selected activity not found.");
+      showAlert({
+        title: 'Error',
+        message: "Selected activity not found.",
+        type: 'error'
+      });
       return;
     }
     if (memberUsers.length === 0) {
-      alert("No members available to mark attendance.");
+      showAlert({
+        title: 'No Members',
+        message: "No members available to mark attendance.",
+        type: 'warning'
+      });
       return;
     }
 
     setIsBulkSubmitting(true);
     try {
-      const records = memberUsers.map(user => ({
+      const records: { userId: string; activityId: string; status: AttendanceStatus }[] = memberUsers.map(user => ({
         userId: user.uid,
         activityId: activity.id,
-        status: attendanceChecklist[user.uid] ? 'Present' : 'Absent'
+        status: (attendanceChecklist[user.uid] ? 'Present' : 'Absent') as AttendanceStatus
       }));
       await api.addAttendanceBatch(records);
-      alert("Attendance saved for all members.");
+      showAlert({
+        title: 'Success',
+        message: "Attendance saved for all members.",
+        type: 'success'
+      });
     } catch (err: any) {
       console.error("Failed to submit bulk attendance:", err);
-      alert(`Failed to submit attendance: ${err.message || 'Unknown error'}`);
+      showAlert({
+        title: 'Error',
+        message: `Failed to submit attendance: ${err.message || 'Unknown error'}`,
+        type: 'error'
+      });
     } finally {
       setIsBulkSubmitting(false);
     }
@@ -287,7 +312,11 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedActivityId) {
-      alert("Please select an activity.");
+      showAlert({
+        title: 'Selection Required',
+        message: "Please select an activity.",
+        type: 'warning'
+      });
       return;
     }
     const activity = activities.find(a => a.id === selectedActivityId);
@@ -302,22 +331,30 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
 
     setIsSubmitting(true);
     try {
-        await handleRecordAttendance(newRecordData);
-        setIsFormVisible(false);
-        setSelectedActivityId('');
-        setSelectedStatus('Present');
+      await handleRecordAttendance(newRecordData);
+      setIsFormVisible(false);
+      setSelectedActivityId('');
+      setSelectedStatus('Present');
     } catch (err: any) {
-        console.error("Failed to submit attendance:", err);
-        alert(`An error occurred while submitting your attendance: ${err.message}`);
+      console.error("Failed to submit attendance:", err);
+      showAlert({
+        title: 'Error',
+        message: `An error occurred while submitting your attendance: ${err.message}`,
+        type: 'error'
+      });
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
   const handleDownloadCSV = () => {
     if (attendanceRecords.length === 0) {
-        alert("No attendance data to download.");
-        return;
+      showAlert({
+        title: 'No Data',
+        message: "No attendance data to download.",
+        type: 'info'
+      });
+      return;
     }
 
     const headers = ['Activity Title', 'Date', 'Status'];
@@ -344,11 +381,11 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
 
 
   if (isLoadingAttendance || isLoadingActivities || isLoadingUsers) {
-      return <div className="text-center p-8 text-gray-500 dark:text-gray-400">Loading attendance data...</div>;
+    return <div className="text-center p-8 text-gray-500 dark:text-gray-400">Loading attendance data...</div>;
   }
-  
+
   if (attendanceError || activitiesError) {
-      return <div className="text-center p-8 text-red-500 dark:text-red-400">{`Error: ${attendanceError || activitiesError}`}</div>;
+    return <div className="text-center p-8 text-red-500 dark:text-red-400">{`Error: ${attendanceError || activitiesError}`}</div>;
   }
 
   return (
@@ -513,115 +550,115 @@ const Attendance: React.FC<AttendanceProps> = ({ currentUser, isVisible }) => {
         <div ref={logRef} className="scroll-animate lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">Attendance Log</h2>
           <div className="overflow-x-auto">
-             {attendanceRecords.length > 0 ? (
-                <table className="w-full text-left">
+            {attendanceRecords.length > 0 ? (
+              <table className="w-full text-left">
                 <thead className="border-b-2 border-gray-200 dark:border-gray-700">
-                    <tr>
+                  <tr>
                     <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Event</th>
                     <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Date</th>
                     <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Status</th>
-                    </tr>
+                  </tr>
                 </thead>
                 <tbody>
-                    {attendanceRecords.map((record) => (
+                  {attendanceRecords.map((record) => (
                     <tr key={record.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300">{record.activityTitle}</td>
-                        <td className="py-3 px-4 text-gray-500 dark:text-gray-400">{formatDate(record.date)}</td>
-                        <td className="py-3 px-4">
+                      <td className="py-3 px-4 text-gray-700 dark:text-gray-300">{record.activityTitle}</td>
+                      <td className="py-3 px-4 text-gray-500 dark:text-gray-400">{formatDate(record.date)}</td>
+                      <td className="py-3 px-4">
                         <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusColors[record.status]}`}>
-                            {record.status}
+                          {record.status}
                         </span>
-                        </td>
+                      </td>
                     </tr>
-                    ))}
+                  ))}
                 </tbody>
-                </table>
-             ) : (
-                <p className="text-center text-gray-500 dark:text-gray-400 py-4">You have no attendance records yet.</p>
-             )}
+              </table>
+            ) : (
+              <p className="text-center text-gray-500 dark:text-gray-400 py-4">You have no attendance records yet.</p>
+            )}
           </div>
         </div>
         <div ref={summaryRef} className="scroll-animate bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4 text-center">Summary</h2>
           <div className="relative w-full h-[300px]">
             {shouldRenderChart ? (
-                hasPieData ? (
-                    <ChartErrorBoundary>
-                        <ResponsiveContainer width="99%" height="100%">
-                            <PieChart>
-                                <Pie
-                                data={pieChartData}
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={80}
-                                fill="#8884d8"
-                                dataKey="value"
-                                label={({ name, percent }) => `${name} ${(Number(percent || 0) * 100).toFixed(0)}%`}
-                                >
-                                {pieChartData.map((entry) => (
-                                    <Cell key={`cell-${entry.name}`} fill={chartColors[entry.name as AttendanceStatus]} />
-                                ))}
-                                </Pie>
-                                <RechartsTooltip 
-                                contentStyle={{ 
-                                    backgroundColor: 'rgba(31, 41, 55, 0.8)',
-                                    borderColor: '#4B5563'
-                                }}
-                                itemStyle={{ color: '#D1D5DB' }}
-                                />
-                                <Legend wrapperStyle={{color: '#9CA3AF'}}/>
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </ChartErrorBoundary>
-                ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-gray-400">No attendance data yet.</div>
-                )
+              hasPieData ? (
+                <ChartErrorBoundary>
+                  <ResponsiveContainer width="99%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieChartData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(Number(percent || 0) * 100).toFixed(0)}%`}
+                      >
+                        {pieChartData.map((entry) => (
+                          <Cell key={`cell-${entry.name}`} fill={chartColors[entry.name as AttendanceStatus]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(31, 41, 55, 0.8)',
+                          borderColor: '#4B5563'
+                        }}
+                        itemStyle={{ color: '#D1D5DB' }}
+                      />
+                      <Legend wrapperStyle={{ color: '#9CA3AF' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartErrorBoundary>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-400">No attendance data yet.</div>
+              )
             ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-gray-400">Loading chart...</div>
+              <div className="absolute inset-0 flex items-center justify-center text-gray-400">Loading chart...</div>
             )}
           </div>
         </div>
       </div>
-      
+
       <div ref={trendRef} className="scroll-animate bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">Attendance Trend</h2>
-           {lineChartData.length > 1 ? (
-            <div className="relative w-full h-80">
-                {shouldRenderChart ? (
-                    <ChartErrorBoundary>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={lineChartData} margin={{ top: 5, right: 20, left: -10, bottom: 50 }}>
-                                <defs>
-                                    <linearGradient id={lineGradientId} x1="0" y1="0" x2="1" y2="0">
-                                        {lineChartData.map((entry, index) => {
-                                            const offsetDenominator = lineChartData.length > 1 ? lineChartData.length - 1 : 1;
-                                            const offset = (index / offsetDenominator) * 100;
-                                            return <stop key={index} offset={`${offset}%`} stopColor={chartColors[entry.status as AttendanceStatus]} />;
-                                        })}
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-                                <XAxis dataKey="date" tickFormatter={(d) => formatDate(d).split(',')[0]} tick={{ fontSize: 12 }} angle={-35} textAnchor="end" height={70} interval={0} />
-                                <YAxis domain={[0, 2]} ticks={[0, 1, 2]} tickFormatter={yAxisTickFormatter} tick={{ fontSize: 12 }} />
-                                <RechartsTooltip content={<CustomTooltip />} />
-                                <Line 
-                                type="monotone" 
-                                dataKey="value" 
-                                stroke={`url(#${lineGradientId})`} 
-                                strokeWidth={3} 
-                                activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2 }} 
-                                dot={{ r: 4, stroke: '#fff', strokeWidth: 1 }} 
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </ChartErrorBoundary>
-                ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-gray-400">Loading chart...</div>
-                )}
-            </div>
-           ) : (
-              <p className="text-center text-gray-500 dark:text-gray-400 py-4">More attendance records are needed to show a trend.</p>
-           )}
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">Attendance Trend</h2>
+        {lineChartData.length > 1 ? (
+          <div className="relative w-full h-80">
+            {shouldRenderChart ? (
+              <ChartErrorBoundary>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={lineChartData} margin={{ top: 5, right: 20, left: -10, bottom: 50 }}>
+                    <defs>
+                      <linearGradient id={lineGradientId} x1="0" y1="0" x2="1" y2="0">
+                        {lineChartData.map((entry, index) => {
+                          const offsetDenominator = lineChartData.length > 1 ? lineChartData.length - 1 : 1;
+                          const offset = (index / offsetDenominator) * 100;
+                          return <stop key={index} offset={`${offset}%`} stopColor={chartColors[entry.status as AttendanceStatus]} />;
+                        })}
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+                    <XAxis dataKey="date" tickFormatter={(d) => formatDate(d).split(',')[0]} tick={{ fontSize: 12 }} angle={-35} textAnchor="end" height={70} interval={0} />
+                    <YAxis domain={[0, 2]} ticks={[0, 1, 2]} tickFormatter={yAxisTickFormatter} tick={{ fontSize: 12 }} />
+                    <RechartsTooltip content={<CustomTooltip />} />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke={`url(#${lineGradientId})`}
+                      strokeWidth={3}
+                      activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2 }}
+                      dot={{ r: 4, stroke: '#fff', strokeWidth: 1 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartErrorBoundary>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-gray-400">Loading chart...</div>
+            )}
+          </div>
+        ) : (
+          <p className="text-center text-gray-500 dark:text-gray-400 py-4">More attendance records are needed to show a trend.</p>
+        )}
       </div>
     </>
   );

@@ -34,13 +34,14 @@ const AddSuggestionModal: React.FC<{ isOpen: boolean; onClose: () => void; onSub
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const { showAlert } = useData();
 
     if (!isOpen) return null;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!title.trim() || !description.trim()) return;
-        
+
         setIsSubmitting(true);
         try {
             await onSubmit(type, title, description);
@@ -50,7 +51,11 @@ const AddSuggestionModal: React.FC<{ isOpen: boolean; onClose: () => void; onSub
             setType('FEATURE');
         } catch (error) {
             console.error(error);
-            alert("Failed to submit suggestion.");
+            showAlert({
+                title: 'Submission Failed',
+                message: 'Failed to submit your suggestion. Please try again.',
+                type: 'error'
+            });
         } finally {
             setIsSubmitting(false);
         }
@@ -85,8 +90,8 @@ const AddSuggestionModal: React.FC<{ isOpen: boolean; onClose: () => void; onSub
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             value={title}
                             onChange={e => setTitle(e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-pink-500 focus:border-pink-500 outline-none"
@@ -96,7 +101,7 @@ const AddSuggestionModal: React.FC<{ isOpen: boolean; onClose: () => void; onSub
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-                        <textarea 
+                        <textarea
                             value={description}
                             onChange={e => setDescription(e.target.value)}
                             rows={4}
@@ -106,8 +111,8 @@ const AddSuggestionModal: React.FC<{ isOpen: boolean; onClose: () => void; onSub
                         />
                     </div>
                     <Tooltip text="Send your suggestion or bug report to the club.">
-                        <button 
-                            type="submit" 
+                        <button
+                            type="submit"
                             disabled={isSubmitting}
                             className="w-full py-2.5 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-lg shadow-md transition-all disabled:opacity-50"
                         >
@@ -120,8 +125,8 @@ const AddSuggestionModal: React.FC<{ isOpen: boolean; onClose: () => void; onSub
     );
 };
 
-const SuggestionCard: React.FC<{ 
-    suggestion: Suggestion, 
+const SuggestionCard: React.FC<{
+    suggestion: Suggestion,
     currentUser: User,
     onVote: (id: string, upvotes: string[]) => void,
     onDelete: (id: string) => void,
@@ -147,7 +152,7 @@ const SuggestionCard: React.FC<{
                     </span>
                 </div>
                 {(isAuthor || isPatron) && (
-                    <button 
+                    <button
                         onClick={() => onDelete(suggestion.id)}
                         className="text-gray-400 hover:text-red-500 transition-colors p-1"
                         title="Delete Suggestion"
@@ -165,8 +170,8 @@ const SuggestionCard: React.FC<{
             <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                     {avatarSrc ? (
-                        <img 
-                            src={avatarSrc} 
+                        <img
+                            src={avatarSrc}
                             alt={suggestion.userName || 'User'}
                             className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-600 object-cover"
                         />
@@ -182,7 +187,7 @@ const SuggestionCard: React.FC<{
 
                 <div className="flex items-center gap-3">
                     {isPatron && (
-                        <select 
+                        <select
                             value={suggestion.status}
                             onChange={(e) => onStatusChange(suggestion.id, e.target.value as SuggestionStatus)}
                             className="text-xs bg-gray-100 dark:bg-gray-700 border-none rounded px-2 py-1 focus:ring-1 focus:ring-pink-500"
@@ -193,8 +198,8 @@ const SuggestionCard: React.FC<{
                             <option value="REJECTED">Rejected</option>
                         </select>
                     )}
-                    
-                    <button 
+
+                    <button
                         onClick={() => onVote(suggestion.id, upvotes)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-sm transition-all ${hasVoted ? 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400 ring-1 ring-pink-200 dark:ring-pink-800' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
                     >
@@ -274,7 +279,7 @@ const Suggestions: React.FC<SuggestionsProps> = ({ currentUser }) => {
                     <p className="text-gray-600 dark:text-gray-400 mt-1">Help us improve the ICT Club Hub.</p>
                 </div>
                 <Tooltip text="Create a new feature request or bug report.">
-                    <button 
+                    <button
                         onClick={() => setIsModalOpen(true)}
                         className="flex items-center gap-2 px-5 py-2.5 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-pink-500/25 transition-all"
                     >
@@ -304,9 +309,9 @@ const Suggestions: React.FC<SuggestionsProps> = ({ currentUser }) => {
             ) : (
                 <div className="grid gap-4 md:grid-cols-2">
                     {filteredSuggestions.map(suggestion => (
-                        <SuggestionCard 
-                            key={suggestion.id} 
-                            suggestion={suggestion} 
+                        <SuggestionCard
+                            key={suggestion.id}
+                            suggestion={suggestion}
                             currentUser={currentUser}
                             onVote={handleVote}
                             onDelete={setDeleteId}
@@ -316,13 +321,13 @@ const Suggestions: React.FC<SuggestionsProps> = ({ currentUser }) => {
                 </div>
             )}
 
-            <AddSuggestionModal 
-                isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)} 
-                onSubmit={handleAddSuggestion} 
+            <AddSuggestionModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSubmit={handleAddSuggestion}
             />
 
-            <ConfirmationModal 
+            <ConfirmationModal
                 isOpen={!!deleteId}
                 onClose={() => setDeleteId(null)}
                 onConfirm={handleDelete}

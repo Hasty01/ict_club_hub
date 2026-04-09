@@ -1,7 +1,5 @@
-
-
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
-import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType, Roadmap, FeatureFlags, Team, TeamChallenge, NotificationPrefs, VotingPosition, VotingContestant, VotingVote } from './types';
+import { Activity, AttendanceRecord, FeedItem, ProjectData, User, Resource, AppNotification, Room, ShowcaseItem, Suggestion, Challenge, ChallengeSubmission, Toast, ToastType, Roadmap, FeatureFlags, Team, TeamChallenge, NotificationPrefs, VotingPosition, VotingContestant, VotingVote, AlertConfig, AlertType } from './types';
 import * as api from './services/apiService';
 import { supabase } from './services/supabaseClient';
 
@@ -36,6 +34,11 @@ interface IDataContext {
   // Notification prefs
   notificationPrefs: NotificationPrefs;
   updateNotificationPrefs: (updates: Partial<NotificationPrefs>) => void;
+
+  // Alert Modal
+  alertConfig: AlertConfig | null;
+  showAlert: (config: Omit<AlertConfig, 'isOpen'>) => void;
+  hideAlert: () => void;
 
   // Chat Unread State
   unreadMessageCounts: Record<string, number>;
@@ -171,6 +174,17 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
 
   // Toast State
   const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Alert Modal State
+  const [alertConfig, setAlertConfig] = useState<AlertConfig | null>(null);
+
+  const showAlert = useCallback((config: Omit<AlertConfig, 'isOpen'>) => {
+    setAlertConfig({ ...config, isOpen: true });
+  }, []);
+
+  const hideAlert = useCallback(() => {
+    setAlertConfig(prev => prev ? { ...prev, isOpen: false } : null);
+  }, []);
 
   const [isLoadingActivities, setIsLoadingActivities] = useState(true);
   const [isLoadingAttendance, setIsLoadingAttendance] = useState(true);
@@ -899,6 +913,11 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     toasts,
     showToast,
     removeToast,
+
+    // Alert Modal
+    alertConfig,
+    showAlert,
+    hideAlert
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

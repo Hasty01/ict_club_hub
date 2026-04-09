@@ -1,7 +1,6 @@
-
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Resource, User, Tab } from '../types';
+import { useData } from '../DataContext';
 import { LinkIcon } from './icons/LinkIcon';
 import { VideoCameraIcon } from './icons/VideoCameraIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -9,30 +8,31 @@ import { CodeIcon } from './icons/CodeIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
 
 interface ResourceCardProps {
-  resource: Resource;
-  currentUser: User;
-  onDelete: (resource: Resource) => void;
-  setActiveTab: (tab: Tab) => void;
+    resource: Resource;
+    currentUser: User;
+    onDelete: (resource: Resource) => void;
+    setActiveTab: (tab: Tab) => void;
 }
 
 const getResourceIcon = (type: Resource['type']) => {
-  switch (type) {
-    case 'LINK':
-      return <LinkIcon />;
-    case 'VIDEO':
-      return <VideoCameraIcon />;
-    case 'PYTHON':
-        return <CodeIcon />;
-    case 'DOCUMENT':
-        return <DocumentTextIcon />;
-    default:
-      return null;
-  }
+    switch (type) {
+        case 'LINK':
+            return <LinkIcon />;
+        case 'VIDEO':
+            return <VideoCameraIcon />;
+        case 'PYTHON':
+            return <CodeIcon />;
+        case 'DOCUMENT':
+            return <DocumentTextIcon />;
+        default:
+            return null;
+    }
 };
 
 const ResourceCard: React.FC<ResourceCardProps> = ({ resource, currentUser, onDelete, setActiveTab }) => {
     const isPatron = currentUser.role === 'PATRON';
     const [isLoading, setIsLoading] = useState(false);
+    const { showAlert } = useData();
     const cardRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -66,7 +66,11 @@ const ResourceCard: React.FC<ResourceCardProps> = ({ resource, currentUser, onDe
                 setActiveTab('playground');
             } catch (error) {
                 console.error("Error opening file in playground:", error);
-                alert("Could not load the file into the playground.");
+                showAlert({
+                    title: 'Load Failed',
+                    message: 'Could not load the file into the playground.',
+                    type: 'error'
+                });
             } finally {
                 setIsLoading(false);
             }
@@ -82,7 +86,7 @@ const ResourceCard: React.FC<ResourceCardProps> = ({ resource, currentUser, onDe
         if (resource.type === 'DOCUMENT') return 'View Document';
         return 'View Resource';
     };
-    
+
     const iconElement = getResourceIcon(resource.type);
 
     const isImage = !!resource.url && /\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i.test(resource.url);

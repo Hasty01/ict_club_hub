@@ -48,7 +48,7 @@ const MilestoneCard: React.FC<{
             <div className={`absolute left-0 top-0 -ml-[9px] w-4 h-4 rounded-full border-2 border-white dark:border-gray-900 z-10 transition-colors ${isCompleted ? 'bg-green-500' : isLocked ? 'bg-gray-300 dark:bg-gray-600' : 'bg-pink-500'}`}>
                 {isCompleted && <div className="absolute inset-0 flex items-center justify-center text-white"><CheckCircleIcon className="w-2 h-2" /></div>}
             </div>
-            
+
             <div className={`bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border transition-all ${isLocked ? 'opacity-60 grayscale' : 'hover:shadow-md border-gray-200 dark:border-gray-700'}`}>
                 <div className="flex justify-between items-start mb-2">
                     <div>
@@ -58,7 +58,7 @@ const MilestoneCard: React.FC<{
                     {isLocked ? <LockClosedIcon className="w-5 h-5 text-gray-400" /> : isCompleted ? <TrophyIcon className="w-5 h-5 text-yellow-500" /> : null}
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">{milestone.description}</p>
-                
+
                 <div className="flex flex-wrap gap-2 mb-4">
                     {milestone.resources.map((res, i) => (
                         <a key={i} href={res.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-xs hover:bg-pink-100 dark:hover:bg-pink-900/30 transition-colors">
@@ -70,7 +70,7 @@ const MilestoneCard: React.FC<{
 
                 {!isPatron && !isCompleted && !isLocked && (
                     <Tooltip text="Take the assessment to unlock the next milestone.">
-                        <button 
+                        <button
                             onClick={onTakeQuiz}
                             className="w-full py-2 bg-pink-600 text-white rounded-lg text-sm font-bold hover:bg-pink-700 transition-all flex items-center justify-center gap-2"
                         >
@@ -95,6 +95,7 @@ const CreateRoadmapModal: React.FC<{
     const [suggestedTopics, setSuggestedTopics] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [generatedMilestones, setGeneratedMilestones] = useState<Milestone[] | null>(null);
+    const { showAlert } = useData();
 
     useEffect(() => {
         if (isOpen) {
@@ -118,7 +119,11 @@ const CreateRoadmapModal: React.FC<{
             setGeneratedMilestones(milestonesWithIds);
         } catch (error) {
             console.error(error);
-            alert("Failed to generate roadmap.");
+            showAlert({
+                title: 'Generation Failed',
+                message: 'Failed to generate the roadmap. Please try again.',
+                type: 'error'
+            });
         } finally {
             setIsGenerating(false);
         }
@@ -126,12 +131,16 @@ const CreateRoadmapModal: React.FC<{
 
     const handleConfirmSave = async () => {
         if (!generatedMilestones) return;
-        await onSave({
-            skillLevel: level,
-            topic: `${language}: ${topic}`,
-            milestones: generatedMilestones
-        });
-        onClose();
+        try {
+            await onSave({
+                skillLevel: level,
+                topic: `${language}: ${topic}`,
+                milestones: generatedMilestones
+            });
+            onClose();
+        } catch (error) {
+            console.error(error);
+        }
     };
 
     if (!isOpen) return null;
@@ -141,14 +150,14 @@ const CreateRoadmapModal: React.FC<{
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[90vh]">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400"><XIcon /></button>
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Create AI Roadmap</h3>
-                
+
                 {!generatedMilestones ? (
                     <div className="space-y-4">
                         <div className="flex gap-4">
                             <div className="flex-1">
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Language</label>
-                                <select 
-                                    value={language} 
+                                <select
+                                    value={language}
                                     onChange={e => setLanguage(e.target.value as any)}
                                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-pink-500"
                                 >
@@ -158,8 +167,8 @@ const CreateRoadmapModal: React.FC<{
                             </div>
                             <div className="flex-1">
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Skill Level</label>
-                                <select 
-                                    value={level} 
+                                <select
+                                    value={level}
                                     onChange={e => setLevel(e.target.value as any)}
                                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-pink-500"
                                 >
@@ -171,10 +180,10 @@ const CreateRoadmapModal: React.FC<{
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Topic</label>
-                            <input 
-                                type="text" 
-                                value={topic} 
-                                onChange={e => setTopic(e.target.value)} 
+                            <input
+                                type="text"
+                                value={topic}
+                                onChange={e => setTopic(e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-pink-500"
                                 placeholder={`e.g., ${language} basics, DOM manipulation, etc.`}
                             />
@@ -189,7 +198,7 @@ const CreateRoadmapModal: React.FC<{
                             />
                         </div>
                         <Tooltip text="Generate a personalized roadmap with milestones and resources.">
-                            <button 
+                            <button
                                 onClick={handleGenerate}
                                 disabled={isGenerating || !topic}
                                 className="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
@@ -229,7 +238,7 @@ const CreateRoadmapModal: React.FC<{
 };
 
 const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
-    const { roadmaps, isLoadingRoadmaps, roadmapsError, fetchRoadmaps, showToast, updateUserSkillLevel } = useData();
+    const { roadmaps, isLoadingRoadmaps, fetchRoadmaps, showToast, showAlert } = useData();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [activePatronTab, setActivePatronTab] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'>('BEGINNER');
@@ -255,8 +264,12 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
                 const newProgress: Record<string, number[]> = {};
                 for (const r of visibleRoadmaps) {
                     if (r.id) {
-                        const p = await api.getUserRoadmapProgress(currentUser.uid, r.id);
-                        newProgress[r.id] = p?.completedMilestoneIndices || [];
+                        try {
+                            const p = await api.getUserRoadmapProgress(currentUser.uid, r.id);
+                            newProgress[r.id] = p?.completedMilestoneIndices || [];
+                        } catch (e) {
+                            console.error("Error loading progress", e);
+                        }
                     }
                 }
                 setProgress(newProgress);
@@ -356,7 +369,7 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
                     </p>
                 </div>
                 {isPatron && (
-                    <button 
+                    <button
                         onClick={() => setIsCreateModalOpen(true)}
                         className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold rounded-xl shadow-lg transition-all hover:-translate-y-0.5"
                     >
@@ -390,7 +403,7 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
                     {visibleRoadmaps.map(roadmap => {
                         const userCompletedIndices = progress[roadmap.id!] || [];
                         const milestones = roadmap.milestones || [];
-                        
+
                         return (
                             <div key={roadmap.id} className="relative">
                                 <div className="flex justify-between items-center mb-6">
@@ -406,13 +419,13 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
                                     {milestones.map((ms, idx) => {
                                         const isCompleted = userCompletedIndices.includes(idx);
                                         const isLocked = idx > 0 && !userCompletedIndices.includes(idx - 1) && !isPatron;
-                                        
+
                                         return (
-                                            <MilestoneCard 
-                                                key={idx} 
-                                                milestone={ms} 
-                                                index={idx} 
-                                                isLast={idx === milestones.length - 1} 
+                                            <MilestoneCard
+                                                key={idx}
+                                                milestone={ms}
+                                                index={idx}
+                                                isLast={idx === milestones.length - 1}
                                                 isLocked={isLocked}
                                                 isCompleted={isCompleted}
                                                 isPatron={isPatron}

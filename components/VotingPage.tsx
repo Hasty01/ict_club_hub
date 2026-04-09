@@ -30,6 +30,7 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         isLoadingVoting,
         votingError,
         showToast,
+        showAlert,
         allUsers,
         votingContestants
     } = useData();
@@ -404,80 +405,85 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                         </select>
                     </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredActiveElections.length === 0 ? (
-                        <div className="col-span-full py-20 bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center text-center px-4">
-                            <VoteIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-4" />
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">No Matching Elections</h3>
-                            <p className="text-gray-500 dark:text-gray-400 mt-1">Try clearing your search or changing the status filter.</p>
-                        </div>
-                    ) : filteredActiveElections.map(pos => (
-                        <div key={pos.id} className="group bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-xl border border-gray-100 dark:border-gray-700 p-6 flex flex-col transition-all duration-300 hover:-translate-y-1">
-                            <div className="flex justify-between items-start mb-4">
-                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isVotingOpen(pos) ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'}`}>
-                                    {isVotingOpen(pos) ? 'Open' : isUpcoming(pos) ? 'Upcoming' : 'Closed'}
-                                </span>
-                                <span className="text-xs text-gray-400 flex items-center gap-1 font-medium">
-                                    <ClockIcon className="w-3 h-3" />
-                                    {isUpcoming(pos) ? `Starts in ${getTimeRemaining(pos.startDate)}` : getTimeRemaining(pos.dueDate)}
-                                </span>
-                                {currentUser.role === 'PATRON' && (
-                                    <button
-                                        onClick={() => {
-                                            if (window.confirm('Are you sure you want to delete this position? All candidates and votes will be permanently removed.')) {
-                                                deleteVotingPosition(pos.id);
-                                            }
-                                        }}
-                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-                                        title="Delete Position"
-                                    >
-                                        <TrashIcon className="w-4 h-4" />
-                                    </button>
-                                )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredActiveElections.length === 0 ? (
+                            <div className="col-span-full py-20 bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center text-center px-4">
+                                <VoteIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-4" />
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">No Matching Elections</h3>
+                                <p className="text-gray-500 dark:text-gray-400 mt-1">Try clearing your search or changing the status filter.</p>
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-pink-600 transition-colors">
-                                {pos.title}
-                            </h3>
-                            <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-3 mb-4 flex-grow">
-                                {pos.description || 'No description provided.'}
-                            </p>
-
-                            {pos.criteria && (
-                                <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/50">
-                                    <p className="text-xs font-bold text-blue-700 dark:text-blue-300 flex items-center gap-1 mb-1">
-                                        <InfoIcon className="w-3.5 h-3.5" />
-                                        Contesting Criteria
-                                    </p>
-                                    <p className="text-xs text-blue-600/80 dark:text-blue-400/80 italic">
-                                        {pos.criteria}
-                                    </p>
+                        ) : filteredActiveElections.map(pos => (
+                            <div key={pos.id} className="group bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-xl border border-gray-100 dark:border-gray-700 p-6 flex flex-col transition-all duration-300 hover:-translate-y-1">
+                                <div className="flex justify-between items-start mb-4">
+                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isVotingOpen(pos) ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'}`}>
+                                        {isVotingOpen(pos) ? 'Open' : isUpcoming(pos) ? 'Upcoming' : 'Closed'}
+                                    </span>
+                                    <span className="text-xs text-gray-400 flex items-center gap-1 font-medium">
+                                        <ClockIcon className="w-3 h-3" />
+                                        {isUpcoming(pos) ? `Starts in ${getTimeRemaining(pos.startDate)}` : getTimeRemaining(pos.dueDate)}
+                                    </span>
+                                    {currentUser.role === 'PATRON' && (
+                                        <button
+                                            onClick={() => {
+                                                showAlert({
+                                                    title: 'Delete Position',
+                                                    message: 'Are you sure you want to delete this position? All candidates and votes will be permanently removed.',
+                                                    type: 'confirm',
+                                                    onConfirm: () => deleteVotingPosition(pos.id)
+                                                });
+                                            }}
+                                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                                            title="Delete Position"
+                                        >
+                                            <TrashIcon className="w-4 h-4" />
+                                        </button>
+                                    )}
                                 </div>
-                            )}
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-pink-600 transition-colors">
+                                    {pos.title}
+                                </h3>
+                                <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-3 mb-4 flex-grow">
+                                    {pos.description || 'No description provided.'}
+                                </p>
 
-                            <div className="grid grid-cols-2 gap-3 mt-auto">
-                                <button
-                                    onClick={() => handleActionClick(pos, 'contest')}
-                                    disabled={userContestantFor.has(pos.id)}
-                                    className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed ${userContestantFor.has(pos.id) ? 'bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                                >
-                                    <UserIcon className="w-4 h-4" />
-                                    {userContestantFor.has(pos.id) ? (
-                                        getContestantStatus(pos.id) === 'APPROVED' ? 'Approved Candidate' :
-                                            getContestantStatus(pos.id) === 'REJECTED' ? 'Application Rejected' :
-                                                'Applied (Pending)'
-                                    ) : 'Contest'}
-                                </button>
-                                <button
-                                    onClick={() => handleActionClick(pos, 'vote')}
-                                    className="flex items-center justify-center gap-2 py-3 px-4 bg-pink-600 text-white rounded-xl font-bold hover:bg-pink-700 shadow-lg shadow-pink-500/25 transition-all text-sm"
-                                >
-                                    <VoteIcon className="w-4 h-4" />
-                                    Vote Now
-                                </button>
+                                {pos.criteria && (
+                                    <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/50">
+                                        <p className="text-xs font-bold text-blue-700 dark:text-blue-300 flex items-center gap-1 mb-1">
+                                            <InfoIcon className="w-3.5 h-3.5" />
+                                            Contesting Criteria
+                                        </p>
+                                        <p className="text-xs text-blue-600/80 dark:text-blue-400/80 italic">
+                                            {pos.criteria}
+                                        </p>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-2 gap-3 mt-auto">
+                                    <button
+                                        onClick={() => handleActionClick(pos, 'contest')}
+                                        disabled={userContestantFor.has(pos.id)}
+                                        className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed ${userContestantFor.has(pos.id) ? 'bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                                    >
+                                        <UserIcon className="w-4 h-4" />
+                                        {userContestantFor.has(pos.id) ? (
+                                            getContestantStatus(pos.id) === 'APPROVED' ? 'Approved Candidate' :
+                                                getContestantStatus(pos.id) === 'REJECTED' ? 'Application Rejected' :
+                                                    'Applied (Pending)'
+                                        ) : 'Contest'}
+                                    </button>
+                                    <button
+                                        onClick={() => handleActionClick(pos, 'vote')}
+                                        className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all text-sm shadow-lg ${isVotingOpen(pos)
+                                            ? 'bg-pink-600 text-white hover:bg-pink-700 shadow-pink-500/25'
+                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed shadow-none'}`}
+                                    >
+                                        <VoteIcon className="w-4 h-4" />
+                                        {isVotingOpen(pos) ? 'Vote Now' : isUpcoming(pos) ? 'Starts Soon' : 'Closed'}
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
                 </div>
             ) : activeTab === 'past' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -513,9 +519,12 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                             {currentUser.role === 'PATRON' && (
                                 <button
                                     onClick={() => {
-                                        if (window.confirm('Are you sure you want to delete this past position? This cannot be undone.')) {
-                                            deleteVotingPosition(pos.id);
-                                        }
+                                        showAlert({
+                                            title: 'Delete Record',
+                                            message: 'Are you sure you want to delete this past position? This cannot be undone.',
+                                            type: 'confirm',
+                                            onConfirm: () => deleteVotingPosition(pos.id)
+                                        });
                                     }}
                                     className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/30 transition-all text-sm mt-3"
                                 >

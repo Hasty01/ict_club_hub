@@ -78,7 +78,13 @@ USING (true);
 
 CREATE POLICY "Members can contest" 
 ON voting_contestants FOR INSERT 
-WITH CHECK (auth.uid()::text = user_uid);
+WITH CHECK (
+    auth.uid()::text = user_uid AND
+    EXISTS (
+        SELECT 1 FROM voting_positions 
+        WHERE id = position_id AND NOW() >= start_date AND NOW() <= due_date
+    )
+);
 
 CREATE POLICY "Patrons can moderate contestants" 
 ON voting_contestants FOR UPDATE 
@@ -107,7 +113,13 @@ USING (
 
 CREATE POLICY "Authenticated users can vote" 
 ON voting_votes FOR INSERT 
-WITH CHECK (auth.uid()::text = voter_uid);
+WITH CHECK (
+    auth.uid()::text = voter_uid AND
+    EXISTS (
+        SELECT 1 FROM voting_positions 
+        WHERE id = position_id AND NOW() >= start_date AND NOW() <= due_date
+    )
+);
 
 -- Migration for Feature Flags
 DO $$ 

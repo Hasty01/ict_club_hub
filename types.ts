@@ -405,3 +405,16 @@ export interface VotingVote {
   voterId: string;
   createdAt: string;
 }
+
+// Alert Modal Types
+export type AlertType = 'info' | 'success' | 'warning' | 'error' | 'confirm';
+
+export interface AlertConfig {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  type: AlertType;
+  onConfirm?: () => void;
+  confirmText?: string;
+  cancelText?: string;
+}

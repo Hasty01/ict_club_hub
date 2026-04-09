@@ -401,7 +401,7 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
     const [isSavingBio, setIsSavingBio] = useState(false);
     const [bioStatus, setBioStatus] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'details' | 'appearance' | 'notifications'>('details');
-    const { fetchUsers, fetchFeedItems, fetchProjectData, showcaseItems } = useData();
+    const { fetchUsers, fetchFeedItems, fetchProjectData, showcaseItems, showAlert } = useData();
     const badgesRef = useRef<HTMLDivElement>(null);
     const summaryRef = useRef<HTMLDivElement>(null);
 
@@ -480,7 +480,11 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
             setIsAvatarModalOpen(false);
         } catch (error: any) {
             console.error("Failed to update avatar:", error);
-            alert(`Error updating avatar: ${error.message}`);
+            showAlert({
+                title: 'Update Failed',
+                message: `Error updating avatar: ${error.message}`,
+                type: 'error'
+            });
         } finally {
             setIsUpdatingAvatar(false);
         }
@@ -534,8 +538,8 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
                     <button
                         onClick={() => setActiveTab('notifications')}
                         className={`flex-1 py-4 text-sm font-medium text-center transition-colors focus:outline-none ${activeTab === 'notifications'
-                                ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400 bg-gray-50 dark:bg-gray-800'
-                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400 bg-gray-50 dark:bg-gray-800'
+                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                             }`}
                     >
                         Notifications

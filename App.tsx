@@ -20,6 +20,7 @@ import { MoonIcon } from './components/icons/MoonIcon';
 import { LogoutIcon } from './components/icons/LogoutIcon';
 import ToastContainer from './components/Toast';
 import OfflineIndicator from './components/OfflineIndicator';
+import AlertModal from './components/AlertModal';
 
 type View = 'welcome' | 'login' | 'signup' | 'dashboard' | 'patronLogin' | 'patronSignUp';
 type Theme = 'light' | 'dark';
@@ -29,6 +30,23 @@ const CACHED_USER_KEY = 'cached_user_profile';
 const ToastRenderer = () => {
   const { toasts, removeToast } = useData();
   return <ToastContainer toasts={toasts} removeToast={removeToast} />;
+};
+
+const AlertModalRenderer = () => {
+  const { alertConfig, hideAlert } = useData();
+  if (!alertConfig) return null;
+  return (
+    <AlertModal
+      isOpen={alertConfig.isOpen}
+      title={alertConfig.title}
+      message={alertConfig.message}
+      type={alertConfig.type}
+      onClose={hideAlert}
+      onConfirm={alertConfig.onConfirm}
+      confirmText={alertConfig.confirmText}
+      cancelText={alertConfig.cancelText}
+    />
+  );
 };
 
 const App: React.FC = () => {
@@ -425,6 +443,7 @@ const App: React.FC = () => {
             </div>
           </div>
           <ToastRenderer />
+          <AlertModalRenderer />
         </DataProvider>
       );
     }

@@ -2096,6 +2096,7 @@ export const addVotingPosition = async (position: Omit<VotingPosition, 'id' | 'c
             title: position.title,
             description: position.description,
             criteria: position.criteria,
+            start_date: position.startDate,
             due_date: position.dueDate,
             created_by: position.createdBy,
             status: 'OPEN'
