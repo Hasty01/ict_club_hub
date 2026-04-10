@@ -237,11 +237,185 @@ const CreateRoadmapModal: React.FC<{
     );
 };
 
+const EditRoadmapModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (roadmap: Roadmap) => Promise<void>;
+    roadmap: Roadmap;
+}> = ({ isOpen, onClose, onSave, roadmap }) => {
+    const [milestones, setMilestones] = useState<Milestone[]>(roadmap.milestones || []);
+    const [topic, setTopic] = useState(roadmap.topic || '');
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            setMilestones(roadmap.milestones || []);
+            setTopic(roadmap.topic || '');
+        }
+    }, [isOpen, roadmap]);
+
+    const handleUpdateMilestone = (idx: number, field: keyof Milestone, value: any) => {
+        const newMilestones = [...milestones];
+        newMilestones[idx] = { ...newMilestones[idx], [field]: value };
+        setMilestones(newMilestones);
+    };
+
+    const handleAddResource = (msIdx: number) => {
+        const newMilestones = [...milestones];
+        newMilestones[msIdx].resources.push({ title: 'New Resource', type: 'ARTICLE', url: '' });
+        setMilestones(newMilestones);
+    };
+
+    const handleRemoveResource = (msIdx: number, resIdx: number) => {
+        const newMilestones = [...milestones];
+        newMilestones[msIdx].resources.splice(resIdx, 1);
+        setMilestones(newMilestones);
+    };
+
+    const handleUpdateResource = (msIdx: number, resIdx: number, field: keyof RoadmapResource, value: any) => {
+        const newMilestones = [...milestones];
+        newMilestones[msIdx].resources[resIdx] = { ...newMilestones[msIdx].resources[resIdx], [field]: value };
+        setMilestones(newMilestones);
+    };
+
+    const handleConfirmSave = async () => {
+        setIsSaving(true);
+        try {
+            await onSave({
+                ...roadmap,
+                topic,
+                milestones
+            });
+            onClose();
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[90vh]">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400"><XIcon /></button>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Edit Roadmap</h3>
+
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Roadmap Title</label>
+                    <input
+                        type="text"
+                        value={topic}
+                        onChange={e => setTopic(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-pink-500"
+                    />
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-6">
+                    {milestones.map((ms, msIdx) => (
+                        <div key={ms.id || msIdx} className="p-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-750">
+                            <div className="flex gap-4 mb-3">
+                                <div className="flex-1">
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Milestone Title</label>
+                                    <input
+                                        type="text"
+                                        value={ms.title}
+                                        onChange={e => handleUpdateMilestone(msIdx, 'title', e.target.value)}
+                                        className="w-full px-2 py-1 text-sm border-b border-gray-300 dark:border-gray-600 bg-transparent dark:text-white focus:border-pink-500 outline-none"
+                                    />
+                                </div>
+                                <div className="w-24">
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Duration</label>
+                                    <input
+                                        type="text"
+                                        value={ms.duration}
+                                        onChange={e => handleUpdateMilestone(msIdx, 'duration', e.target.value)}
+                                        className="w-full px-2 py-1 text-sm border-b border-gray-300 dark:border-gray-600 bg-transparent dark:text-white focus:border-pink-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="mb-4">
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Description</label>
+                                <textarea
+                                    value={ms.description}
+                                    onChange={e => handleUpdateMilestone(msIdx, 'description', e.target.value)}
+                                    className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-transparent dark:text-white focus:border-pink-500 outline-none"
+                                    rows={2}
+                                />
+                            </div>
+
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase">Resources</label>
+                                    <button onClick={() => handleAddResource(msIdx)} className="text-pink-600 text-[10px] font-bold hover:underline flex items-center gap-1">
+                                        <PlusCircleIcon className="w-3 h-3" /> Add Resource
+                                    </button>
+                                </div>
+                                <div className="space-y-2">
+                                    {ms.resources.map((res, resIdx) => (
+                                        <div key={resIdx} className="flex gap-2 items-start bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                                            <select
+                                                value={res.type}
+                                                onChange={e => handleUpdateResource(msIdx, resIdx, 'type', e.target.value as any)}
+                                                className="text-[10px] bg-gray-100 dark:bg-gray-700 dark:text-white rounded px-1 py-0.5 outline-none"
+                                            >
+                                                <option value="VIDEO">Video</option>
+                                                <option value="ARTICLE">Article</option>
+                                                <option value="DOCS">Docs</option>
+                                                <option value="PRACTICE">Code</option>
+                                            </select>
+                                            <div className="flex-1 space-y-1">
+                                                <input
+                                                    type="text"
+                                                    value={res.title}
+                                                    onChange={e => handleUpdateResource(msIdx, resIdx, 'title', e.target.value)}
+                                                    placeholder="Title"
+                                                    className="w-full text-xs font-bold bg-transparent dark:text-white outline-none"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={res.url}
+                                                    onChange={e => handleUpdateResource(msIdx, resIdx, 'url', e.target.value)}
+                                                    placeholder="URL"
+                                                    className="w-full text-[10px] text-gray-500 bg-transparent outline-none"
+                                                />
+                                            </div>
+                                            <button onClick={() => handleRemoveResource(msIdx, resIdx)} className="text-gray-400 hover:text-red-500">
+                                                <TrashIcon className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="mt-6 flex gap-3">
+                    <button onClick={onClose} className="flex-1 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium">Cancel</button>
+                    <button 
+                        onClick={handleConfirmSave} 
+                        disabled={isSaving}
+                        className="flex-1 py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 disabled:opacity-50"
+                    >
+                        {isSaving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
     const { roadmaps, isLoadingRoadmaps, fetchRoadmaps, showToast, showAlert } = useData();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingRoadmap, setEditingRoadmap] = useState<Roadmap | null>(null);
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [activePatronTab, setActivePatronTab] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'>('BEGINNER');
+    const [selectedLanguage, setSelectedLanguage] = useState<'Python' | 'JavaScript'>('Python');
     const [quizModalOpen, setQuizModalOpen] = useState(false);
     const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[] | null>(null);
     const [activeMilestoneIndex, setActiveMilestoneIndex] = useState<number | null>(null);
@@ -251,12 +425,26 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
 
     const isPatron = currentUser.role === 'PATRON';
 
+    const getRoadmapLanguage = (topic: string) => {
+        const lower = (topic || '').toLowerCase();
+        if (lower.startsWith('python')) return 'Python';
+        if (lower.startsWith('javascript')) return 'JavaScript';
+        if (lower.includes('javascript')) return 'JavaScript';
+        if (lower.includes('python')) return 'Python';
+        return 'Python';
+    };
+
     const visibleRoadmaps = useMemo(() => {
+        let filtered = roadmaps;
         if (isPatron) {
-            return roadmaps.filter(r => r.skillLevel === activePatronTab);
+            filtered = filtered.filter(r => r.skillLevel === activePatronTab);
+        } else {
+            filtered = filtered.filter(r => r.skillLevel === currentUser.skillLevel);
         }
-        return roadmaps.filter(r => r.skillLevel === currentUser.skillLevel);
-    }, [roadmaps, isPatron, activePatronTab, currentUser.skillLevel]);
+        
+        // Filter by selected language for both members and patrons
+        return filtered.filter(r => getRoadmapLanguage(r.topic) === selectedLanguage);
+    }, [roadmaps, isPatron, activePatronTab, currentUser.skillLevel, selectedLanguage]);
 
     useEffect(() => {
         if (!isPatron && visibleRoadmaps.length > 0) {
@@ -288,13 +476,20 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
         }
     };
 
-    const getRoadmapLanguage = (topic: string) => {
-        const lower = (topic || '').toLowerCase();
-        if (lower.startsWith('python')) return 'Python';
-        if (lower.startsWith('javascript')) return 'JavaScript';
-        if (lower.includes('javascript')) return 'JavaScript';
-        if (lower.includes('python')) return 'Python';
-        return 'Python';
+    const handleEdit = async (roadmap: Roadmap) => {
+        if (!roadmap.id) return;
+        try {
+            await api.updateRoadmap(roadmap.id, roadmap);
+            await fetchRoadmaps();
+            showToast("Roadmap updated!", "success");
+        } catch (error: any) {
+            showToast("Failed to update roadmap.", "error");
+        }
+    };
+
+    const openEditModal = (roadmap: Roadmap) => {
+        setEditingRoadmap(roadmap);
+        setIsEditModalOpen(true);
     };
 
     const handleDelete = async () => {
@@ -378,25 +573,46 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
                 )}
             </div>
 
-            {isPatron && (
-                <div className="flex border-b border-gray-200 dark:border-gray-700 space-x-1 mb-8">
-                    {(['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const).map((level) => (
-                        <button
-                            key={level}
-                            onClick={() => setActivePatronTab(level)}
-                            className={`pb-3 px-4 sm:px-6 text-sm sm:text-base font-medium transition-colors relative focus:outline-none ${activePatronTab === level ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
-                        >
-                            {level.charAt(0) + level.slice(1).toLowerCase()}
-                        </button>
-                    ))}
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex space-x-1">
+                    {isPatron ? (
+                        (['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const).map((level) => (
+                            <button
+                                key={level}
+                                onClick={() => setActivePatronTab(level)}
+                                className={`pb-3 px-4 text-sm font-medium transition-colors relative focus:outline-none ${activePatronTab === level ? 'text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                            >
+                                {level.charAt(0) + level.slice(1).toLowerCase()}
+                            </button>
+                        ))
+                    ) : (
+                        <div className="pb-3 px-4 text-sm font-bold text-pink-600 dark:text-pink-400 border-b-2 border-pink-600 dark:border-pink-400">
+                            {currentUser.skillLevel?.charAt(0) + (currentUser.skillLevel?.slice(1).toLowerCase() || '')} Track
+                        </div>
+                    )}
                 </div>
-            )}
+
+                <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 mb-3">
+                    <button 
+                        onClick={() => setSelectedLanguage('Python')}
+                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${selectedLanguage === 'Python' ? 'bg-white dark:bg-gray-700 text-pink-600 dark:text-pink-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                    >
+                        Python
+                    </button>
+                    <button 
+                        onClick={() => setSelectedLanguage('JavaScript')}
+                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${selectedLanguage === 'JavaScript' ? 'bg-white dark:bg-gray-700 text-pink-600 dark:text-pink-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                    >
+                        JavaScript
+                    </button>
+                </div>
+            </div>
 
             {visibleRoadmaps.length === 0 ? (
                 <div className="text-center py-20 bg-gray-50 dark:bg-gray-800/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                     <MapIcon className="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Paths Active</h3>
-                    <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">Patrons haven't published a roadmap for this level yet.</p>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No {selectedLanguage} Paths Active</h3>
+                    <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">Patrons haven't published a {selectedLanguage} roadmap for this level yet.</p>
                 </div>
             ) : (
                 <div className="grid gap-12">
@@ -411,7 +627,10 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
                                         {roadmap.topic}
                                     </h3>
                                     {isPatron && (
-                                        <button onClick={() => setDeleteId(roadmap.id!)} className="p-2 text-gray-400 hover:text-red-500 transition-colors"><TrashIcon /></button>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => openEditModal(roadmap)} className="p-2 text-gray-400 hover:text-pink-600 transition-colors"><PencilIcon className="w-5 h-5" /></button>
+                                            <button onClick={() => setDeleteId(roadmap.id!)} className="p-2 text-gray-400 hover:text-red-500 transition-colors"><TrashIcon className="w-5 h-5" /></button>
+                                        </div>
                                     )}
                                 </div>
 
@@ -441,6 +660,14 @@ const RoadmapView: React.FC<RoadmapViewProps> = ({ currentUser }) => {
             )}
 
             <CreateRoadmapModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSave={handleCreate} initialLevel={activePatronTab} />
+            {editingRoadmap && (
+                <EditRoadmapModal 
+                    isOpen={isEditModalOpen} 
+                    onClose={() => setIsEditModalOpen(false)} 
+                    onSave={handleEdit} 
+                    roadmap={editingRoadmap} 
+                />
+            )}
             <ConfirmationModal isOpen={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} title="Delete Path" message="This will remove the roadmap for all students." confirmText="Delete" isDangerous />
             <RoadmapQuizModal isOpen={quizModalOpen} onClose={() => setQuizModalOpen(false)} quizQuestions={quizQuestions} onPass={handleQuizPass} />
         </div>
