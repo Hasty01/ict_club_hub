@@ -8,6 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript&style=for-the-badge)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.0-38bdf8?logo=tailwindcss&style=for-the-badge)](https://tailwindcss.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-Backend-3ecf8e?logo=supabase&style=for-the-badge)](https://supabase.com/)
+[![Hugging Face](https://img.huggingface.co/badge/Hugging%20Face-AI-FFD21E?logo=huggingface&style=for-the-badge)](https://huggingface.co/)
 [![Gemini AI](https://img.shields.io/badge/Gemini-AI-8E75B2?logo=googlebard&style=for-the-badge)](https://deepmind.google/technologies/gemini/)
 
 </div>
@@ -24,9 +25,9 @@ Built with **React, TypeScript, and Supabase**, the hub empowers students to lea
 
 ## ✨ Core Features
 
-### 🤖 AI-Powered Mentorship (Gemini 2.0/2.5)
-The platform integrates advanced AI to provide 24/7 guidance:
-*   **AI Tutor:** A context-aware assistant that answers coding questions and provides club information.
+### 🤖 AI-Powered Mentorship (Hugging Face & Gemini)
+The platform integrates advanced AI (primarily via Hugging Face Router with Gemini fallbacks) to provide 24/7 guidance:
+*   **AI Tutor:** A context-aware assistant (GPT-OSS via HF) that answers coding questions and provides club information.
 *   **Smart Roadmaps:** Generates personalized learning paths (Beginner to Advanced) for any tech topic.
 *   **Milestone Quizzes:** Dynamically generates quizzes to test knowledge after completing roadmap milestones.
 *   **AI Challenge Generator:** Patrons can describe concepts, and the AI crafts creative, scenario-based coding challenges tailored to different skill levels.
@@ -57,7 +58,8 @@ A robust coding environment running directly in the browser using **Pyodide**.
 ### 1. Prerequisites
 *   Node.js (v18 or higher recommended)
 *   A Supabase project for the backend.
-*   A Google Gemini API Key for AI features.
+*   A **Hugging Face API Token** (Primary AI).
+*   A **Google Gemini API Key** (Fallback/Roadmaps).
 
 ### 2. Installation
 ```bash
@@ -73,7 +75,8 @@ Create a `.env` file in the root directory:
 ```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_API_KEY=your_google_gemini_api_key
+VITE_HF_TOKEN=your_hugging_face_token
+VITE_GEMINI_API_KEY=your_google_gemini_api_key
 ```
 
 ### 4. Database Setup
@@ -89,7 +92,7 @@ npm run dev
 ## 🏗️ Tech Stack
 *   **Frontend:** React 18, Vite, Tailwind CSS, Lucide Icons, Headless UI.
 *   **Backend:** Supabase (Auth, Postgres, Real-time, Storage).
-*   **AI:** Google Gemini API (Flash/Pro).
+*   **AI:** Hugging Face Router (GPT-OSS), Google Gemini API (Flash/Pro).
 *   **Runtime:** Pyodide (for in-browser Python execution).
 *   **Deployment:** Vercel / Netlify.
 
