@@ -1290,7 +1290,7 @@ export const getShowcaseItems = async (): Promise<ShowcaseItem[]> => {
             const user = userMap.get(item.user_uid);
             return {
                 id: String(item.id),
-                createdAt: new Date(item.created_at).toLocaleDateString(),
+                createdAt: item.created_at,
                 userUid: item.user_uid,
                 userName: user?.name || 'Unknown',
                 userAvatarUrl: user?.avatar_url,

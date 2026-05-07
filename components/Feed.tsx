@@ -139,6 +139,7 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
           action: string;
           meta: string;
           time: string;
+          sortTime: number;
       }> = [];
 
       showcaseItems.forEach(item => {
@@ -149,6 +150,7 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
               action: 'Shared a showcase',
               meta: item.title,
               time: item.createdAt,
+              sortTime: toTime(item.createdAt),
           });
       });
 
@@ -160,6 +162,7 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
               action: suggestion.type === 'BUG' ? 'Reported a bug' : 'Suggested a feature',
               meta: suggestion.title,
               time: suggestion.createdAt,
+              sortTime: toTime(suggestion.createdAt),
           });
       });
 
@@ -178,6 +181,7 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
               action: label,
               meta: item.title || item.message,
               time: item.timestamp,
+              sortTime: toTime(item.timestamp),
           });
       });
 
@@ -193,18 +197,29 @@ const Feed: React.FC<FeedProps> = ({ currentUser }) => {
                   action: 'Submitted a project task',
                   meta: task.content,
                   time: submission.submittedAt,
+                  sortTime: toTime(submission.submittedAt),
               });
           });
       });
 
       return entries
-          .filter(entry => toTime(entry.time) > 0)
-          .sort((a, b) => toTime(b.time) - toTime(a.time))
+          .filter(entry => entry.sortTime > 0)
+          .sort((a, b) => {
+              if (b.sortTime !== a.sortTime) return b.sortTime - a.sortTime;
+              return b.id.localeCompare(a.id);
+          })
           .slice(0, 8);
   }, [allUsers, showcaseItems, suggestions, items, projectData]);
 
   const recentActivityDisplay = useMemo(() => {
-      return recentInteractions.slice(0, 5);
+      return [...recentInteractions]
+          .sort((a, b) => {
+              const aTime = new Date(a.time).getTime();
+              const bTime = new Date(b.time).getTime();
+              if (bTime !== aTime) return bTime - aTime;
+              return b.id.localeCompare(a.id);
+          })
+          .slice(0, 5);
   }, [recentInteractions]);
 
   const isLoadingActivityFeed = isLoadingShowcase || isLoadingSuggestions || isLoadingProjects || isLoadingFeed;
