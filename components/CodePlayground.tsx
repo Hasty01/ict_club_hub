@@ -1446,14 +1446,20 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
 
     (window as any).playgroundPrint = (text: string, type: 'log' | 'error') => {
         if (typeof text !== 'string') return;
-        if (type === 'error') {
-            setOutput(prev => [...prev, { type: 'error', content: text }]);
-            scrollToBottom();
-            return;
+        const normalized = text.replace(/\r\n/g, '\n');
+        const endsWithNewline = normalized.endsWith('\n');
+        const parts = normalized.split('\n');
+        if (endsWithNewline) {
+            parts.pop();
         }
-        const parts = text.split('\n');
         setOutput(prev => {
             let newOutput = [...prev];
+            if (parts.length === 0) {
+                if (endsWithNewline) {
+                    newOutput.push({ type, content: '' });
+                }
+                return newOutput;
+            }
             let lastLine = newOutput.length > 0 ? newOutput[newOutput.length - 1] : null;
             if (lastLine && lastLine.type === type) {
                 lastLine.content += parts[0];
@@ -1465,6 +1471,9 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
                 for (let i = 1; i < parts.length; i++) {
                     newOutput.push({ type, content: parts[i] });
                 }
+            }
+            if (endsWithNewline) {
+                newOutput.push({ type, content: '' });
             }
             return newOutput;
         });
@@ -2217,7 +2226,7 @@ if "${projectDir}" not in sys.path:
                  </div>
                  <div 
                     ref={outputContainerRef}
-                    className="flex-1 p-4 overflow-y-auto custom-scrollbar break-all"
+                    className="flex-1 p-4 overflow-y-auto custom-scrollbar whitespace-pre-wrap break-words"
                     onClick={() => {
                         if (isWaitingForInput && consoleInputRef.current) {
                             consoleInputRef.current.focus();
@@ -2228,9 +2237,9 @@ if "${projectDir}" not in sys.path:
                         <span className="text-gray-600 italic select-none">Run code to see output...</span>
                     ) : (
                         output.map((line, index) => (
-                           <div key={index} className="leading-relaxed mb-0.5">
+                           <div key={index} className="leading-relaxed mb-0.5 whitespace-pre-wrap break-words">
                                 {line.type === 'log' ? (
-                                    <span className="text-gray-300">{line.content}</span>
+                                    <span className="text-gray-300 whitespace-pre-wrap break-words">{line.content}</span>
                                 ) : line.type === 'hint' ? (
                                     <div className="bg-yellow-900/20 p-3 rounded border-l-2 border-yellow-600 my-2 flex gap-3 font-sans text-gray-200">
                                         <div className="text-yellow-500 mt-0.5 flex-shrink-0">
@@ -2241,9 +2250,9 @@ if "${projectDir}" not in sys.path:
                                         </div>
                                     </div>
                                 ) : (
-                                    <span className="text-red-400 font-medium">{line.content}</span>
+                                    <span className="text-red-400 font-medium whitespace-pre-wrap break-words">{line.content}</span>
                                 )}
-                            </div>
+                           </div>
                         ))
                     )}
                     

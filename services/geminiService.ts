@@ -435,7 +435,9 @@ export const generateAIChallenge = async (
         const text = await callGemini(prompt); // Use Gemini for more creative writing
         return parseJSONResponse(text);
     } catch (error) {
-        throw error;
+        console.warn("Gemini challenge error, falling back to Hugging Face:", error);
+        const text = await callAI([{ role: "user", content: prompt }], true);
+        return parseJSONResponse(text);
     }
 };
 

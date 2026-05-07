@@ -486,6 +486,11 @@ create policy "Playground files insert"
       where p.id = playground_project_files.project_id
         and (
           p.created_by = auth.uid()::text
+          or exists (
+            select 1 from public.playground_project_members ppm
+            where ppm.project_id = p.id
+              and ppm.user_uid = auth.uid()::text
+          )
           or (p.team_id is not null and exists (
             select 1 from public.team_members tm
             where tm.team_id = p.team_id
@@ -503,6 +508,11 @@ create policy "Playground files update"
       where p.id = playground_project_files.project_id
         and (
           p.created_by = auth.uid()::text
+          or exists (
+            select 1 from public.playground_project_members ppm
+            where ppm.project_id = p.id
+              and ppm.user_uid = auth.uid()::text
+          )
           or (p.team_id is not null and exists (
             select 1 from public.team_members tm
             where tm.team_id = p.team_id
@@ -520,6 +530,11 @@ create policy "Playground files delete"
       where p.id = playground_project_files.project_id
         and (
           p.created_by = auth.uid()::text
+          or exists (
+            select 1 from public.playground_project_members ppm
+            where ppm.project_id = p.id
+              and ppm.user_uid = auth.uid()::text
+          )
           or (p.team_id is not null and exists (
             select 1 from public.team_members tm
             where tm.team_id = p.team_id
@@ -541,6 +556,11 @@ create policy "Playground activity insert"
       where p.id = playground_project_activity.project_id
         and (
           p.created_by = auth.uid()::text
+          or exists (
+            select 1 from public.playground_project_members ppm
+            where ppm.project_id = p.id
+              and ppm.user_uid = auth.uid()::text
+          )
           or (p.team_id is not null and exists (
             select 1 from public.team_members tm
             where tm.team_id = p.team_id
@@ -570,6 +590,98 @@ create policy "Project files update"
 create policy "Project files delete"
   on storage.objects for delete
   using (bucket_id = 'project_files' and auth.role() = 'authenticated');
+
+drop policy if exists "Playground files insert" on public.playground_project_files;
+create policy "Playground files insert"
+  on public.playground_project_files for insert
+  with check (
+    exists (
+      select 1 from public.playground_projects p
+      where p.id = playground_project_files.project_id
+        and (
+          p.created_by = auth.uid()::text
+          or exists (
+            select 1 from public.playground_project_members ppm
+            where ppm.project_id = p.id
+              and ppm.user_uid = auth.uid()::text
+          )
+          or (p.team_id is not null and exists (
+            select 1 from public.team_members tm
+            where tm.team_id = p.team_id
+              and tm.user_uid = auth.uid()::text
+          ))
+        )
+    )
+  );
+
+drop policy if exists "Playground files update" on public.playground_project_files;
+create policy "Playground files update"
+  on public.playground_project_files for update
+  using (
+    exists (
+      select 1 from public.playground_projects p
+      where p.id = playground_project_files.project_id
+        and (
+          p.created_by = auth.uid()::text
+          or exists (
+            select 1 from public.playground_project_members ppm
+            where ppm.project_id = p.id
+              and ppm.user_uid = auth.uid()::text
+          )
+          or (p.team_id is not null and exists (
+            select 1 from public.team_members tm
+            where tm.team_id = p.team_id
+              and tm.user_uid = auth.uid()::text
+          ))
+        )
+    )
+  );
+
+drop policy if exists "Playground files delete" on public.playground_project_files;
+create policy "Playground files delete"
+  on public.playground_project_files for delete
+  using (
+    exists (
+      select 1 from public.playground_projects p
+      where p.id = playground_project_files.project_id
+        and (
+          p.created_by = auth.uid()::text
+          or exists (
+            select 1 from public.playground_project_members ppm
+            where ppm.project_id = p.id
+              and ppm.user_uid = auth.uid()::text
+          )
+          or (p.team_id is not null and exists (
+            select 1 from public.team_members tm
+            where tm.team_id = p.team_id
+              and tm.user_uid = auth.uid()::text
+          ))
+        )
+    )
+  );
+
+drop policy if exists "Playground activity insert" on public.playground_project_activity;
+create policy "Playground activity insert"
+  on public.playground_project_activity for insert
+  with check (
+    exists (
+      select 1 from public.playground_projects p
+      where p.id = playground_project_activity.project_id
+        and (
+          p.created_by = auth.uid()::text
+          or exists (
+            select 1 from public.playground_project_members ppm
+            where ppm.project_id = p.id
+              and ppm.user_uid = auth.uid()::text
+          )
+          or (p.team_id is not null and exists (
+            select 1 from public.team_members tm
+            where tm.team_id = p.team_id
+              and tm.user_uid = auth.uid()::text
+          ))
+        )
+    )
+  );
 
 -- Attendance policies (patrons record attendance)
 alter table public.attendance enable row level security;
