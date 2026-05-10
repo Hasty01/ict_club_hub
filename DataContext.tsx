@@ -799,6 +799,33 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
     };
   }, [currentUser, rooms, showToast, showBrowserNotification]);
 
+  // Real-time listener for all club data
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const dataChannel = supabase.channel('club_data_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, () => fetchActivities())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'challenges' }, () => fetchChallenges())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_items' }, () => fetchFeedItems())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'resources' }, () => fetchResources())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => fetchUsers())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'showcase_items' }, () => fetchShowcaseItems())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'suggestions' }, () => fetchSuggestions())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => fetchTeams())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_challenges' }, () => fetchTeamChallenges())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'voting_positions' }, () => fetchVotingPositions())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'voting_contestants' }, () => fetchAllVotingContestants())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'game_leaderboard' }, () => {
+          // Since getGameLeaderboard is called with gameKey, we might need a more global fetch or leave it to component level
+          // But for now, we can just trigger a general refresh if needed
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(dataChannel);
+    };
+  }, [currentUser, fetchActivities, fetchChallenges, fetchFeedItems, fetchResources, fetchUsers, fetchShowcaseItems, fetchSuggestions, fetchTeams, fetchTeamChallenges, fetchVotingPositions, fetchAllVotingContestants]);
+
 
   // Fetch all data when the provider mounts
   useEffect(() => {
