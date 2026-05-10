@@ -43,6 +43,23 @@ const detectShowcaseLanguage = (code: string) => {
     return 'JS';
 };
 
+const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return dateString;
+        return new Intl.DateTimeFormat('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }).format(date);
+    } catch {
+        return dateString;
+    }
+};
+
 const ShowcaseCard: React.FC<{
     item: ShowcaseItem,
     currentUser: User,
@@ -118,7 +135,7 @@ const ShowcaseCard: React.FC<{
                         <div>
                             <h3 className="font-bold text-gray-900 dark:text-gray-100 text-lg leading-tight line-clamp-1" title={item.title}>{item.title}</h3>
                             <div className="flex items-center gap-2">
-                                <p className="text-xs text-gray-500 dark:text-gray-400">by {item.userName} • {item.createdAt}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">by {item.userName} • {formatDate(item.createdAt)}</p>
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${languageBadge === 'HTML'
                                         ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
                                         : languageBadge === 'PY'
@@ -209,7 +226,7 @@ const ShowcaseCard: React.FC<{
                                     <div>
                                         <div className="flex items-baseline gap-2">
                                             <span className="font-bold text-gray-900 dark:text-white text-xs">{comment.userName}</span>
-                                            <span className="text-[10px] text-gray-400">{comment.createdAt}</span>
+                                            <span className="text-[10px] text-gray-400">{formatDate(comment.createdAt)}</span>
                                         </div>
                                         <p className="text-gray-700 dark:text-gray-300 text-xs mt-0.5">{comment.content}</p>
                                     </div>

@@ -98,6 +98,23 @@ const ResourceCard: React.FC<ResourceCardProps> = ({ resource, currentUser, onDe
         }
     })() : '';
 
+    const formatDate = (dateString: string) => {
+        if (!dateString) return '';
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return dateString;
+            return new Intl.DateTimeFormat('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        } catch {
+            return dateString;
+        }
+    };
+
     return (
         <div ref={cardRef} className="scroll-animate group bg-white dark:bg-gray-900 rounded-2xl shadow-sm hover:shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col transition-all duration-300">
             <div className="relative">
@@ -141,7 +158,7 @@ const ResourceCard: React.FC<ResourceCardProps> = ({ resource, currentUser, onDe
                     <div className="text-xs text-gray-500 dark:text-gray-400">
                         <span className="font-semibold text-gray-700 dark:text-gray-200">{resource.uploaderName}</span>
                         <span className="mx-2">•</span>
-                        <span>{resource.createdAt}</span>
+                        <span>{formatDate(resource.createdAt)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <a
