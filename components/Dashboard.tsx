@@ -240,7 +240,13 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
                     <Suggestions currentUser={currentUser} />
                 </TabPanel>
                 <TabPanel active={activeTab === 'challenges' && (featureFlags.showChallenges || currentUser.role === 'PATRON')}>
-                    <Challenges currentUser={currentUser} />
+                    <Challenges 
+                        currentUser={currentUser} 
+                        onMakeSubmission={(challenge) => {
+                            sessionStorage.setItem('pending_challenge_context', JSON.stringify(challenge));
+                            setActiveTab('playground');
+                        }}
+                    />
                 </TabPanel>
                 {/* FIX: Removed invalid 'bottom_roadmap' comparison as it is not a valid member of the Tab type union. */}
                 <TabPanel active={activeTab === 'roadmap' && (featureFlags.showRoadmap || currentUser.role === 'PATRON')}>

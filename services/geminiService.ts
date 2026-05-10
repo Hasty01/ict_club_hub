@@ -402,6 +402,44 @@ export const analyzeChallengeSubmission = async (challengeTitle: string, code: s
     }
 };
 
+export const autoEvaluateChallenge = async (
+    challengeTitle: string,
+    challengeDescription: string,
+    code: string
+): Promise<{ passed: boolean; feedback: string; weaknesses: string; improvements: string }> => {
+    const prompt = `You are a strict but encouraging programming instructor evaluating a coding challenge to decide if a student deserves a "Badge" for their achievement.
+
+Challenge Title: "${challengeTitle}"
+Challenge Description: "${challengeDescription}"
+
+Student's Submitted Code:
+${code}
+
+Evaluation Guidelines:
+1. Compare the student's code DIRECTLY against the Scenario, Task, and Requirements listed in the description.
+2. If the code correctly solves the task and meets all mandatory requirements, set "passed" to true.
+3. If "passed" is true, the student will AUTOMATICALLY EARN A BADGE.
+4. If "passed" is false, explain exactly which requirements were missed or where the logic failed.
+5. Provide constructive feedback that helps the student learn, regardless of the result.
+
+Return ONLY a JSON object with this exact structure:
+{
+    "passed": boolean,
+    "feedback": "A direct explanation of why the code passed or failed, explicitly mentioning if they earned the badge or what they need to fix to get it next time.",
+    "weaknesses": "Specific technical weaknesses or bugs found in the code.",
+    "improvements": "Actionable, advanced tips or alternative approaches to refine their coding style."
+}`;
+
+    try {
+        const text = await callGemini(prompt);
+        return JSON.parse(cleanResponse(text));
+    } catch (error) {
+        console.warn("Gemini evaluation error, falling back to Hugging Face:", error);
+        const text = await callAI([{ role: "user", content: prompt }], true);
+        return JSON.parse(cleanResponse(text));
+    }
+};
+
 export const generateAIChallenge = async (
     skillLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED',
     concepts: string,

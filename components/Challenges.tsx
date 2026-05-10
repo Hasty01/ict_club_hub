@@ -19,6 +19,7 @@ import Tooltip from './Tooltip';
 
 interface ChallengesProps {
     currentUser: User;
+    onMakeSubmission?: (challenge: Challenge) => void;
 }
 
 const DifficultyBadge: React.FC<{ difficulty?: string }> = ({ difficulty }) => {
@@ -147,7 +148,8 @@ const ChallengeCard: React.FC<{
     currentUser: User;
     onOpenSubmission: (id: string) => void;
     onOpenReview: (id: string, title: string) => void;
-}> = ({ challenge, currentUser, onOpenSubmission, onOpenReview }) => {
+    onMakeSubmission?: (challenge: Challenge) => void;
+}> = ({ challenge, currentUser, onOpenSubmission, onOpenReview, onMakeSubmission }) => {
     const isPatron = currentUser.role === 'PATRON';
     const hasBadge = currentUser.badges?.includes(challenge.title);
     const today = new Date();
@@ -219,10 +221,10 @@ const ChallengeCard: React.FC<{
                     !hasBadge && challenge.status === 'ACTIVE' && !isExpired ? (
                         <Tooltip text="Submit your solution to earn a badge.">
                             <button
-                                onClick={() => onOpenSubmission(challenge.id)}
+                                onClick={() => onMakeSubmission ? onMakeSubmission(challenge) : onOpenSubmission(challenge.id)}
                                 className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                             >
-                                Submit Solution
+                                {onMakeSubmission ? 'Make a submission' : 'Submit Solution'}
                             </button>
                         </Tooltip>
                     ) : (
@@ -648,7 +650,7 @@ const ReviewSubmissionsModal: React.FC<{
     );
 };
 
-const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
+const Challenges: React.FC<ChallengesProps> = ({ currentUser, onMakeSubmission }) => {
     const { challenges, allUsers, fetchChallenges, isLoadingChallenges, challengesError } = useData();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
@@ -817,6 +819,7 @@ const Challenges: React.FC<ChallengesProps> = ({ currentUser }) => {
                             currentUser={currentUser}
                             onOpenSubmission={openSubmission}
                             onOpenReview={openReview}
+                            onMakeSubmission={onMakeSubmission}
                         />
                     ))}
                 </div>

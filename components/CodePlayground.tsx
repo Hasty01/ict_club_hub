@@ -429,6 +429,9 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   const outputContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [pendingChallenge, setPendingChallenge] = useState<any | null>(null);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [evaluationResult, setEvaluationResult] = useState<{ passed: boolean, feedback: string, weaknesses: string, improvements: string } | null>(null);
   const codeRef = useRef(code);
   const activeFileRef = useRef<PlaygroundProjectFile | null>(null);
   const completionProvidersRef = useRef<any[]>([]);
@@ -514,6 +517,29 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
   useEffect(() => {
       loadProjects();
   }, []);
+
+  useEffect(() => {
+      const savedContext = sessionStorage.getItem('pending_challenge_context');
+      if (savedContext) {
+          try {
+              const challenge = JSON.parse(savedContext);
+              setPendingChallenge(challenge);
+              
+              const commentChar = language === 'python' ? '#' : '//';
+              const challengeIntro = `${commentChar} =========================================\n` +
+                                     `${commentChar} CHALLENGE: ${challenge.title}\n` +
+                                     `${commentChar} =========================================\n` +
+                                     challenge.description.split('\n').map((line: string) => `${commentChar} ${line}`).join('\n') +
+                                     `\n\n${commentChar} Write your solution below:\n\n`;
+              
+              setCode(challengeIntro);
+              setActiveTabState('editor');
+              sessionStorage.removeItem('pending_challenge_context');
+          } catch (e) {
+              console.error("Error parsing challenge context", e);
+          }
+      }
+  }, [language]);
 
   useEffect(() => {
       if (!activeProject) {
@@ -1351,6 +1377,32 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           showToast("Failed to publish code: " + error.message, "error");
       }
   };
+
+  const handleAutoEvaluate = async () => {
+      if (!pendingChallenge) return;
+      setIsEvaluating(true);
+      setEvaluationResult(null);
+      try {
+          const submissionId = await api.submitChallenge(pendingChallenge.id, currentUser.uid, code);
+          const result = await geminiService.autoEvaluateChallenge(
+              pendingChallenge.title,
+              pendingChallenge.description,
+              code
+          );
+          setEvaluationResult(result);
+          if (result.passed) {
+              await api.reviewSubmission(submissionId, 'APPROVED', `AI Evaluation: ${result.feedback}`, currentUser.uid);
+              showToast("Congratulations! Challenge passed and badge awarded!", "success");
+          } else {
+              showToast("Challenge evaluation complete. See feedback for improvements.", "info");
+          }
+      } catch (error: any) {
+          console.error("Auto-evaluation failed:", error);
+          showToast("Evaluation failed: " + error.message, "error");
+      } finally {
+          setIsEvaluating(false);
+      }
+  };
   
   const handleGetHint = async () => {
       setIsGettingHint(true);
@@ -2054,6 +2106,31 @@ if "${projectDir}" not in sys.path:
         className="hidden"
       />
 
+      {/* Challenge Mode Banner */}
+      {pendingChallenge && (
+        <div className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-4 py-2 flex items-center justify-between shadow-md z-20">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-1.5 rounded-lg">
+              <TrophyIcon className="w-5 h-5 text-yellow-300" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider opacity-90">Challenge Mode</p>
+              <p className="text-sm font-semibold">{pendingChallenge.title}</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => {
+                setPendingChallenge(null);
+                showToast("Exited challenge mode.", "info");
+            }}
+            className="text-white/70 hover:text-white transition-colors p-1"
+            title="Exit Challenge"
+          >
+            <XIcon className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
       {/* Compact Toolbar */}
       <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -2130,6 +2207,23 @@ if "${projectDir}" not in sys.path:
                     <span className="hidden sm:inline">{isExecuting ? 'Running...' : 'Run'}</span>
                  </button>
              </Tooltip>
+
+             {pendingChallenge && (
+                 <Tooltip text="Submit your code for AI evaluation and badge awarding.">
+                     <button 
+                        onClick={handleAutoEvaluate} 
+                        disabled={isExecuting || isEvaluating || (language === 'python' && !isPyodideReady) || isWaitingForInput}
+                        className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white px-4 py-1.5 rounded-md text-xs font-bold flex items-center gap-2 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                     >
+                        {isEvaluating ? (
+                            <span className="animate-spin h-3 w-3 border-2 border-white/30 border-t-white rounded-full"></span>
+                        ) : (
+                            <SparklesIcon className="w-4 h-4 text-yellow-300"/>
+                        )}
+                        <span>{isEvaluating ? 'Evaluating...' : 'Submit to AI'}</span>
+                     </button>
+                 </Tooltip>
+             )}
              
              {/* Dropdown Trigger */}
              <div className="relative" ref={menuRef}>
@@ -2463,6 +2557,121 @@ if "${projectDir}" not in sys.path:
         code={code}
         currentUser={currentUser}
       />
+
+      {isEvaluating && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 border border-gray-200 dark:border-gray-700">
+                  <div className="relative">
+                      <div className="w-16 h-16 border-4 border-pink-100 dark:border-pink-900/30 rounded-full"></div>
+                      <div className="absolute top-0 left-0 w-16 h-16 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+                      <SparklesIcon className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-pink-500" />
+                  </div>
+                  <div className="text-center">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">Analyzing Solution</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 animate-pulse">Kevin is reviewing your code...</p>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {evaluationResult && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-fade-in">
+              <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-gray-200 dark:border-gray-700">
+                  <div className={`p-6 text-white flex items-center justify-between ${evaluationResult.passed ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-orange-600 to-red-600'}`}>
+                      <div className="flex items-center gap-3">
+                          <div className="bg-white/20 p-2 rounded-2xl">
+                              {evaluationResult.passed ? <BadgeCheckIcon className="w-8 h-8" /> : <XCircleIcon className="w-8 h-8" />}
+                          </div>
+                          <div>
+                              <h3 className="text-2xl font-bold">{evaluationResult.passed ? 'Challenge Passed!' : 'Needs Improvement'}</h3>
+                              <p className="text-white/80 text-sm font-medium">{pendingChallenge?.title}</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setEvaluationResult(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                          <XIcon className="w-6 h-6" />
+                      </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                      <div className="space-y-8">
+                          <section>
+                              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                  <TrophyIcon className={`w-4 h-4 ${evaluationResult.passed ? 'text-yellow-500' : 'text-gray-400'}`} />
+                                  Badge Status
+                              </h4>
+                              <div className={`p-5 rounded-2xl border flex items-center gap-4 ${evaluationResult.passed ? 'bg-yellow-50/50 dark:bg-yellow-900/10 border-yellow-100 dark:border-yellow-900/20' : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
+                                  <div className={`p-3 rounded-xl ${evaluationResult.passed ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600' : 'bg-gray-200 dark:bg-gray-700 text-gray-400'}`}>
+                                      <TrophyIcon className="w-8 h-8" />
+                                  </div>
+                                  <div>
+                                      <p className="font-bold text-gray-900 dark:text-white">
+                                          {evaluationResult.passed ? 'Badge Earned!' : 'Badge Locked'}
+                                      </p>
+                                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                                          {evaluationResult.passed 
+                                              ? `Congratulations! You've successfully unlocked the ${pendingChallenge?.title} badge.` 
+                                              : 'Correct the issues mentioned below and try again to earn your badge!'}
+                                      </p>
+                                  </div>
+                              </div>
+                          </section>
+
+                          <section>
+                              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                  <SparklesIcon className="w-4 h-4 text-purple-500" />
+                                  AI Feedback
+                              </h4>
+                              <div className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300 leading-relaxed">
+                                  <FormattedMessage text={evaluationResult.feedback} isUser={false} />
+                              </div>
+                          </section>
+
+                          {evaluationResult.weaknesses && (
+                              <section>
+                                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                      <PlayIcon className="w-4 h-4 text-orange-500 rotate-90" />
+                                      Key Weaknesses
+                                  </h4>
+                                  <div className="bg-orange-50/50 dark:bg-orange-900/10 p-5 rounded-2xl border border-orange-100/50 dark:border-orange-900/20 text-gray-700 dark:text-gray-300 leading-relaxed">
+                                      <FormattedMessage text={evaluationResult.weaknesses} isUser={false} />
+                                  </div>
+                              </section>
+                          )}
+
+                          <section>
+                              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                  <LightBulbIcon className="w-4 h-4 text-yellow-500" />
+                                  Recommended Improvements
+                              </h4>
+                              <div className="bg-blue-50/50 dark:bg-blue-900/10 p-5 rounded-2xl border border-blue-100/50 dark:border-blue-900/20 text-gray-700 dark:text-gray-300 leading-relaxed">
+                                  <FormattedMessage text={evaluationResult.improvements} isUser={false} />
+                              </div>
+                          </section>
+                      </div>
+                  </div>
+
+                  <div className="p-6 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3">
+                      {!evaluationResult.passed && (
+                          <button 
+                            onClick={() => setEvaluationResult(null)}
+                            className="px-6 py-2.5 rounded-xl text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 transition-all"
+                          >
+                            Try Again
+                          </button>
+                      )}
+                      <button 
+                        onClick={() => {
+                            if (evaluationResult.passed) setPendingChallenge(null);
+                            setEvaluationResult(null);
+                        }}
+                        className={`px-8 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg hover:shadow-xl transition-all ${evaluationResult.passed ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gray-900 dark:bg-white dark:text-gray-900'}`}
+                      >
+                        {evaluationResult.passed ? 'Claim Badge & Finish' : 'Got it'}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

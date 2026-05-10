@@ -1475,14 +1475,15 @@ export const addChallenge = async (challenge: {
     await notifyAllUsers(`New Challenge: ${challenge.title}`, 'challenges', challenge.createdBy);
 };
 
-export const submitChallenge = async (challengeId: string, userId: string, content: string) => {
-    const { error } = await supabase.from('challenge_submissions').insert({
+export const submitChallenge = async (challengeId: string, userId: string, content: string): Promise<string> => {
+    const { data, error } = await supabase.from('challenge_submissions').insert({
         challenge_id: challengeId,
         user_uid: userId,
         content: content,
         status: 'PENDING'
-    });
+    }).select('id').single();
     if (error) throw error;
+    return String(data.id);
 };
 
 export const getSubmissions = async (challengeId: string): Promise<ChallengeSubmission[]> => {

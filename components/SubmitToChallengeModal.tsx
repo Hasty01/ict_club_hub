@@ -52,7 +52,6 @@ const SubmitToChallengeModal: React.FC<SubmitToChallengeModalProps> = ({ isOpen,
             } catch (e) {
                 setAiFeedback({ isOpen: true, content: "AI feedback is unavailable right now. Please try again later.", isLoading: false, title: `Feedback: ${challengeTitle}` });
             }
-            onClose();
             setSelectedChallengeId(null);
         } catch (error: any) {
             console.error("Submission failed:", error);
