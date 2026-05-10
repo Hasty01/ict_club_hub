@@ -5,6 +5,7 @@ import AiTutor from './AiTutor';
 import DailyTipModal from './PythonTipModal';
 import { useData } from '../DataContext';
 import FeatureIntroModal from './FeatureIntroModal';
+import NotificationPromptModal from './NotificationPromptModal';
 
 const Feed = lazy(() => import('./Feed'));
 const Activities = lazy(() => import('./Activities'));
@@ -56,7 +57,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
         return daySeed % 2 === 0 ? 'javascript' : 'python';
     }, []);
     const [featureIntro, setFeatureIntro] = useState<{ tab: Tab; title: string; body: string } | null>(null);
-    const { featureFlags } = useData();
+    const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
+    const { featureFlags, notificationPrefs } = useData();
 
     useEffect(() => {
         // Check if we have shown the tip today
@@ -73,6 +75,30 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
             return () => clearTimeout(timer);
         }
     }, []);
+
+    useEffect(() => {
+        // Check for notifications
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            // ONLY show if they haven't explicitly subscribed in our DB
+            if (!notificationPrefs.browserEnabled) {
+                const hasSeenNotificationPrompt = localStorage.getItem(`has_seen_notification_prompt_${currentUser.uid}`);
+                if (!hasSeenNotificationPrompt && Notification.permission !== 'denied') {
+                    const timer = setTimeout(() => {
+                        setShowNotificationPrompt(true);
+                    }, 2000); // Wait 2s to avoid overwhelming with other modals
+                    return () => clearTimeout(timer);
+                }
+            } else {
+                // If they are subscribed, ensure the prompt is hidden
+                setShowNotificationPrompt(false);
+            }
+        }
+    }, [currentUser.uid, notificationPrefs.browserEnabled]);
+
+    const handleCloseNotificationPrompt = () => {
+        setShowNotificationPrompt(false);
+        localStorage.setItem(`has_seen_notification_prompt_${currentUser.uid}`, 'true');
+    };
 
     const isFirstLoginSession = useMemo(() => {
         if (typeof window === 'undefined') return false;
@@ -269,6 +295,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
                 title={featureIntro?.title || ''}
                 body={featureIntro?.body || ''}
                 onClose={handleCloseFeatureIntro}
+            />
+
+            <NotificationPromptModal
+                isOpen={showNotificationPrompt}
+                onClose={handleCloseNotificationPrompt}
+                userId={currentUser.uid}
             />
         </div>
     );

@@ -37,6 +37,11 @@ const NotificationPromptModal: React.FC<NotificationPromptModalProps> = ({ isOpe
             const permission = await Notification.requestPermission();
             
             if (permission === 'granted') {
+                // Immediately close the modal and update UI
+                onClose();
+                updateNotificationPrefs({ browserEnabled: true });
+                
+                // Run the subscription process in the background
                 const reg = await navigator.serviceWorker.ready;
                 const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
                 
@@ -47,16 +52,12 @@ const NotificationPromptModal: React.FC<NotificationPromptModalProps> = ({ isOpe
                             applicationServerKey: urlBase64ToUint8Array(vapidKey)
                         });
                         await api.upsertPushSubscription(userId, subscription);
-                        updateNotificationPrefs({ browserEnabled: true });
                     } catch (subErr) {
                         console.error("Subscription failed:", subErr);
+                        // Revert preferences if subscription explicitly fails
+                        updateNotificationPrefs({ browserEnabled: false });
                     }
                 }
-                
-                setStep('success');
-                setTimeout(() => {
-                    onClose();
-                }, 2000);
             } else {
                 setStep('denied');
             }
@@ -107,7 +108,7 @@ const NotificationPromptModal: React.FC<NotificationPromptModalProps> = ({ isOpe
                                 <button
                                     onClick={handleEnable}
                                     disabled={isSubmitting}
-                                    className="w-full py-4.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                                    className="w-full py-5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
                                 >
                                     {isSubmitting ? (
                                         <>

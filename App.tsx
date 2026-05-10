@@ -341,7 +341,6 @@ const App: React.FC = () => {
     }
   }, [user]);
 
-
   const toggleTheme = useCallback(() => {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   }, []);
