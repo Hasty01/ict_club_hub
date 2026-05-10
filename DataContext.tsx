@@ -816,8 +816,32 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User }> 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'voting_positions' }, () => fetchVotingPositions())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'voting_contestants' }, () => fetchAllVotingContestants())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'game_leaderboard' }, () => {
-          // Since getGameLeaderboard is called with gameKey, we might need a more global fetch or leave it to component level
-          // But for now, we can just trigger a general refresh if needed
+          // General refresh if needed
+      })
+      .on('postgres_changes', { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'users',
+          filter: `uid=eq.${currentUser.uid}`
+      }, (payload) => {
+          if (payload.new) {
+              const u = payload.new as any;
+              setCurrentUser({
+                  uid: u.uid,
+                  email: u.email,
+                  name: u.name,
+                  username: u.username,
+                  studentClass: u.class_name,
+                  role: u.role,
+                  status: u.status,
+                  avatarUrl: u.avatar_url,
+                  bio: u.bio,
+                  phoneNumber: u.phone_number,
+                  skillLevel: u.skill_level,
+                  badges: u.badges,
+                  lastLogin: u.last_login
+              });
+          }
       })
       .subscribe();
 

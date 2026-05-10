@@ -1391,9 +1391,10 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           );
           setEvaluationResult(result);
           if (result.passed) {
-              await api.reviewSubmission(submissionId, 'APPROVED', `AI Evaluation: ${result.feedback}`, currentUser.uid);
+              await api.reviewSubmission(submissionId, 'APPROVED', pendingChallenge.title, currentUser.uid);
               showToast("Congratulations! Challenge passed and badge awarded!", "success");
           } else {
+              await api.reviewSubmission(submissionId, 'REJECTED', pendingChallenge.title, currentUser.uid);
               showToast("Challenge evaluation complete. See feedback for improvements.", "info");
           }
       } catch (error: any) {
