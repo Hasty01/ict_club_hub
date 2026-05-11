@@ -6,9 +6,11 @@ import { XIcon } from './icons/XIcon';
 import { TrophyIcon } from './icons/TrophyIcon';
 import { CheckIcon } from './icons/CheckIcon';
 import * as api from '../services/apiService';
-import { analyzeChallengeSubmission } from '../services/geminiService';
+import { autoEvaluateChallenge } from '../services/geminiService';
 import { FormattedMessage } from './FormattedMessage';
 import { SparklesIcon } from './icons/SparklesIcon';
+import { ExclamationCircleIcon } from './icons/ExclamationCircleIcon';
+import { LightBulbIcon } from './icons/LightBulbIcon';
 
 interface SubmitToChallengeModalProps {
     isOpen: boolean;
@@ -18,14 +20,25 @@ interface SubmitToChallengeModalProps {
 }
 
 const SubmitToChallengeModal: React.FC<SubmitToChallengeModalProps> = ({ isOpen, onClose, code, currentUser }) => {
-    const { challenges, fetchChallenges, showToast } = useData();
+    const { challenges, fetchChallenges, showToast, fetchUsers } = useData();
     const [selectedChallengeId, setSelectedChallengeId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [aiFeedback, setAiFeedback] = useState<{ isOpen: boolean, content: string, isLoading: boolean, title: string }>({
+    const [aiFeedback, setAiFeedback] = useState<{ 
+        isOpen: boolean, 
+        content: string, 
+        weaknesses: string,
+        improvements: string,
+        passed: boolean | null,
+        isLoading: boolean, 
+        title: string 
+    }>({
         isOpen: false,
         content: '',
+        weaknesses: '',
+        improvements: '',
+        passed: null,
         isLoading: false,
-        title: 'AI Feedback'
+        title: 'AI Evaluation'
     });
 
     if (!isOpen) return null;
@@ -41,16 +54,55 @@ const SubmitToChallengeModal: React.FC<SubmitToChallengeModalProps> = ({ isOpen,
         
         setIsSubmitting(true);
         try {
-            await api.submitChallenge(selectedChallengeId, currentUser.uid, code);
-            await fetchChallenges(); // Refresh data to potentially update UI elsewhere if needed
-            showToast("Challenge submitted successfully!", "success");
-            const challengeTitle = challenges.find(c => c.id === selectedChallengeId)?.title || 'Challenge';
-            setAiFeedback({ isOpen: true, content: '', isLoading: true, title: `Feedback: ${challengeTitle}` });
+            const submissionId = await api.submitChallenge(selectedChallengeId, currentUser.uid, code);
+            const challenge = challenges.find(c => c.id === selectedChallengeId);
+            const challengeTitle = challenge?.title || 'Challenge';
+            const challengeDescription = challenge?.description || '';
+            
+            setAiFeedback({ 
+                isOpen: true, 
+                content: '', 
+                weaknesses: '',
+                improvements: '',
+                passed: null,
+                isLoading: true, 
+                title: `Evaluation: ${challengeTitle}` 
+            });
+
             try {
-                const result = await analyzeChallengeSubmission(challengeTitle, code);
-                setAiFeedback({ isOpen: true, content: result, isLoading: false, title: `Feedback: ${challengeTitle}` });
+                const result = await autoEvaluateChallenge(challengeTitle, challengeDescription, code);
+                
+                // Award badge if passed
+                if (result.passed) {
+                    await api.reviewSubmission(submissionId, 'APPROVED', challengeTitle, currentUser.uid);
+                    showToast(`Congratulations! You earned the ${challengeTitle} badge!`, "success");
+                    await fetchUsers(); // Refresh user data to show new badge
+                } else {
+                    await api.reviewSubmission(submissionId, 'REJECTED', challengeTitle, currentUser.uid);
+                }
+
+                setAiFeedback({ 
+                    isOpen: true, 
+                    content: result.feedback, 
+                    weaknesses: result.weaknesses,
+                    improvements: result.improvements,
+                    passed: result.passed,
+                    isLoading: false, 
+                    title: `Evaluation: ${challengeTitle}` 
+                });
+                
+                await fetchChallenges(); // Refresh data
             } catch (e) {
-                setAiFeedback({ isOpen: true, content: "AI feedback is unavailable right now. Please try again later.", isLoading: false, title: `Feedback: ${challengeTitle}` });
+                console.error("AI evaluation failed:", e);
+                setAiFeedback({ 
+                    isOpen: true, 
+                    content: "AI evaluation is unavailable right now, but your solution has been submitted for manual review.", 
+                    weaknesses: '',
+                    improvements: '',
+                    passed: null,
+                    isLoading: false, 
+                    title: `Evaluation: ${challengeTitle}` 
+                });
             }
             setSelectedChallengeId(null);
         } catch (error: any) {
@@ -120,40 +172,102 @@ const SubmitToChallengeModal: React.FC<SubmitToChallengeModalProps> = ({ isOpen,
 
             {aiFeedback.isOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[80vh]">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 relative border border-gray-200 dark:border-gray-700 flex flex-col max-h-[90vh]">
                         <button onClick={() => setAiFeedback(prev => ({ ...prev, isOpen: false }))} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded-full transition-colors">
                             <XIcon />
                         </button>
                         
                         <div className="flex items-center gap-4 mb-6">
-                            <div className="p-3 bg-pink-100 dark:bg-pink-900/30 rounded-xl">
-                                <SparklesIcon className="w-8 h-8 text-pink-600 dark:text-pink-400" />
+                            <div className={`p-3 rounded-xl ${aiFeedback.passed ? 'bg-green-100 dark:bg-green-900/30' : aiFeedback.passed === false ? 'bg-red-100 dark:bg-red-900/30' : 'bg-pink-100 dark:bg-pink-900/30'}`}>
+                                {aiFeedback.passed ? (
+                                    <TrophyIcon className="w-8 h-8 text-green-600 dark:text-green-400" />
+                                ) : aiFeedback.passed === false ? (
+                                    <ExclamationCircleIcon className="w-8 h-8 text-red-600 dark:text-red-400" />
+                                ) : (
+                                    <SparklesIcon className="w-8 h-8 text-pink-600 dark:text-pink-400" />
+                                )}
                             </div>
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                                     {aiFeedback.title}
                                 </h3>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Instant AI feedback on your submission</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    {aiFeedback.passed ? 'Challenge Passed!' : aiFeedback.passed === false ? 'Challenge Not Yet Passed' : 'Instant AI evaluation on your submission'}
+                                </p>
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-6">
                             {aiFeedback.isLoading ? (
-                                <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
-                                    <p className="text-gray-500 animate-pulse">Analyzing submission...</p>
+                                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
+                                    <p className="text-gray-500 animate-pulse font-medium">Analyzing your code against challenge requirements...</p>
                                 </div>
                             ) : (
-                                <FormattedMessage text={aiFeedback.content} isUser={false} />
+                                <>
+                                    <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                                        <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                                            <SparklesIcon className="w-4 h-4 text-pink-500" />
+                                            Verdict & Feedback
+                                        </h4>
+                                        <FormattedMessage text={aiFeedback.content} isUser={false} />
+                                    </div>
+
+                                    {aiFeedback.weaknesses && (
+                                        <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-100 dark:border-red-900/20">
+                                            <h4 className="text-sm font-bold text-red-900 dark:text-red-400 mb-2 flex items-center gap-2">
+                                                <AlertTriangleIcon className="w-4 h-4" />
+                                                Areas for Improvement / Missing Requirements
+                                            </h4>
+                                            <div className="text-sm text-red-800 dark:text-red-300">
+                                                <FormattedMessage text={aiFeedback.weaknesses} isUser={false} />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {aiFeedback.improvements && (
+                                        <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/20">
+                                            <h4 className="text-sm font-bold text-blue-900 dark:text-blue-400 mb-2 flex items-center gap-2">
+                                                <LightbulbIcon className="w-4 h-4" />
+                                                Suggested Enhancements
+                                            </h4>
+                                            <div className="text-sm text-blue-800 dark:text-blue-300">
+                                                <FormattedMessage text={aiFeedback.improvements} isUser={false} />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <section className="pt-4 border-t border-gray-100 dark:border-gray-700">
+                                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                            <TrophyIcon className={`w-4 h-4 ${aiFeedback.passed ? 'text-yellow-500' : 'text-gray-400'}`} />
+                                            Badge Status
+                                        </h4>
+                                        <div className={`p-5 rounded-2xl border flex items-center gap-4 ${aiFeedback.passed ? 'bg-yellow-50/50 dark:bg-yellow-900/10 border-yellow-100 dark:border-yellow-900/20' : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
+                                            <div className={`p-3 rounded-xl ${aiFeedback.passed ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600' : 'bg-gray-200 dark:bg-gray-700 text-gray-400'}`}>
+                                                <TrophyIcon className="w-8 h-8" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-900 dark:text-white">
+                                                    {aiFeedback.passed ? 'Badge Earned!' : 'Badge Locked'}
+                                                </p>
+                                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                    {aiFeedback.passed 
+                                                        ? `Congratulations! You've successfully unlocked the ${aiFeedback.title.replace('Evaluation: ', '')} badge.` 
+                                                        : 'Correct the issues mentioned below and try again to earn your badge!'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </section>
+                                </>
                             )}
                         </div>
                         
                         <div className="mt-6 flex justify-end">
                             <button 
                                 onClick={() => setAiFeedback(prev => ({ ...prev, isOpen: false }))} 
-                                className="px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:opacity-90 transition-opacity"
+                                className="px-6 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:opacity-90 transition-opacity shadow-lg"
                             >
-                                Close
+                                {aiFeedback.passed ? 'Awesome!' : 'Got it'}
                             </button>
                         </div>
                     </div>

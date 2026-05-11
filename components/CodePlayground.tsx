@@ -9,6 +9,8 @@ import { CopyIcon } from './icons/CopyIcon';
 import { GlobeIcon } from './icons/GlobeIcon'; 
 import { ShareIcon } from './icons/ShareIcon';
 import { TrophyIcon } from './icons/TrophyIcon';
+import { XCircleIcon } from './icons/XCircleIcon';
+import { BadgeCheckIcon } from './icons/BadgeCheckIcon';
 import Tooltip from './Tooltip';
 import { LightBulbIcon } from './icons/LightBulbIcon';
 import { DotsVerticalIcon } from './icons/DotsVerticalIcon';
@@ -17,6 +19,7 @@ import { ViewGridIcon } from './icons/ViewGridIcon';
 import { UsersIcon } from './icons/UsersIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { PencilIcon } from './icons/PencilIcon';
+import { SparklesIcon } from './icons/SparklesIcon';
 import Editor from '@monaco-editor/react';
 import { emmetHTML, emmetCSS } from 'emmet-monaco-es';
 import { User, Tab, PlaygroundProject, PlaygroundProjectFile, PlaygroundProjectActivity, PlaygroundProjectMember } from '../types';
@@ -350,7 +353,7 @@ const processCarriageReturns = (text: string) => {
 };
 
 const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, setActiveTab }) => {
-  const { fetchShowcaseItems, showToast, teams, allUsers } = useData();
+  const { fetchShowcaseItems, showToast, teams, allUsers, fetchUsers } = useData();
   const [language, setLanguage] = useState<SingleLanguage>(() => {
       return (localStorage.getItem('playground_lang') as SingleLanguage) || 'python';
   });
@@ -1393,6 +1396,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ theme, currentUser, set
           if (result.passed) {
               await api.reviewSubmission(submissionId, 'APPROVED', pendingChallenge.title, currentUser.uid);
               showToast("Congratulations! Challenge passed and badge awarded!", "success");
+              await fetchUsers(); 
           } else {
               await api.reviewSubmission(submissionId, 'REJECTED', pendingChallenge.title, currentUser.uid);
               showToast("Challenge evaluation complete. See feedback for improvements.", "info");
@@ -2597,6 +2601,42 @@ if "${projectDir}" not in sys.path:
                       <div className="space-y-8">
                           <section>
                               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                  <SparklesIcon className="w-4 h-4 text-purple-500" />
+                                  AI Feedback
+                              </h4>
+                              <div className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300 leading-relaxed">
+                                  <FormattedMessage text={evaluationResult.feedback} isUser={false} />
+                              </div>
+                          </section>
+
+                          {evaluationResult.weaknesses && (
+                              <section>
+                                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                      {evaluationResult.passed ? (
+                                          <PlayIcon className="w-4 h-4 text-emerald-500 rotate-90" />
+                                      ) : (
+                                          <XCircleIcon className="w-4 h-4 text-orange-500" />
+                                      )}
+                                      {evaluationResult.passed ? 'Technical Highlights' : 'Missing Requirements'}
+                                  </h4>
+                                  <div className={`p-5 rounded-2xl border leading-relaxed ${evaluationResult.passed ? 'bg-emerald-50/30 dark:bg-emerald-900/10 border-emerald-100/50 dark:border-emerald-900/20 text-emerald-900/80 dark:text-emerald-100/80' : 'bg-orange-50/50 dark:bg-orange-900/10 border-orange-100/50 dark:border-orange-900/20 text-gray-700 dark:text-gray-300'}`}>
+                                      <FormattedMessage text={evaluationResult.weaknesses} isUser={false} />
+                                  </div>
+                              </section>
+                          )}
+
+                          <section>
+                              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                  <LightBulbIcon className="w-4 h-4 text-yellow-500" />
+                                  Recommended Improvements
+                              </h4>
+                              <div className="bg-blue-50/50 dark:bg-blue-900/10 p-5 rounded-2xl border border-blue-100/50 dark:border-blue-900/20 text-gray-700 dark:text-gray-300 leading-relaxed">
+                                  <FormattedMessage text={evaluationResult.improvements} isUser={false} />
+                              </div>
+                          </section>
+
+                          <section className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                                   <TrophyIcon className={`w-4 h-4 ${evaluationResult.passed ? 'text-yellow-500' : 'text-gray-400'}`} />
                                   Badge Status
                               </h4>
@@ -2614,38 +2654,6 @@ if "${projectDir}" not in sys.path:
                                               : 'Correct the issues mentioned below and try again to earn your badge!'}
                                       </p>
                                   </div>
-                              </div>
-                          </section>
-
-                          <section>
-                              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                  <SparklesIcon className="w-4 h-4 text-purple-500" />
-                                  AI Feedback
-                              </h4>
-                              <div className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300 leading-relaxed">
-                                  <FormattedMessage text={evaluationResult.feedback} isUser={false} />
-                              </div>
-                          </section>
-
-                          {evaluationResult.weaknesses && (
-                              <section>
-                                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                      <PlayIcon className="w-4 h-4 text-orange-500 rotate-90" />
-                                      Key Weaknesses
-                                  </h4>
-                                  <div className="bg-orange-50/50 dark:bg-orange-900/10 p-5 rounded-2xl border border-orange-100/50 dark:border-orange-900/20 text-gray-700 dark:text-gray-300 leading-relaxed">
-                                      <FormattedMessage text={evaluationResult.weaknesses} isUser={false} />
-                                  </div>
-                              </section>
-                          )}
-
-                          <section>
-                              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                  <LightBulbIcon className="w-4 h-4 text-yellow-500" />
-                                  Recommended Improvements
-                              </h4>
-                              <div className="bg-blue-50/50 dark:bg-blue-900/10 p-5 rounded-2xl border border-blue-100/50 dark:border-blue-900/20 text-gray-700 dark:text-gray-300 leading-relaxed">
-                                  <FormattedMessage text={evaluationResult.improvements} isUser={false} />
                               </div>
                           </section>
                       </div>

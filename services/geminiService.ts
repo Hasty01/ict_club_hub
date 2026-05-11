@@ -126,6 +126,40 @@ const parseJSONResponse = (text: string) => {
     }
 };
 
+const toSafeText = (value: unknown, fallback: string = ''): string => {
+    if (typeof value === 'string') return value;
+    if (value == null) return fallback;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch {
+        return fallback;
+    }
+};
+
+const normalizeChallengeEvaluation = (value: any): {
+    passed: boolean;
+    feedback: string;
+    weaknesses: string;
+    improvements: string;
+} => {
+    const passed = typeof value?.passed === 'boolean'
+        ? value.passed
+        : String(value?.passed ?? '').toLowerCase() === 'true';
+
+    return {
+        passed,
+        feedback: toSafeText(
+            value?.feedback,
+            passed
+                ? 'Your submission passed evaluation.'
+                : 'Your submission was evaluated, but detailed feedback was unavailable.'
+        ),
+        weaknesses: toSafeText(value?.weaknesses, ''),
+        improvements: toSafeText(value?.improvements, ''),
+    };
+};
+
 const callAI = async (messages: any[], jsonMode: boolean = false): Promise<string> => {
     if (!apiKey) throw new Error("AI Service missing API Key");
 
@@ -425,18 +459,18 @@ Evaluation Guidelines:
 Return ONLY a JSON object with this exact structure:
 {
     "passed": boolean,
-    "feedback": "A direct explanation of why the code passed or failed, explicitly mentioning if they earned the badge or what they need to fix to get it next time.",
-    "weaknesses": "Specific technical weaknesses or bugs found in the code.",
-    "improvements": "Actionable, advanced tips or alternative approaches to refine their coding style."
+    "feedback": "Start with a clear verdict (e.g., 'Your code is excellent' or 'Your code does not yet meet all requirements'). Then, provide a concise explanation of why it passed or failed. If it failed, explicitly point out which specific demands from the challenge were missing or incorrect. Finally, end with a clear statement: 'You have earned the badge!' or 'The badge remains locked for now.'",
+    "weaknesses": "List the specific technical errors, missing requirements, or logical bugs. Use bullet points if multiple items are missing.",
+    "improvements": "Actionable advice on how to fix the errors or how to write even better code in the future."
 }`;
 
     try {
         const text = await callGemini(prompt);
-        return JSON.parse(cleanResponse(text));
+        return normalizeChallengeEvaluation(parseJSONResponse(text));
     } catch (error) {
         console.warn("Gemini evaluation error, falling back to Hugging Face:", error);
         const text = await callAI([{ role: "user", content: prompt }], true);
-        return JSON.parse(cleanResponse(text));
+        return normalizeChallengeEvaluation(parseJSONResponse(text));
     }
 };
 

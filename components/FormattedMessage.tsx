@@ -211,7 +211,7 @@ const renderTable = (header: string[], rows: string[][], isUser: boolean, key: n
     );
 };
 
-const renderTextPart = (content: string, isUser: boolean) => {
+const renderTextPart = (content: string, isUser: boolean, partIndex: number) => {
     const lines = content.split('\n');
     const nodes: React.ReactNode[] = [];
     let i = 0;
@@ -220,6 +220,7 @@ const renderTextPart = (content: string, isUser: boolean) => {
         const line = lines[i];
         const trimmed = line.trim();
         const next = lines[i + 1];
+        const baseKey = `part-${partIndex}-line-${i}`;
 
         if (isTableRow(line) && next && isTableSeparator(next)) {
             const header = splitTableRow(line);
@@ -229,7 +230,7 @@ const renderTextPart = (content: string, isUser: boolean) => {
                 rows.push(splitTableRow(lines[i]));
                 i += 1;
             }
-            nodes.push(renderTable(header, rows, isUser, i));
+            nodes.push(renderTable(header, rows, isUser, `${baseKey}-table`));
             continue;
         }
 
@@ -237,7 +238,7 @@ const renderTextPart = (content: string, isUser: boolean) => {
         if (trimmed.startsWith('>')) {
             const quoteText = trimmed.replace(/^>\s?/, '');
             nodes.push(
-                <div key={i} className={`border-l-4 pl-3 my-2 ${isUser ? 'border-teal-300 text-teal-50/90' : 'border-pink-400 text-gray-700 dark:text-gray-200'}`}>
+                <div key={baseKey} className={`border-l-4 pl-3 my-2 ${isUser ? 'border-teal-300 text-teal-50/90' : 'border-pink-400 text-gray-700 dark:text-gray-200'}`}>
                     {formatInline(quoteText, isUser)}
                 </div>
             );
@@ -248,7 +249,7 @@ const renderTextPart = (content: string, isUser: boolean) => {
         // Horizontal Rule
         if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
             nodes.push(
-                <hr key={i} className={`my-3 border-0 h-px ${isUser ? 'bg-teal-300/40' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                <hr key={baseKey} className={`my-3 border-0 h-px ${isUser ? 'bg-teal-300/40' : 'bg-gray-200 dark:bg-gray-700'}`} />
             );
             i += 1;
             continue;
@@ -257,7 +258,7 @@ const renderTextPart = (content: string, isUser: boolean) => {
         // Unordered List
         if (trimmed.match(/^[-*]\s/)) {
             nodes.push(
-                <div key={i} className="flex gap-2 ml-1 mb-1">
+                <div key={baseKey} className="flex gap-2 ml-1 mb-1">
                     <span className={`text-xs mt-1.5 ${isUser ? 'text-teal-200' : 'text-pink-500'}`}>●</span>
                     <span className="flex-1">{formatInline(trimmed.substring(2), isUser)}</span>
                 </div>
@@ -270,7 +271,7 @@ const renderTextPart = (content: string, isUser: boolean) => {
         const orderedMatch = trimmed.match(/^(\d+)\.\s/);
         if (orderedMatch) {
             nodes.push(
-                <div key={i} className="flex gap-2 ml-1 mb-1">
+                <div key={baseKey} className="flex gap-2 ml-1 mb-1">
                     <span className={`font-bold text-xs mt-0.5 ${isUser ? 'text-teal-200' : 'text-pink-500'}`}>{orderedMatch[1]}.</span>
                     <span className="flex-1">{formatInline(trimmed.substring(orderedMatch[0].length), isUser)}</span>
                 </div>
@@ -285,11 +286,11 @@ const renderTextPart = (content: string, isUser: boolean) => {
             const level = headingMatch[1].length;
             const text = headingMatch[2].trim();
             if (level === 3) {
-                nodes.push(<h4 key={i} className="font-bold text-base mt-3 mb-1 block">{formatInline(text, isUser)}</h4>);
+                nodes.push(<h4 key={baseKey} className="font-bold text-base mt-3 mb-1 block">{formatInline(text, isUser)}</h4>);
             } else if (level === 2) {
-                nodes.push(<h3 key={i} className="font-bold text-lg mt-4 mb-2 block border-b border-gray-200 dark:border-gray-700 pb-1">{formatInline(text, isUser)}</h3>);
+                nodes.push(<h3 key={baseKey} className="font-bold text-lg mt-4 mb-2 block border-b border-gray-200 dark:border-gray-700 pb-1">{formatInline(text, isUser)}</h3>);
             } else {
-                nodes.push(<h2 key={i} className="font-extrabold text-xl mt-4 mb-2 block">{formatInline(text, isUser)}</h2>);
+                nodes.push(<h2 key={baseKey} className="font-extrabold text-xl mt-4 mb-2 block">{formatInline(text, isUser)}</h2>);
             }
             i += 1;
             continue;
@@ -297,12 +298,12 @@ const renderTextPart = (content: string, isUser: boolean) => {
 
         // Empty lines
         if (!trimmed) {
-            nodes.push(<div key={i} className="h-2" />);
+            nodes.push(<div key={baseKey} className="h-2" />);
             i += 1;
             continue;
         }
 
-        nodes.push(<div key={i} className="min-h-[1.25rem]">{formatInline(line, isUser)}</div>);
+        nodes.push(<div key={baseKey} className="min-h-[1.25rem]">{formatInline(line, isUser)}</div>);
         i += 1;
     }
 
@@ -334,7 +335,7 @@ export const FormattedMessage: React.FC<{ text: string, isUser: boolean }> = ({ 
                 }
                 return (
                     <div key={index}>
-                        {renderTextPart(part.content, isUser)}
+                        {renderTextPart(part.content, isUser, index)}
                     </div>
                 );
             })}
