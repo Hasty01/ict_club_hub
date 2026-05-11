@@ -24,6 +24,7 @@ import OfflineIndicator from './components/OfflineIndicator';
 import AlertModal from './components/AlertModal';
 import DeploymentChangelogModal from './components/DeploymentChangelogModal';
 import { LATEST_DEPLOYMENT_CHANGELOG } from './deploymentChangelog';
+import StreakNoticeModal from './components/StreakNoticeModal';
 
 type View = 'welcome' | 'login' | 'signup' | 'dashboard' | 'patronLogin' | 'patronSignUp' | 'freeRunner';
 type Theme = 'light' | 'dark';
@@ -76,6 +77,8 @@ const App: React.FC = () => {
   const [showTourModal, setShowTourModal] = useState(false);
   const [showDeploymentChangelog, setShowDeploymentChangelog] = useState(false);
   const [pendingDeploymentChangelog, setPendingDeploymentChangelog] = useState(false);
+  const [streakNotice, setStreakNotice] = useState<{ title: string; message: string; variant: 'warning' | 'danger' } | null>(null);
+  const [pendingStreakNotice, setPendingStreakNotice] = useState<{ title: string; message: string; variant: 'warning' | 'danger' } | null>(null);
   const [isOnline, setIsOnline] = useState(() => {
     if (typeof window !== 'undefined') {
       return navigator.onLine;
@@ -192,13 +195,18 @@ const App: React.FC = () => {
 
       if (userProfile) {
         if (userProfile.status === 'APPROVED') {
-          setUser(userProfile);
+          const streakResult = await api.syncUserLoginStreak(userProfile);
+          const hydratedUser = {
+            ...streakResult.user,
+            lastLogin: new Date().toISOString(),
+          };
+          setUser(hydratedUser);
           setView('dashboard');
-          cacheUserProfile(userProfile);
+          cacheUserProfile(hydratedUser);
 
           // Check if user has seen the feature tour
-          const hasSeenTour = localStorage.getItem(`has_seen_tour_${userProfile.uid}`);
-          const hasUnseenDeploymentChangelog = shouldShowDeploymentChangelog(userProfile.uid);
+          const hasSeenTour = localStorage.getItem(`has_seen_tour_${hydratedUser.uid}`);
+          const hasUnseenDeploymentChangelog = shouldShowDeploymentChangelog(hydratedUser.uid);
           if (!hasSeenTour) {
             setShowTourModal(true);
             setPendingDeploymentChangelog(hasUnseenDeploymentChangelog);
@@ -212,6 +220,24 @@ const App: React.FC = () => {
             try {
               sessionStorage.removeItem('first_login_session');
             } catch { }
+          }
+
+          if (streakResult.notice) {
+            const nextNotice = {
+              title: streakResult.notice.title,
+              message: streakResult.notice.message,
+              variant: streakResult.notice.type === 'broken' ? 'danger' : 'warning',
+            } as const;
+            if (!hasSeenTour || hasUnseenDeploymentChangelog) {
+              setPendingStreakNotice(nextNotice);
+              setStreakNotice(null);
+            } else {
+              setStreakNotice(nextNotice);
+              setPendingStreakNotice(null);
+            }
+          } else {
+            setStreakNotice(null);
+            setPendingStreakNotice(null);
           }
 
           // Update Last Login
@@ -312,6 +338,8 @@ const App: React.FC = () => {
         setView('welcome');
         setShowDeploymentChangelog(false);
         setPendingDeploymentChangelog(false);
+        setStreakNotice(null);
+        setPendingStreakNotice(null);
         cacheUserProfile(null);
       }
     });
@@ -343,6 +371,8 @@ const App: React.FC = () => {
       setActiveTab('feed');
       setShowDeploymentChangelog(false);
       setPendingDeploymentChangelog(false);
+      setStreakNotice(null);
+      setPendingStreakNotice(null);
       cacheUserProfile(null);
     }
   }, []);
@@ -366,16 +396,23 @@ const App: React.FC = () => {
       if (pendingDeploymentChangelog) {
         setShowDeploymentChangelog(true);
         setPendingDeploymentChangelog(false);
+      } else if (pendingStreakNotice) {
+        setStreakNotice(pendingStreakNotice);
+        setPendingStreakNotice(null);
       }
     }
-  }, [user, pendingDeploymentChangelog]);
+  }, [user, pendingDeploymentChangelog, pendingStreakNotice]);
 
   const handleCloseDeploymentChangelog = useCallback(() => {
     setShowDeploymentChangelog(false);
     if (user) {
       markDeploymentChangelogSeen(user.uid);
     }
-  }, [user]);
+    if (pendingStreakNotice) {
+      setStreakNotice(pendingStreakNotice);
+      setPendingStreakNotice(null);
+    }
+  }, [user, pendingStreakNotice]);
 
   const toggleTheme = useCallback(() => {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
@@ -438,6 +475,21 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2 sm:gap-4">
+                  <div
+                    className="hidden sm:flex items-center gap-2 rounded-full border border-amber-200/80 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5"
+                    title={user.streakGraceUsed ? 'Streak grace used' : 'Streak grace available'}
+                  >
+                    <span aria-hidden="true" className="text-sm leading-none">🔥</span>
+                    <div className="leading-tight">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
+                        Streak
+                      </p>
+                      <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">
+                        {user.streakCount || 0} day{(user.streakCount || 0) === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                  </div>
+
                   <button
                     onClick={toggleTheme}
                     className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
@@ -539,6 +591,13 @@ const App: React.FC = () => {
         isOpen={showDeploymentChangelog}
         entry={LATEST_DEPLOYMENT_CHANGELOG}
         onClose={handleCloseDeploymentChangelog}
+      />
+      <StreakNoticeModal
+        isOpen={!!streakNotice}
+        title={streakNotice?.title || ''}
+        message={streakNotice?.message || ''}
+        variant={streakNotice?.variant || 'warning'}
+        onClose={() => setStreakNotice(null)}
       />
     </div>
   );

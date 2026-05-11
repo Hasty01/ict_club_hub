@@ -218,7 +218,10 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
         phoneNumber: data.phone_number,
         skillLevel: data.skill_level,
         badges: data.badges,
-        lastLogin: data.last_login
+        lastLogin: data.last_login,
+        streakCount: data.streak_count ?? 0,
+        streakLastActiveDate: data.streak_last_active_date ?? undefined,
+        streakGraceUsed: data.streak_grace_used ?? false
     };
 };
 
@@ -238,7 +241,10 @@ export const getUsers = async (): Promise<User[]> => {
         phoneNumber: u.phone_number,
         skillLevel: u.skill_level,
         badges: u.badges,
-        lastLogin: u.last_login
+        lastLogin: u.last_login,
+        streakCount: u.streak_count ?? 0,
+        streakLastActiveDate: u.streak_last_active_date ?? undefined,
+        streakGraceUsed: u.streak_grace_used ?? false
     }));
 };
 
@@ -255,9 +261,124 @@ export const updateUser = async (uid: string, data: Partial<User>) => {
     if (data.skillLevel) updates.skill_level = data.skillLevel;
     if (data.badges) updates.badges = data.badges;
     if (data.lastLogin) updates.last_login = data.lastLogin;
+    if (data.streakCount !== undefined) updates.streak_count = data.streakCount;
+    if (data.streakLastActiveDate !== undefined) updates.streak_last_active_date = data.streakLastActiveDate;
+    if (data.streakGraceUsed !== undefined) updates.streak_grace_used = data.streakGraceUsed;
 
     const { error } = await supabase.from('users').update(updates).eq('uid', uid);
     if (error) throw error;
+};
+
+const STREAK_TIME_ZONE = 'Africa/Nairobi';
+
+const getStreakDayKey = (date: Date = new Date()): string => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: STREAK_TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(date);
+
+    const year = parts.find(part => part.type === 'year')?.value || '1970';
+    const month = parts.find(part => part.type === 'month')?.value || '01';
+    const day = parts.find(part => part.type === 'day')?.value || '01';
+    return `${year}-${month}-${day}`;
+};
+
+const dayDiff = (fromDay: string, toDay: string): number => {
+    const [fromYear, fromMonth, fromDate] = fromDay.split('-').map(Number);
+    const [toYear, toMonth, toDate] = toDay.split('-').map(Number);
+    const fromUtc = Date.UTC(fromYear, (fromMonth || 1) - 1, fromDate || 1);
+    const toUtc = Date.UTC(toYear, (toMonth || 1) - 1, toDate || 1);
+    return Math.floor((toUtc - fromUtc) / 86400000);
+};
+
+export type StreakLoginNotice =
+    | { type: 'saved_with_grace'; title: string; message: string }
+    | { type: 'broken'; title: string; message: string }
+    | null;
+
+export const syncUserLoginStreak = async (user: User): Promise<{ user: User; notice: StreakLoginNotice }> => {
+    const today = getStreakDayKey();
+    const previousDay = user.streakLastActiveDate;
+    const currentCount = Math.max(0, user.streakCount || 0);
+    const graceUsed = !!user.streakGraceUsed;
+
+    if (!previousDay) {
+        const updatedUser = {
+            ...user,
+            streakCount: 1,
+            streakLastActiveDate: today,
+            streakGraceUsed: false,
+        };
+        await updateUser(user.uid, {
+            streakCount: 1,
+            streakLastActiveDate: today,
+            streakGraceUsed: false,
+        });
+        return { user: updatedUser, notice: null };
+    }
+
+    const diff = dayDiff(previousDay, today);
+    if (diff <= 0) {
+        return { user, notice: null };
+    }
+
+    if (diff === 1) {
+        const updatedUser = {
+            ...user,
+            streakCount: currentCount + 1,
+            streakLastActiveDate: today,
+        };
+        await updateUser(user.uid, {
+            streakCount: updatedUser.streakCount,
+            streakLastActiveDate: today,
+        });
+        return { user: updatedUser, notice: null };
+    }
+
+    if (diff === 2 && !graceUsed) {
+        const updatedUser = {
+            ...user,
+            streakCount: currentCount + 1,
+            streakLastActiveDate: today,
+            streakGraceUsed: true,
+        };
+        await updateUser(user.uid, {
+            streakCount: updatedUser.streakCount,
+            streakLastActiveDate: today,
+            streakGraceUsed: true,
+        });
+        return {
+            user: updatedUser,
+            notice: {
+                type: 'saved_with_grace',
+                title: 'Streak Saved',
+                message: 'You were late, but your one streak exception saved this streak. Miss again and the streak will reset.',
+            },
+        };
+    }
+
+    const previousCount = Math.max(1, currentCount);
+    const updatedUser = {
+        ...user,
+        streakCount: 1,
+        streakLastActiveDate: today,
+        streakGraceUsed: false,
+    };
+    await updateUser(user.uid, {
+        streakCount: 1,
+        streakLastActiveDate: today,
+        streakGraceUsed: false,
+    });
+    return {
+        user: updatedUser,
+        notice: {
+            type: 'broken',
+            title: 'Streak Lost',
+            message: `Your ${previousCount}-day streak ended because you missed too many days. Log in consistently to build it again.`,
+        },
+    };
 };
 
 export const deleteUser = async (uid: string) => {

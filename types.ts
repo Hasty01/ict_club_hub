@@ -107,6 +107,9 @@ export interface User {
   skillLevel?: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
   badges?: string[]; // List of challenge titles won
   lastLogin?: string; // ISO Date string
+  streakCount?: number;
+  streakLastActiveDate?: string;
+  streakGraceUsed?: boolean;
 }
 
 export type ActivityCategory = 'WORKSHOP' | 'SOCIAL' | 'COMPETITION' | 'GUEST_SPEAKER' | 'OTHER';

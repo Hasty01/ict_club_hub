@@ -458,6 +458,12 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
         );
     }, [attendance]);
 
+    const streakCount = currentUser.streakCount || 0;
+    const streakGraceLabel = currentUser.streakGraceUsed ? 'Grace already used' : 'Grace available';
+    const streakGraceTone = currentUser.streakGraceUsed
+        ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300';
+
     const totalActivities = attendance.length;
 
     const portfolioItems = useMemo(() => {
@@ -620,6 +626,36 @@ const Profile: React.FC<{ currentUser: User, onUpdateUserProfile: (user: User) =
                                         )}
                                     </div>
                                 </div>
+                            </div>
+
+                            <div className="mt-6 bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Login Streak</h3>
+                                        <div className="flex items-center gap-3">
+                                            <span aria-hidden="true" className="text-2xl leading-none">🔥</span>
+                                            <div>
+                                                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                                                    {streakCount} day{streakCount === 1 ? '' : 's'}
+                                                </p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {currentUser.streakLastActiveDate ? `Last active: ${currentUser.streakLastActiveDate}` : 'Start your streak by logging in daily.'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <span className={`inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold ${streakGraceTone}`}>
+                                            {streakGraceLabel}
+                                        </span>
+                                        <span className="inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 px-3 py-1 text-xs font-semibold">
+                                            One late exception policy
+                                        </span>
+                                    </div>
+                                </div>
+                                <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">
+                                    If you miss one day, your grace can preserve the streak once. A later miss after that resets it.
+                                </p>
                             </div>
 
                             <div className="mt-6 bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-4">

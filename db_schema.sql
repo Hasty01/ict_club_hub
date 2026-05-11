@@ -260,6 +260,11 @@ alter table public.users
 alter table public.users
   add column if not exists class_name text;
 
+alter table public.users
+  add column if not exists streak_count integer not null default 0,
+  add column if not exists streak_last_active_date date,
+  add column if not exists streak_grace_used boolean not null default false;
+
 -- Team challenge submissions policies
 create policy "Team submissions visible to authenticated users"
   on public.team_challenge_submissions for select
