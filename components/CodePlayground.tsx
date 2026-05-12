@@ -2270,7 +2270,7 @@ if "${projectDir}" not in sys.path:
                         ) : (
                             <SparklesIcon className="w-4 h-4 text-yellow-300"/>
                         )}
-                        <span>{isEvaluating ? 'Evaluating...' : 'Submit to AI'}</span>
+                        <span>{isEvaluating ? 'Evaluating...' : 'Submit Challenge'}</span>
                      </button>
                  </Tooltip>
              )}
