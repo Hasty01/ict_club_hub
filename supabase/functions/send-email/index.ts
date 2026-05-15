@@ -74,31 +74,30 @@ const TEMPLATES: Record<string, (data: any) => { subject: string; html: string }
   'approval': (data) => ({
     subject: "Welcome to the Hub! Your account is approved 🚀",
     html: `
-        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 20px; text-align: center; color: white;">
-            <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.025em;">Welcome, ${data.name}!</h1>
+        <div style="background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%); padding: 48px 20px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -0.025em;">Welcome, ${data.name}!</h1>
         </div>
         <div style="padding: 40px;">
             <p style="font-size: 16px; color: #4b5563; margin-bottom: 24px; line-height: 1.6;">
                 Great news! Your account has been <strong>approved</strong> by the club patrons. You now have full access to the ICT Club Hub.
             </p>
             
-            <div style="background-color: #f3f4f6; border-radius: 16px; padding: 24px; margin: 32px 0;">
-                <h3 style="margin-top: 0; font-size: 14px; color: #6b7280; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">What's Next?</h3>
-                <ul style="padding-left: 20px; color: #4b5563; font-size: 15px; line-height: 1.8;">
-                    <li>Participate in coding challenges</li>
-                    <li>Join the club chat and collaborate</li>
-                    <li>Showcase your projects to the community</li>
-                    <li>Earn points and climb the leaderboard</li>
-                </ul>
+            <div style="background-color: #f3f4f6; border-radius: 12px; padding: 24px; text-align: center; margin: 32px 0; border: 2px dashed #e5e7eb;">
+                <p style="margin-top: 0; font-size: 14px; color: #6b7280; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Membership Status</p>
+                <div style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 0.1em; color: #7c3aed; margin: 0;">APPROVED</div>
             </div>
+
+            <p style="font-size: 16px; color: #4b5563; margin-bottom: 24px; line-height: 1.6;">
+                You can now participate in coding challenges, join the real-time chat, and showcase your projects to the community.
+            </p>
 
             <div style="text-align: center; margin-top: 32px;">
-                <a href="${data.origin || 'https://clubhub.hakimkavuma.space'}" style="display: inline-block; padding: 14px 32px; background-color: #8b5cf6; color: white; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.3);">Access Your Dashboard</a>
+                <a href="${data.origin || 'https://clubhub.hakimkavuma.space'}" style="display: inline-block; padding: 14px 32px; background-color: #7c3aed; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px -1px rgba(124, 58, 237, 0.3);">Access Your Dashboard</a>
             </div>
 
-            <p style="font-size: 14px; color: #94a3b8; margin-top: 40px; text-align: center;">
-                If you have any questions, reach out in the help channel.
-            </p>
+            <div style="font-size: 14px; color: #6b7280; margin-top: 32px; border-top: 1px solid #f3f4f6; padding-top: 24px; text-align: center;">
+                <p>Welcome to the community! We're excited to see what you'll create.</p>
+            </div>
         </div>
     `
   }),
