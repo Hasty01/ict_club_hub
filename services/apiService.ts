@@ -531,27 +531,13 @@ export const changePassword = async (newPassword: string) => {
 };
 
 export const sendPasswordResetEmail = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const { error } = await supabase.functions.invoke('request-password-reset', {
+        body: { 
+            email,
+            redirectTo: `${window.location.origin}/reset-password`
+        }
+    });
     if (error) throw error;
-    
-    // Optionally send a secondary notification via Resend to ensure delivery or provide custom branding
-    try {
-        await sendEmail({
-            to: email,
-            subject: "Password Reset Requested",
-            html: `
-                <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 12px;">
-                    <h3 style="color: #7c3aed;">Password Reset Request</h3>
-                    <p>We received a request to reset your password for your ICT Club Hub account.</p>
-                    <p>If you didn't make this request, you can safely ignore this email.</p>
-                    <p>A separate email with a reset code has been sent to you. Please use that code in the app to set a new password.</p>
-                    <p style="font-size: 12px; color: #999; margin-top: 40px;">St. Joseph's SSS Naggalama ICT Club Hub</p>
-                </div>
-            `
-        });
-    } catch (e) {
-        console.warn("Resend secondary reset notification failed", e);
-    }
 };
 
 export const resetPasswordWithOtp = async (email: string, otp: string, newPassword: string) => {
