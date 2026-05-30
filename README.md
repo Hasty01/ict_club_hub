@@ -1,4 +1,4 @@
-# 🚀 ICT Club Hub (Naggalama)
+# 🚀 ICT Club Hub (STAHIZA)
 
 ![Banner](https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=EC4899,8B5CF6,6366f1&height=250&section=header&text=ICT%20Club%20Hub&fontSize=80&fontColor=ffffff&desc=Connect.%20Code.%20Create.&descSize=20&fontAlignY=40)
 
@@ -102,11 +102,11 @@ npm run dev
 
 If you encounter issues during setup (e.g., missing database columns), please refer to the `db_schema.sql` file for the most up-to-date table definitions. 
 
-For feature requests or bug reports, please contact the **ICT Club Naggalama Team**.
+For feature requests or bug reports, please contact the **ICT Club STAHIZA Team**.
 
 ---
 
 <div align="center">
-  <p>Made with ❤️ by Hakim</p>
+  <p>Made with ❤️ by Joel</p>
   <p>© 2026 ICT Club Hub</p>
 </div>
