@@ -195,7 +195,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen
                 <span className="text-xl font-black tracking-tight text-gray-900 dark:text-white leading-none">
                   Club<span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600">Hub</span>
                 </span>
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium tracking-widest uppercase mt-0.5">Naggalama</span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium tracking-widest uppercase mt-0.5">STAHIZA</span>
               </div>
             )}
           </div>
