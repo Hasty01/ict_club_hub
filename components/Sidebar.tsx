@@ -83,7 +83,7 @@ const ClubHubLogo = () => (
   <img 
     src="/logo.png" 
     alt="ClubHub Logo" 
-    className="h-9 w-9 flex-shrink-0 object-contain filter drop-shadow-sm"
+    className="h-9 w-9 flex-shrink-0 object-contain filter drop-shadow-sm rounded-[20px] shadow-lg shadow-sky-500/60"
   />
 );
 
