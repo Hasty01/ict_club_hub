@@ -80,21 +80,14 @@ const NavLink: React.FC<{
 };
 
 const ClubHubLogo = () => (
-  <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-9 w-9 flex-shrink-0 filter drop-shadow-sm">
-    <defs>
-      <linearGradient id="sidebar_logo_grad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#EC4899" />
-        <stop offset="100%" stopColor="#8B5CF6" />
-      </linearGradient>
-    </defs>
-    <circle cx="32" cy="32" r="30" fill="url(#sidebar_logo_grad)" />
-    <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" fontFamily="monospace, sans-serif" fontSize="28" fontWeight="bold" fill="white" letterSpacing="-1">
-      ICH
-    </text>
-  </svg>
+  <img 
+    src="/logo.png" 
+    alt="ClubHub Logo" 
+    className="h-9 w-9 flex-shrink-0 object-contain filter drop-shadow-sm"
+  />
 );
 
-const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen, onClose, isCollapsed, onToggleCollapse }) => {
+function Sidebar({ user, activeTab, setActiveTab, isOpen, onClose, isCollapsed, onToggleCollapse }) {
   const { unreadMessageCounts, notifications, featureFlags } = useData();
 
   const totalUnread = useMemo(() => {
@@ -177,8 +170,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen
       <div
         className={`fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-20 md:hidden transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
-        aria-hidden="true"
-      />
+        aria-hidden="true" />
 
       {/* Sidebar Container */}
       <aside className={`bg-white/80 dark:bg-gray-900/80 border-r border-gray-200 dark:border-gray-800 flex flex-col h-screen transform transition-all md:transition-all duration-300 ease-in-out md:sticky md:top-0 ${isCollapsed ? 'md:w-[5.5rem]' : 'w-72'} ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} fixed inset-y-0 left-0 z-30 shadow-2xl md:shadow-none overflow-hidden`}>
@@ -227,8 +219,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen
                     activeTab={activeTab}
                     onClick={handleNavClick}
                     isCollapsed={isCollapsed}
-                    badge={item.badge}
-                  />
+                    badge={item.badge} />
                 ))}
               </ul>
             </div>
@@ -250,6 +241,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, isOpen
       </aside>
     </>
   );
-};
+}
 
 export default Sidebar;
