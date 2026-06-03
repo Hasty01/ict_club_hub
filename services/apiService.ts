@@ -33,17 +33,65 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
         (!isTitleRequired || title.trim().length > 0) &&
         (type !== 'POLL' || validPollOptions.length >= 2);
 
-    const handleTypeChange = (newType: FeedItemType) => {
-        setType(newType);
-        setErrorMsg(null);
-        // Clear type-specific states to keep payload predictable
-        if (newType === 'POLL') {
-            setTitle('');
-            setImageUrl('');
-            setSelectedFile(null);
-            setPreviewUrl(null);
+const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    if (!message.trim()) {
+        setErrorMsg('Please enter a message or question.');
+        return;
+    }
+
+    if (isTitleRequired && !title.trim()) {
+        setErrorMsg('Please add a title for news or event announcements.');
+        return;
+    }
+
+    setIsSubmitting(true);
+    try {
+        let finalImageUrl = imageUrl.trim() || undefined;
+
+        if (selectedFile) {
+            try {
+                // Call the isolated service cleanly
+                finalImageUrl = await api.uploadFeedImage(selectedFile);
+            } catch (storageErr: any) {
+                throw new Error(`Storage Error: ${storageErr.message || 'Bucket not found or upload denied.'}`);
+            }
         }
-    };
+
+        await onAddAnnouncement({
+            title: type !== 'POLL' ? title.trim() : '',
+            message: message.trim(),
+            type,
+            imageUrl: type !== 'POLL' ? finalImageUrl : undefined,
+            pollOptions: type === 'POLL' ? validPollOptions : undefined
+        });
+
+        // Clear inputs on success
+        setTitle('');
+        setMessage('');
+        setImageUrl('');
+        setSelectedFile(null);
+        setPreviewUrl(null);
+    } catch (error: any) {
+        console.error(error);
+        
+        // This safe parsing string check happens safely inside the TSX UI layer
+        const errorString = JSON.stringify(error).toLowerCase();
+        const rawMessage = error.message || '';
+        
+        if (errorString.includes('row-level security') || errorString.includes('42501')) {
+            setErrorMsg('Database Permission Denied: Row Level Security rules are blocking this post.');
+        } else if (rawMessage.includes('Storage Error')) {
+            setErrorMsg(rawMessage);
+        } else {
+            setErrorMsg('Failed to post announcement. Please check your network connection.');
+        }
+    } finally {
+        setIsSubmitting(false);
+    }
+};
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
