@@ -25,73 +25,13 @@ const AddAnnouncement: React.FC<AddAnnouncementProps> = ({ currentUser, onAddAnn
 
     const isTitleRequired = type === 'NEWS_UPDATE' || type === 'EVENT_ANNOUNCEMENT';
     
-    // Improved to strictly strip white-space options safely
+    // Strictly strip white-space options safely
     const validPollOptions = pollOptions.map(o => o.trim()).filter(Boolean);
 
     const isValid =
         message.trim().length > 0 &&
         (!isTitleRequired || title.trim().length > 0) &&
         (type !== 'POLL' || validPollOptions.length >= 2);
-
-const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
-
-    if (!message.trim()) {
-        setErrorMsg('Please enter a message or question.');
-        return;
-    }
-
-    if (isTitleRequired && !title.trim()) {
-        setErrorMsg('Please add a title for news or event announcements.');
-        return;
-    }
-
-    setIsSubmitting(true);
-    try {
-        let finalImageUrl = imageUrl.trim() || undefined;
-
-        if (selectedFile) {
-            try {
-                // Call the isolated service cleanly
-                finalImageUrl = await api.uploadFeedImage(selectedFile);
-            } catch (storageErr: any) {
-                throw new Error(`Storage Error: ${storageErr.message || 'Bucket not found or upload denied.'}`);
-            }
-        }
-
-        await onAddAnnouncement({
-            title: type !== 'POLL' ? title.trim() : '',
-            message: message.trim(),
-            type,
-            imageUrl: type !== 'POLL' ? finalImageUrl : undefined,
-            pollOptions: type === 'POLL' ? validPollOptions : undefined
-        });
-
-        // Clear inputs on success
-        setTitle('');
-        setMessage('');
-        setImageUrl('');
-        setSelectedFile(null);
-        setPreviewUrl(null);
-    } catch (error: any) {
-        console.error(error);
-        
-        // This safe parsing string check happens safely inside the TSX UI layer
-        const errorString = JSON.stringify(error).toLowerCase();
-        const rawMessage = error.message || '';
-        
-        if (errorString.includes('row-level security') || errorString.includes('42501')) {
-            setErrorMsg('Database Permission Denied: Row Level Security rules are blocking this post.');
-        } else if (rawMessage.includes('Storage Error')) {
-            setErrorMsg(rawMessage);
-        } else {
-            setErrorMsg('Failed to post announcement. Please check your network connection.');
-        }
-    } finally {
-        setIsSubmitting(false);
-    }
-};
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -117,7 +57,6 @@ const handleSubmit = async (e: React.FormEvent) => {
             let finalImageUrl = imageUrl.trim() || undefined;
 
             if (selectedFile) {
-                // Catch storage specific errors if the bucket is missing/protected
                 try {
                     finalImageUrl = await api.uploadFeedImage(selectedFile);
                 } catch (storageErr: any) {
@@ -133,7 +72,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 pollOptions: type === 'POLL' ? validPollOptions : undefined
             });
 
-            // Clean reset
+            // Clean reset form state
             setTitle('');
             setMessage('');
             setImageUrl('');
@@ -144,13 +83,14 @@ const handleSubmit = async (e: React.FormEvent) => {
         } catch (error: any) {
             console.error(error);
             
-            // Unpack explicit Supabase errors dynamically
-            const errorString = error.message || '';
+            // Dynamic unpacking of explicit Supabase engine messages
+            const errorString = JSON.stringify(error).toLowerCase();
+            const rawMessage = error.message || '';
             
             if (errorString.includes('row-level security') || errorString.includes('42501')) {
                 setErrorMsg('Database Permission Denied: You do not have permission to insert into notifications/announcements.');
-            } else if (errorString.includes('Storage Error')) {
-                setErrorMsg(errorString); // Displays the storage message custom caught above
+            } else if (rawMessage.includes('Storage Error')) {
+                setErrorMsg(rawMessage);
             } else {
                 setErrorMsg('Failed to post announcement. Please verify your connection and try again.');
             }
@@ -166,7 +106,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     };
 
     const addOption = () => {
-        if (pollOptions.length < 10) { // UX Guardrail: limit insane poll sizes
+        if (pollOptions.length < 10) { 
             setPollOptions([...pollOptions, '']);
         }
     };
@@ -204,7 +144,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                             <button
                                 key={pill.id}
                                 type="button"
-                                onClick={() => handleTypeChange(pill.id as FeedItemType)}
+                                onClick={() => setType(pill.id as FeedItemType)}
                                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                                     type === pill.id
                                         ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow'
