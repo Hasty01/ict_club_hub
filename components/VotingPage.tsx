@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useData } from '../DataContext';
 import { VotingPosition, VotingContestant, VotingVote, User } from '../types';
@@ -15,7 +14,11 @@ import { XIcon } from './icons/XIcon';
 import { InformationCircleIcon as InfoIcon } from './icons/InformationCircleIcon';
 import { TrashIcon } from './icons/TrashIcon';
 
-const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
+interface VotingPageProps {
+    currentUser: User;
+}
+
+const VotingPage: React.FC<VotingPageProps> = ({ currentUser }) => {
     const {
         votingPositions,
         fetchVotingPositions,
@@ -79,12 +82,22 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
 
         loadAnalyticsVotes();
 
-        // Auto-refresh every 30 seconds when on analytics tab
         if (activeTab === 'analytics') {
             const interval = setInterval(loadAnalyticsVotes, 30000);
             return () => clearInterval(interval);
         }
     }, [activeTab, votingPositions, fetchVotingVotes]);
+
+    // Helper to completely scrub active states when closing overlays
+    const closeModalsAndResetLocalData = () => {
+        setShowVoteModal(false);
+        setShowResultsModal(false);
+        setShowContestModal(false);
+        setShowStatusModal(false);
+        setContestants([]);
+        setVotes([]);
+        setSelectedPosition(null);
+    };
 
     const activeElections = useMemo(() =>
         votingPositions.filter(p => p.status === 'OPEN' && new Date(p.dueDate) > new Date()),
@@ -147,6 +160,7 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                 createdBy: currentUser.uid
             });
             setNewPos({ title: '', description: '', criteria: '', startDate: '', dueDate: '' });
+            showToast('Poll/Election created successfully!', 'success');
             setActiveTab('active');
         } catch (error) {
             console.error(error);
@@ -171,6 +185,7 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
             setShowContestModal(false);
             setManifesto('');
             setCriteriaAgreed(false);
+            showToast('Application submitted successfully!', 'success');
         } catch (error) {
             console.error(error);
         } finally {
@@ -198,7 +213,8 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         setIsSubmitting(true);
         try {
             await castVote(selectedPosition.id, contestantId);
-            setShowVoteModal(false);
+            showToast('Your vote has been counted!', 'success');
+            closeModalsAndResetLocalData();
         } catch (error) {
             console.error(error);
         } finally {
@@ -234,7 +250,6 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
                 setShowStatusModal(true);
                 return;
             }
-
             setShowContestModal(true);
             return;
         }
@@ -269,19 +284,15 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     const hasUserVoted = useMemo(() => votes.some(v => v.voterId === currentUser.uid), [votes, currentUser.uid]);
 
     const approvedContestants = useMemo(() => {
-        // If we are looking at a specific position's results/modal, use the local 'contestants' state
         if (showResultsModal || showVoteModal) {
             return contestants.filter(c => c.status === 'APPROVED');
         }
-        // Otherwise (for analytics), use the global 'votingContestants'
         return votingContestants.filter(c => c.status === 'APPROVED');
     }, [contestants, votingContestants, showResultsModal, showVoteModal]);
 
     const pendingContestants = useMemo(() =>
         votingContestants.filter(c => c.status === 'PENDING'),
         [votingContestants]);
-
-    const globalContestantsCount = useMemo(() => votingContestants.length, [votingContestants]);
 
     const sortedResults = useMemo(() => {
         return [...approvedContestants].sort((a, b) => getVoteCount(b.id) - getVoteCount(a.id));
@@ -296,745 +307,620 @@ const VotingPage: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         return `${hours}h remaining`;
     };
 
+    const isPatron = currentUser?.role === 'PATRON';
+
     return (
         <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Header section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-premium border border-gray-100 dark:border-gray-700 glassmorphism">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-6">
                 <div>
-                    <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white flex items-center gap-3">
-                        <div className="p-3 bg-sky-100 dark:bg-sky-900/40 rounded-xl text-sky-600 dark:text-sky-400">
-                            <VoteIcon className="w-7 h-7" />
-                        </div>
-                        Voting Hub
-                    </h2>
-                    <p className="mt-2 text-gray-500 dark:text-gray-400 max-w-lg">
-                        Shape the future of the club. Contest for positions, review candidates, and cast your vote.
+                    <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white">
+                        Elections & Polls Hub
+                    </h1>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Cast your vote, apply for leadership, or manage active institutional polls.
                     </p>
                 </div>
-
-                <div className="flex p-1 bg-gray-100 dark:bg-gray-700/50 rounded-xl">
+                
+                {/* Global Tab Switchers */}
+                <div className="flex flex-wrap p-1.5 bg-gray-100 dark:bg-gray-800 rounded-xl max-w-max self-start md:self-center">
                     <button
                         onClick={() => setActiveTab('active')}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'active' ? 'bg-white dark:bg-gray-600 text-sky-600 dark:text-sky-300 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
+                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'active' ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-white shadow-md' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
                     >
-                        Active
+                        Active Polls ({electionStats.open + electionStats.upcoming})
                     </button>
                     <button
                         onClick={() => setActiveTab('past')}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'past' ? 'bg-white dark:bg-gray-600 text-sky-600 dark:text-sky-300 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
+                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'past' ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-white shadow-md' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
                     >
-                        Past
+                        Past Results ({electionStats.closed})
                     </button>
-                    {currentUser.role === 'PATRON' && (
-                        <button
-                            onClick={() => setActiveTab('create')}
-                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'create' ? 'bg-white dark:bg-gray-600 text-sky-600 dark:text-sky-300 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
-                        >
-                            Manage
-                        </button>
-                    )}
-                    {currentUser.role === 'PATRON' && (
-                        <button
-                            onClick={() => setActiveTab('vetting')}
-                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all relative ${activeTab === 'vetting' ? 'bg-white dark:bg-gray-600 text-sky-600 dark:text-sky-300 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
-                        >
-                            Vetting
-                            {pendingContestants.length > 0 && (
-                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-sky-500 text-white text-[10px] flex items-center justify-center rounded-full animate-pulse">
-                                    {pendingContestants.length}
-                                </span>
-                            )}
-                        </button>
-                    )}
-                    {currentUser.role === 'PATRON' && (
-                        <button
-                            onClick={() => setActiveTab('analytics')}
-                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'analytics' ? 'bg-white dark:bg-gray-600 text-sky-600 dark:text-sky-300 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
-                        >
-                            Analytics
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold">Open now</p>
-                    <p className="text-2xl font-extrabold text-green-600 dark:text-green-400 mt-1">{electionStats.open}</p>
-                </div>
-                <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold">Upcoming</p>
-                    <p className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1">{electionStats.upcoming}</p>
-                </div>
-                <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold">Closed</p>
-                    <p className="text-2xl font-extrabold text-gray-700 dark:text-gray-200 mt-1">{electionStats.closed}</p>
-                </div>
-                <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold">Pending vetting</p>
-                    <p className="text-2xl font-extrabold text-sky-600 dark:text-sky-400 mt-1">{pendingContestants.length}</p>
-                </div>
-            </div>
-
-            {votingError && (
-                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 flex items-center gap-3">
-                    <AlertIcon className="w-5 h-5" />
-                    <p>{votingError}</p>
-                </div>
-            )}
-
-            {isLoadingVoting ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="h-64 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-2xl" />
-                    ))}
-                </div>
-            ) : activeTab === 'active' ? (
-                <div className="space-y-5">
-                    <div className="flex flex-col lg:flex-row gap-3">
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Search elections by title or description..."
-                            className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                        />
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                            className="px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                        >
-                            <option value="all">All statuses</option>
-                            <option value="open">Open now</option>
-                            <option value="upcoming">Upcoming</option>
-                            <option value="closed">Closed</option>
-                        </select>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredActiveElections.length === 0 ? (
-                            <div className="col-span-full py-20 bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center text-center px-4">
-                                <VoteIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-4" />
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">No Matching Elections</h3>
-                                <p className="text-gray-500 dark:text-gray-400 mt-1">Try clearing your search or changing the status filter.</p>
-                            </div>
-                        ) : filteredActiveElections.map(pos => (
-                            <div key={pos.id} className="group bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-xl border border-gray-100 dark:border-gray-700 p-6 flex flex-col transition-all duration-300 hover:-translate-y-1">
-                                <div className="flex justify-between items-start mb-4">
-                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isVotingOpen(pos) ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'}`}>
-                                        {isVotingOpen(pos) ? 'Open' : isUpcoming(pos) ? 'Upcoming' : 'Closed'}
-                                    </span>
-                                    <span className="text-xs text-gray-400 flex items-center gap-1 font-medium">
-                                        <ClockIcon className="w-3 h-3" />
-                                        {isUpcoming(pos) ? `Starts in ${getTimeRemaining(pos.startDate)}` : getTimeRemaining(pos.dueDate)}
-                                    </span>
-                                    {currentUser.role === 'PATRON' && (
-                                        <button
-                                            onClick={() => {
-                                                showAlert({
-                                                    title: 'Delete Position',
-                                                    message: 'Are you sure you want to delete this position? All candidates and votes will be permanently removed.',
-                                                    type: 'confirm',
-                                                    onConfirm: () => deleteVotingPosition(pos.id)
-                                                });
-                                            }}
-                                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-                                            title="Delete Position"
-                                        >
-                                            <TrashIcon className="w-4 h-4" />
-                                        </button>
-                                    )}
-                                </div>
-                                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-sky-600 transition-colors">
-                                    {pos.title}
-                                </h3>
-                                <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-3 mb-4 flex-grow">
-                                    {pos.description || 'No description provided.'}
-                                </p>
-
-                                {pos.criteria && (
-                                    <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/50">
-                                        <p className="text-xs font-bold text-blue-700 dark:text-blue-300 flex items-center gap-1 mb-1">
-                                            <InfoIcon className="w-3.5 h-3.5" />
-                                            Contesting Criteria
-                                        </p>
-                                        <p className="text-xs text-blue-600/80 dark:text-blue-400/80 italic">
-                                            {pos.criteria}
-                                        </p>
-                                    </div>
-                                )}
-
-                                <div className={`grid gap-3 mt-auto ${currentUser.role === 'PATRON' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                    {currentUser.role === 'PATRON' && (
-                                        <button
-                                            onClick={() => handleActionClick(pos, 'contest')}
-                                            disabled={userContestantFor.has(pos.id)}
-                                            className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed ${userContestantFor.has(pos.id) ? 'bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                                        >
-                                            <UserIcon className="w-4 h-4" />
-                                            {userContestantFor.has(pos.id) ? (
-                                                getContestantStatus(pos.id) === 'APPROVED' ? 'Approved Candidate' :
-                                                    getContestantStatus(pos.id) === 'REJECTED' ? 'Application Rejected' :
-                                                        'Applied (Pending)'
-                                            ) : 'Add Candidate'}
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleActionClick(pos, 'vote')}
-                                        className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all text-sm shadow-lg ${isVotingOpen(pos)
-                                            ? 'bg-sky-600 text-white hover:bg-sky-700 shadow-sky-500/25'
-                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed shadow-none'}`}
-                                    >
-                                        <VoteIcon className="w-4 h-4" />
-                                        {isVotingOpen(pos) ? 'Vote Now' : isUpcoming(pos) ? 'Starts Soon' : 'Closed'}
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            ) : activeTab === 'past' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {pastElections.length === 0 ? (
-                        <div className="col-span-full py-20 bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center text-center px-4">
-                            <BarChart3Icon className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-4" />
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">No Past Elections</h3>
-                        </div>
-                    ) : pastElections.map(pos => (
-                        <div key={pos.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col">
-                            <div className="flex justify-between items-start mb-4">
-                                <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-full text-xs font-bold uppercase tracking-wider">
-                                    Closed
-                                </span>
-                                <span className="text-xs text-gray-400 font-medium">
-                                    Ended {new Date(pos.dueDate).toLocaleDateString()}
-                                </span>
-                            </div>
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                                {pos.title}
-                            </h3>
-                            <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2 mb-6 flex-grow">
-                                {pos.description}
-                            </p>
-
+                    
+                    {isPatron && (
+                        <>
                             <button
-                                onClick={() => handleOpenResults(pos)}
-                                className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-xl font-bold hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-all text-sm"
+                                onClick={() => setActiveTab('create')}
+                                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'create' ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-white shadow-md' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
                             >
-                                <BarChart3Icon className="w-4 h-4" />
-                                View Results
+                                Create Poll
                             </button>
-                            {currentUser.role === 'PATRON' && (
+                            <button
+                                onClick={() => setActiveTab('vetting')}
+                                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'vetting' ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-white shadow-md' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                            >
+                                Vetting ({pendingContestants.length})
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('analytics')}
+                                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'analytics' ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-white shadow-md' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                            >
+                                Analytics
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* TAB CONTENT: ACTIVE ELECTIONS */}
+            {activeTab === 'active' && (
+                <div className="space-y-6">
+                    {/* Filter and Instant Creation Row */}
+                    <div className="flex flex-col lg:flex-row gap-4">
+                        <div className="flex-1 flex flex-col sm:flex-row gap-3">
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search elections by title or description..."
+                                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            />
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+                                className="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            >
+                                <option value="all">All Statuses</option>
+                                <option value="open">Open Now</option>
+                                <option value="upcoming">Upcoming</option>
+                                <option value="closed">Closed</option>
+                            </select>
+                        </div>
+
+                        {/* CRITICAL: Explicit New Poll Button Visible to Creators */}
+                        {isPatron && (
+                            <button
+                                onClick={() => setActiveTab('create')}
+                                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl shadow-md shadow-sky-500/10 transition-all text-sm whitespace-nowrap"
+                            >
+                                <PlusIcon className="w-4 h-4" />
+                                Create New Poll
+                            </button>
+                        )}
+                    </div>
+
+                    {isLoadingVoting ? (
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+                            {[1, 2, 3].map((n) => (
+                                <div key={n} className="h-64 bg-gray-100 dark:bg-gray-800 rounded-2xl" />
+                            ))}
+                        </div>
+                    ) : filteredActiveElections.length === 0 ? (
+                        <div className="text-center py-16 bg-gray-50 dark:bg-gray-900/40 border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl">
+                            <ClipboardListIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                            <h3 className="text-base font-bold text-gray-800 dark:text-gray-200">No active polls found</h3>
+                            <p className="text-sm text-gray-400 mt-1">Adjust your filters or query params above.</p>
+                            {isPatron && (
                                 <button
-                                    onClick={() => {
-                                        showAlert({
-                                            title: 'Delete Record',
-                                            message: 'Are you sure you want to delete this past position? This cannot be undone.',
-                                            type: 'confirm',
-                                            onConfirm: () => deleteVotingPosition(pos.id)
-                                        });
-                                    }}
-                                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/30 transition-all text-sm mt-3"
+                                    onClick={() => setActiveTab('create')}
+                                    className="mt-4 text-xs font-bold text-sky-600 hover:underline inline-flex items-center gap-1"
                                 >
-                                    <TrashIcon className="w-4 h-4" />
-                                    Delete Record
+                                    Launch one now <ChevronRightIcon className="w-3 h-3" />
                                 </button>
                             )}
                         </div>
-                    ))}
-                </div>
-            ) : activeTab === 'vetting' ? (
-                <div className="space-y-6">
-                    <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700">
-                        <div className="flex items-center justify-between mb-8">
-                            <div>
-                                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Contestant Vetting</h3>
-                                <p className="text-gray-500 text-sm mt-1">Review manifestos and approve candidates for the ballot.</p>
-                            </div>
-                            <div className="px-4 py-2 bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 rounded-xl text-xs font-bold uppercase tracking-widest">
-                                {pendingContestants.length} Pending
-                            </div>
-                        </div>
+                    ) : (
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredActiveElections.map((pos) => {
+                                const openNow = isVotingOpen(pos);
+                                const upCom = isUpcoming(pos);
 
-                        {pendingContestants.length === 0 ? (
-                            <div className="text-center py-20 bg-gray-50 dark:bg-gray-900/20 rounded-2xl border-2 border-dashed border-gray-100 dark:border-gray-800">
-                                <CheckIcon className="w-16 h-16 text-green-200 dark:text-green-900/40 mx-auto mb-4" />
-                                <h4 className="text-lg font-bold text-gray-900 dark:text-white">All Caught Up!</h4>
-                                <p className="text-gray-500 mt-1">No candidates are currently waiting for approval.</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {pendingContestants.map(c => {
-                                    const pos = votingPositions.find(p => p.id === c.positionId);
-                                    return (
-                                        <div key={c.id} className="group bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
-                                            <div className="flex items-center gap-4 mb-4">
-                                                <img
-                                                    src={c.userAvatarUrl || `https://i.pravatar.cc/100?u=${c.userId}`}
-                                                    className="w-12 h-12 rounded-2xl object-cover border-2 border-white dark:border-gray-700 shadow-sm"
-                                                />
-                                                <div>
-                                                    <h4 className="font-bold text-gray-900 dark:text-white">{c.userName}</h4>
-                                                    <span className="text-[10px] font-black text-sky-500 uppercase tracking-tighter bg-sky-50 dark:bg-sky-900/20 px-2 py-0.5 rounded">
-                                                        For {pos?.title || 'Unknown Position'}
+                                return (
+                                    <div key={pos.id} className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group relative overflow-hidden">
+                                        <div>
+                                            <div className="flex justify-between items-start gap-2 mb-3">
+                                                <span className={`px-2.5 py-1 text-[10px] font-black rounded-full uppercase tracking-wider ${openNow ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400' : upCom ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400' : 'bg-gray-50 text-gray-500'}`}>
+                                                    {openNow ? 'Live Voting' : upCom ? 'Upcoming' : 'Closed'}
+                                                </span>
+                                                <div className="flex items-center gap-1 text-gray-400 text-xs font-medium">
+                                                    <ClockIcon className="w-3.5 h-3.5 text-gray-400" />
+                                                    {getTimeRemaining(pos.dueDate)}
+                                                </div>
+                                            </div>
+
+                                            <h3 className="font-bold text-gray-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors line-clamp-1">
+                                                {pos.title}
+                                            </h3>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 line-clamp-2 min-h-[2rem]">
+                                                {pos.description || 'No additional summary details provided for this entry.'}
+                                            </p>
+
+                                            {getContestantStatus(pos.id) && (
+                                                <div className="mt-3 flex items-center gap-1.5 px-3 py-2 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800/60">
+                                                    <InfoIcon className="w-3.5 h-3.5 text-sky-500" />
+                                                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                                        Your Status: <strong className="uppercase font-bold text-gray-700 dark:text-gray-200">{getContestantStatus(pos.id)}</strong>
                                                     </span>
                                                 </div>
-                                            </div>
-                                            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl mb-6 text-sm text-gray-700 dark:text-gray-300 italic leading-relaxed">
-                                                "{c.manifesto}"
-                                            </div>
-                                            <div className="flex gap-3">
-                                                <button
-                                                    onClick={() => updateContestantStatus(c.id, 'APPROVED')}
-                                                    className="flex-1 py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-all shadow-lg shadow-green-500/20"
-                                                >
-                                                    Approve
-                                                </button>
-                                                <button
-                                                    onClick={() => updateContestantStatus(c.id, 'REJECTED')}
-                                                    className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
-                                                >
-                                                    Reject
-                                                </button>
-                                            </div>
+                                            )}
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            ) : activeTab === 'analytics' ? (
-                <div className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
-                            <div className="absolute -right-4 -top-4 w-24 h-24 bg-sky-500/5 rounded-full group-hover:scale-150 transition-transform duration-700" />
-                            <div className="flex items-center gap-3 text-sky-600 mb-4">
-                                <BarChart3Icon className="w-6 h-6" />
-                                <h4 className="font-bold text-xs uppercase tracking-widest">Global Participation</h4>
-                            </div>
-                            <div className="text-4xl font-black text-gray-900 dark:text-white">
-                                {allUsers.length > 0 ? ((analyticsVotes.length / allUsers.length) * 100).toFixed(1) : 0}%
-                            </div>
-                            <p className="text-xs text-gray-500 mt-2 font-medium">{analyticsVotes.length} votes cast by {allUsers.length} members</p>
-                        </div>
 
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
-                            <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/5 rounded-full group-hover:scale-150 transition-transform duration-700" />
-                            <div className="flex items-center gap-3 text-blue-600 mb-4">
-                                <UserIcon className="w-6 h-6" />
-                                <h4 className="font-bold text-xs uppercase tracking-widest">Election Density</h4>
-                            </div>
-                            <div className="text-4xl font-black text-gray-900 dark:text-white">
-                                {votingPositions.length > 0 ? (globalContestantsCount / votingPositions.length).toFixed(1) : 0}
-                            </div>
-                            <p className="text-xs text-gray-500 mt-2 font-medium">Average candidates per election</p>
-                        </div>
+                                        <div className={`grid gap-2.5 mt-5 ${isPatron ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                            {isPatron ? (
+                                                <button
+                                                    onClick={() => handleActionClick(pos, 'contest')}
+                                                    className="flex items-center justify-center gap-1.5 px-3 py-2 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-bold rounded-xl transition-all"
+                                                >
+                                                    <UserIcon className="w-3.5 h-3.5" />
+                                                    Add Candidate
+                                                </button>
+                                            ) : (
+                                                !userContestantFor.has(pos.id) && (
+                                                    <button
+                                                        onClick={() => handleActionClick(pos, 'contest')}
+                                                        className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold rounded-xl transition-all"
+                                                    >
+                                                        <PlusIcon className="w-3.5 h-3.5" />
+                                                        Apply
+                                                    </button>
+                                                )
+                                            )}
 
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
-                            <div className="absolute -right-4 -top-4 w-24 h-24 bg-green-500/5 rounded-full group-hover:scale-150 transition-transform duration-700" />
-                            <div className="flex items-center gap-3 text-green-600 mb-4">
-                                <CheckIcon className="w-6 h-6" />
-                                <h4 className="font-bold text-xs uppercase tracking-widest">Vetting Efficiency</h4>
-                            </div>
-                            <div className="text-4xl font-black text-gray-900 dark:text-white">
-                                {globalContestantsCount > 0 ? ((approvedContestants.length / globalContestantsCount) * 100).toFixed(0) : 0}%
-                            </div>
-                            <p className="text-xs text-gray-500 mt-2 font-medium">{approvedContestants.length} of {globalContestantsCount} apps approved</p>
-                        </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700">
-                        <div className="flex items-center justify-between mb-8">
-                            <h4 className="text-xl font-bold text-gray-900 dark:text-white">Live Vote Breakdown</h4>
-                            <button
-                                onClick={async () => {
-                                    try {
-                                        const voteCollections = await Promise.all(votingPositions.map(pos => fetchVotingVotes(pos.id)));
-                                        setAnalyticsVotes(voteCollections.flat());
-                                    } catch (e) {
-                                        console.error('Refresh failed', e);
-                                    }
-                                }}
-                                className="flex items-center gap-2 px-4 py-2 bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 rounded-xl text-sm font-bold hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-all"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                Refresh
-                            </button>
-                        </div>
-
-                        {votingPositions.length === 0 ? (
-                            <div className="text-center py-16 text-gray-400">No elections to display.</div>
-                        ) : (
-                            <div className="space-y-8">
-                                {votingPositions.map(pos => {
-                                    const posContestants = votingContestants
-                                        .filter(c => c.positionId === pos.id && c.status === 'APPROVED');
-                                    const posVotes = analyticsVotes.filter(v => v.positionId === pos.id);
-                                    const totalPosVotes = posVotes.length;
-                                    const ranked = [...posContestants].sort((a, b) =>
-                                        posVotes.filter(v => v.contestantId === b.id).length -
-                                        posVotes.filter(v => v.contestantId === a.id).length
-                                    );
-                                    const medals = ['🥇', '🥈', '🥉'];
-                                    const statusLabel = isVotingOpen(pos) ? 'LIVE' : isUpcoming(pos) ? 'Upcoming' : 'Closed';
-
-                                    return (
-                                        <div key={pos.id} className="border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden">
-                                            {/* Position Header */}
-                                            <div className="flex items-center justify-between px-6 py-4 bg-gray-50 dark:bg-gray-900/30">
-                                                <div className="flex items-center gap-3">
-                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isVotingOpen(pos) ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 animate-pulse' :
-                                                        isUpcoming(pos) ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
-                                                            'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
-                                                        }`}>{statusLabel}</span>
-                                                    <h5 className="font-bold text-gray-900 dark:text-white">{pos.title}</h5>
-                                                </div>
-                                                <span className="text-sm font-black text-gray-500 dark:text-gray-400">
-                                                    {totalPosVotes} vote{totalPosVotes !== 1 ? 's' : ''}
-                                                </span>
-                                            </div>
-
-                                            {/* Candidate Leaderboard */}
-                                            <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
-                                                {ranked.length === 0 ? (
-                                                    <div className="px-6 py-5 text-sm text-gray-400 italic">No approved candidates yet.</div>
-                                                ) : ranked.map((contestant, idx) => {
-                                                    const cVotes = posVotes.filter(v => v.contestantId === contestant.id).length;
-                                                    const pct = totalPosVotes > 0 ? (cVotes / totalPosVotes) * 100 : 0;
-                                                    const isLeading = idx === 0 && cVotes > 0;
-
-                                                    return (
-                                                        <div key={contestant.id} className={`px-6 py-4 flex items-center gap-4 ${isLeading ? 'bg-yellow-50/50 dark:bg-yellow-900/10' : ''}`}>
-                                                            {/* Rank / Medal */}
-                                                            <div className="w-8 text-center text-lg flex-shrink-0">
-                                                                {idx < 3 && cVotes > 0 ? medals[idx] : <span className="text-sm font-bold text-gray-400">#{idx + 1}</span>}
-                                                            </div>
-
-                                                            {/* Avatar */}
-                                                            <img
-                                                                src={contestant.userAvatarUrl || `https://i.pravatar.cc/60?u=${contestant.userId}`}
-                                                                alt={contestant.userName}
-                                                                className="w-9 h-9 rounded-xl object-cover border-2 border-white dark:border-gray-700 shadow-sm flex-shrink-0"
-                                                            />
-
-                                                            {/* Name + Bar */}
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex items-center justify-between mb-1.5">
-                                                                    <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{contestant.userName}</span>
-                                                                    <span className="text-sm font-black text-gray-700 dark:text-gray-200 ml-3 flex-shrink-0">
-                                                                        {cVotes} <span className="text-[11px] font-medium text-gray-400">({pct.toFixed(0)}%)</span>
-                                                                    </span>
-                                                                </div>
-                                                                <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                                                                    <div
-                                                                        className={`h-full rounded-full transition-all duration-700 ease-out ${isLeading
-                                                                            ? 'bg-gradient-to-r from-yellow-400 to-sky-500'
-                                                                            : 'bg-gradient-to-r from-sky-400 to-purple-500'
-                                                                            }`}
-                                                                        style={{ width: `${pct}%` }}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
+                                            <button
+                                                onClick={() => handleActionClick(pos, 'vote')}
+                                                className={`flex items-center justify-center gap-1.5 px-3 py-2 text-white text-xs font-bold rounded-xl transition-all ${openNow ? 'bg-sky-600 hover:bg-sky-700 shadow-md shadow-sky-500/10' : 'bg-gray-400 dark:bg-gray-700 cursor-not-allowed'}`}
+                                            >
+                                                <VoteIcon className="w-3.5 h-3.5" />
+                                                Vote Now
+                                            </button>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
-            ) : (
-                <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-700">
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Create New Position</h3>
-                    <form onSubmit={handleCreatePosition} className="space-y-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Position Title</label>
+            )}
+
+            {/* TAB CONTENT: PAST RESULTS */}
+            {activeTab === 'past' && (
+                <div className="space-y-6">
+                    {pastElections.length === 0 ? (
+                        <div className="text-center py-16 bg-gray-50 dark:bg-gray-900/40 border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl">
+                            <HourglassIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                            <h3 className="text-base font-bold text-gray-800 dark:text-gray-200">No archival election metrics</h3>
+                            <p className="text-sm text-gray-400 mt-1">When an election timeline finishes, its results display here.</p>
+                        </div>
+                    ) : (
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {pastElections.map((pos) => (
+                                <div key={pos.id} className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="px-2 py-0.5 text-[10px] font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full">
+                                                CONCLUDED
+                                            </span>
+                                            <span className="text-[11px] text-gray-400 font-medium">
+                                                Ended {new Date(pos.dueDate).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                        <h3 className="font-bold text-gray-900 dark:text-white line-clamp-1">{pos.title}</h3>
+                                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 line-clamp-2">
+                                            {pos.description || 'No additional background documentation logged.'}
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        onClick={() => handleOpenResults(pos)}
+                                        className="mt-5 w-full flex items-center justify-center gap-1.5 px-4 py-2 border border-sky-100 dark:border-gray-700 hover:bg-sky-50 dark:hover:bg-gray-700/50 text-sky-600 dark:text-sky-400 text-xs font-bold rounded-xl transition-all"
+                                    >
+                                        <BarChart3Icon className="w-3.5 h-3.5" />
+                                        View Ballot Tallies
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* TAB CONTENT: CREATE NEW POLL / POSITION FORM */}
+            {activeTab === 'create' && isPatron && (
+                <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-6 md:p-8 max-w-2xl mx-auto shadow-sm">
+                    <div className="flex items-center gap-3 border-b border-gray-100 dark:border-gray-700 pb-4 mb-6">
+                        <div className="p-2.5 bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-400 rounded-xl">
+                            <PlusIcon className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Configure New Public Poll</h2>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">Initialize a new secure ballot or election timeline container.</p>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleCreatePosition} className="space-y-5">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                                Title / Role Position *
+                            </label>
                             <input
                                 type="text"
                                 required
-                                className="w-full p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none transition-all dark:text-white"
-                                placeholder="e.g. Club President"
+                                placeholder="e.g., Guild President, Vice Chairman, Tech Lead"
                                 value={newPos.title}
-                                onChange={e => setNewPos({ ...newPos, title: e.target.value })}
+                                onChange={(e) => setNewPos({ ...newPos, title: e.target.value })}
+                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
                             />
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Description</label>
+
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                                Description Context
+                            </label>
                             <textarea
-                                className="w-full p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none transition-all min-h-[120px] dark:text-white"
-                                placeholder="Describe the responsibilities..."
+                                rows={3}
+                                placeholder="State responsibilities, scope, expectations, or background parameters..."
                                 value={newPos.description}
-                                onChange={e => setNewPos({ ...newPos, description: e.target.value })}
+                                onChange={(e) => setNewPos({ ...newPos, description: e.target.value })}
+                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
                             />
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Contesting Criteria</label>
+
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                                Entry Filters / Nomination Criteria
+                            </label>
                             <textarea
-                                className="w-full p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none transition-all min-h-[80px] dark:text-white"
-                                placeholder="Who is eligible? (e.g. Must be a member for 6 months)"
+                                rows={2}
+                                placeholder="e.g., Must have a CGPA > 3.5, must be in Senior 5 or second year..."
                                 value={newPos.criteria}
-                                onChange={e => setNewPos({ ...newPos, criteria: e.target.value })}
+                                onChange={(e) => setNewPos({ ...newPos, criteria: e.target.value })}
+                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
                             />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Voting Starts</label>
+
+                        <div className="grid sm:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                                    Start Operational Window *
+                                </label>
                                 <input
                                     type="datetime-local"
                                     required
-                                    className="w-full p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none transition-all dark:text-white"
                                     value={newPos.startDate}
-                                    onChange={e => setNewPos({ ...newPos, startDate: e.target.value })}
+                                    onChange={(e) => setNewPos({ ...newPos, startDate: e.target.value })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Voting Ends (Deadline)</label>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                                    Due Closing Deadline *
+                                </label>
                                 <input
                                     type="datetime-local"
                                     required
-                                    className="w-full p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none transition-all dark:text-white"
                                     value={newPos.dueDate}
-                                    onChange={e => setNewPos({ ...newPos, dueDate: e.target.value })}
+                                    onChange={(e) => setNewPos({ ...newPos, dueDate: e.target.value })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
                                 />
                             </div>
                         </div>
+
                         <button
+                            type="submit"
                             disabled={isSubmitting}
-                            className="w-full py-4 bg-gradient-to-r from-sky-600 to-indigo-900 text-white rounded-2xl font-bold hover:opacity-90 transition-all shadow-lg shadow-sky-500/25 disabled:opacity-50"
+                            className="w-full mt-2 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-sky-500/10 disabled:opacity-50 flex items-center justify-center gap-2"
                         >
-                            {isSubmitting ? 'Posting...' : 'Post Position'}
+                            {isSubmitting ? 'Writing to Ledger...' : 'Publish Active Poll Container'}
                         </button>
                     </form>
                 </div>
             )}
 
-            {/* Contest Modal */}
-            {showContestModal && selectedPosition && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-                        <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                            <div>
-                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Contest for {selectedPosition.title}</h3>
-                                <p className="text-sm text-gray-500 mt-1">Submit your manifesto to the club</p>
-                            </div>
-                            <button
-                                onClick={() => setShowContestModal(false)}
-                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                            >
-                                <XIcon className="w-6 h-6 text-gray-400" />
-                            </button>
+            {/* TAB CONTENT: VETTING INTERFACE */}
+            {activeTab === 'vetting' && isPatron && (
+                <div className="space-y-4 max-w-4xl mx-auto">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                        Pending Candidate Approvals ({pendingContestants.length})
+                    </h2>
+                    
+                    {pendingContestants.length === 0 ? (
+                        <div className="text-center py-12 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl">
+                            <CheckIcon className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+                            <h3 className="font-bold text-sm text-gray-800 dark:text-gray-200">Vetting queue is empty</h3>
+                            <p className="text-xs text-gray-400 mt-0.5">No new member submissions are awaiting approval.</p>
                         </div>
-                        <div className="p-6 space-y-6">
-                            {selectedPosition.criteria && (
-                                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl">
-                                    <h4 className="text-sm font-extrabold text-amber-800 dark:text-amber-400 mb-1 flex items-center gap-2">
-                                        <AlertIcon className="w-4 h-4" />
-                                        Confirm Eligibility
-                                    </h4>
-                                    <p className="text-sm text-amber-700 dark:text-amber-300 mb-3 italic">
-                                        {selectedPosition.criteria}
-                                    </p>
-                                    <label className="flex items-center gap-3 cursor-pointer group">
-                                        <input
-                                            type="checkbox"
-                                            className="w-5 h-5 rounded border-amber-300 text-amber-600 focus:ring-amber-500 transition-all"
-                                            checked={criteriaAgreed}
-                                            onChange={e => setCriteriaAgreed(e.target.checked)}
-                                        />
-                                        <span className="text-sm font-medium text-amber-800/80 dark:text-amber-400/80 group-hover:text-amber-900">
-                                            I confirm that I meet the criteria for this position.
-                                        </span>
-                                    </label>
-                                </div>
-                            )}
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Your Manifesto</label>
-                                <textarea
-                                    className="w-full p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none transition-all min-h-[160px] dark:text-white text-sm"
-                                    placeholder="Explain why you are the best fit for this role..."
-                                    value={manifesto}
-                                    onChange={e => setManifesto(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="flex gap-4">
-                                <button
-                                    onClick={() => setShowContestModal(false)}
-                                    className="flex-1 py-4 text-gray-500 font-bold hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    disabled={isSubmitting || (selectedPosition.criteria && !criteriaAgreed)}
-                                    onClick={handleContest}
-                                    className="flex-[2] py-4 bg-sky-600 text-white rounded-2xl font-bold hover:bg-sky-700 transition-all shadow-lg shadow-sky-500/25 disabled:opacity-50"
-                                >
-                                    {isSubmitting ? 'Submitting...' : 'Submit Entry'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Vote Modal */}
-            {showVoteModal && selectedPosition && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
-                        <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/20">
-                            <div>
-                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Vote for {selectedPosition.title}</h3>
-                                <p className="text-sm text-gray-500 mt-1">{contestants.length} Contestants</p>
-                            </div>
-                            <button
-                                onClick={() => setShowVoteModal(false)}
-                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                            >
-                                <XIcon className="w-6 h-6 text-gray-400" />
-                            </button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                            {!isVotingOpen(selectedPosition) && (
-                                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl">
-                                    <p className="text-sm font-bold text-amber-700 dark:text-amber-300">Voting opens on {formatDateTime(selectedPosition.startDate)}</p>
-                                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">You can review every candidate manifesto now, and cast your vote once voting officially opens.</p>
-                                </div>
-                            )}
-
-                            {contestants.length === 0 ? (
-                                <div className="text-center py-10">
-                                    <UserIcon className="w-12 h-12 text-gray-200 dark:text-gray-700 mx-auto mb-4" />
-                                    <p className="text-gray-500">No approved candidates available yet.</p>
-                                </div>
-                            ) : approvedContestants.map(contestant => (
-                                <div key={contestant.id} className="p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-3xl shadow-sm hover:shadow-md transition-all">
-                                    <div className="flex items-center gap-4 mb-4">
-                                        <img
-                                            src={contestant.userAvatarUrl || `https://i.pravatar.cc/100?u=${contestant.userId}`}
-                                            alt={contestant.userName}
-                                            className="w-14 h-14 rounded-2xl object-cover border-2 border-white dark:border-gray-700 shadow-sm"
-                                        />
-                                        <div>
-                                            <h4 className="font-extrabold text-gray-900 dark:text-white text-lg">{contestant.userName}</h4>
-                                            <p className="text-xs text-sky-600 dark:text-sky-400 font-bold uppercase tracking-widest">Candidate for {selectedPosition.title}</p>
-                                        </div>
-                                    </div>
-                                    <div className="mb-4">
-                                        <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">Manifesto</p>
-                                        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-2xl text-sm text-gray-700 dark:text-gray-300 italic leading-relaxed">
-                                            {contestant.manifesto?.trim() ? `"${contestant.manifesto}"` : 'No manifesto provided by this candidate yet.'}
-                                        </div>
-                                    </div>
-                                    <button
-                                        disabled={isSubmitting || hasUserVoted || !isVotingOpen(selectedPosition)}
-                                        onClick={() => handleCastVote(contestant.id)}
-                                        className="w-full py-4 bg-white dark:bg-gray-700 border-2 border-sky-100 dark:border-sky-900/30 text-sky-600 dark:text-sky-400 rounded-2xl font-bold hover:bg-sky-600 hover:text-white dark:hover:bg-sky-600 dark:hover:text-white transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                                    >
-                                        {hasUserVoted ? 'Vote Already Cast' : !isVotingOpen(selectedPosition) ? `Vote opens ${new Date(selectedPosition.startDate).toLocaleDateString()}` : `Vote for ${contestant.userName}`}
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Results Modal */}
-            {showResultsModal && selectedPosition && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
-                        <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/20">
-                            <div>
-                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Results: {selectedPosition.title}</h3>
-                                <p className="text-sm text-gray-500 mt-1">{votes.length} Votes Cast Total</p>
-                            </div>
-                            <button
-                                onClick={() => setShowResultsModal(false)}
-                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                            >
-                                <XIcon className="w-6 h-6 text-gray-400" />
-                            </button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                            {sortedResults.length === 0 ? (
-                                <div className="text-center py-10 font-medium text-gray-500">
-                                    No data available for this election.
-                                </div>
-                            ) : sortedResults.map((contestant, index) => {
-                                const count = getVoteCount(contestant.id);
-                                const percent = votes.length > 0 ? (count / votes.length) * 100 : 0;
+                    ) : (
+                        <div className="space-y-4">
+                            {pendingContestants.map((c) => {
+                                const matchedUser = allUsers?.find(u => u.uid === c.userId);
+                                const positionName = votingPositions.find(p => p.id === c.positionId)?.title || 'Unknown Position';
 
                                 return (
-                                    <div key={contestant.id} className="space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                {index === 0 && <span className="p-1 px-2 bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 rounded text-[10px] font-black uppercase">Winner</span>}
-                                                <h4 className="font-bold text-gray-900 dark:text-white">{contestant.userName}</h4>
+                                    <div key={c.id} className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div className="space-y-2">
+                                            <div>
+                                                <h4 className="font-bold text-sm text-gray-900 dark:text-white">
+                                                    {matchedUser?.name || 'Anonymous User'} 
+                                                    <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-2">({matchedUser?.email})</span>
+                                                </h4>
+                                                <p className="text-xs text-sky-600 dark:text-sky-400 font-bold mt-0.5">
+                                                    Applying for: {positionName}
+                                                </p>
                                             </div>
-                                            <div className="text-right">
-                                                <span className="text-lg font-black text-gray-900 dark:text-white">{count}</span>
-                                                <span className="text-xs text-gray-400 ml-1">votes ({percent.toFixed(0)}%)</span>
-                                            </div>
+                                            <blockquote className="text-xs bg-gray-50 dark:bg-gray-900 p-3 rounded-xl border-l-2 border-gray-200 dark:border-gray-700 italic text-gray-600 dark:text-gray-400">
+                                                "{c.manifesto || 'No written manifesto declared.'}"
+                                            </blockquote>
                                         </div>
-                                        <div className="h-4 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden p-[2px]">
-                                            <div
-                                                className={`h-full rounded-full transition-all duration-1000 ${index === 0 ? 'bg-gradient-to-r from-sky-500 to-indigo-900 shadow-sm' : 'bg-gray-300 dark:bg-gray-500'}`}
-                                                style={{ width: `${percent}%` }}
-                                            />
+
+                                        <div className="flex items-center gap-2 self-end md:self-center">
+                                            <button
+                                                onClick={() => updateContestantStatus(c.id, 'REJECTED')}
+                                                className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-bold rounded-lg transition-all"
+                                            >
+                                                Deny Entry
+                                            </button>
+                                            <button
+                                                onClick={() => updateContestantStatus(c.id, 'APPROVED')}
+                                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all"
+                                            >
+                                                Approve
+                                            </button>
                                         </div>
                                     </div>
                                 );
                             })}
+                        </div>
+                    )}
+                </div>
+            )}
 
-                            <div className="mt-8 p-6 bg-sky-50 dark:bg-sky-900/10 rounded-2xl border border-sky-100 dark:border-sky-900/30">
-                                <div className="flex items-center gap-3 text-sky-700 dark:text-sky-300">
-                                    <CheckIcon className="w-6 h-6" />
-                                    <div>
-                                        <h5 className="font-bold">Election Finalized</h5>
-                                        <p className="text-sm opacity-80">This election is officially closed and the results are final.</p>
-                                    </div>
-                                </div>
-                            </div>
+            {/* TAB CONTENT: ANALYTICS RUNTIME VIEW */}
+            {activeTab === 'analytics' && isPatron && (
+                <div className="space-y-6">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Real-Time Poll Diagnostics</h2>
+                    <div className="grid sm:grid-cols-3 gap-4">
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                            <span className="text-xs text-gray-400 font-bold uppercase tracking-wider block">Total Tracked Containers</span>
+                            <span className="text-2xl font-black text-gray-900 dark:text-white mt-1 block">{votingPositions.length}</span>
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                            <span className="text-xs text-gray-400 font-bold uppercase tracking-wider block">Approved Running Candidates</span>
+                            <span className="text-2xl font-black text-sky-600 dark:text-sky-400 mt-1 block">{approvedContestants.length}</span>
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                            <span className="text-xs text-gray-400 font-bold uppercase tracking-wider block">Cached Ballots Computed</span>
+                            <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 block">{analyticsVotes.length}</span>
                         </div>
                     </div>
                 </div>
             )}
-            {/* Status Modal (Upcoming/Closed) */}
-            {showStatusModal && statusModalConfig && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-gray-100 dark:border-gray-700">
-                        <div className="p-8 text-center">
-                            <div className={`w-20 h-20 mx-auto rounded-3xl flex items-center justify-center mb-6 ${statusModalConfig.type === 'upcoming' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
-                                {statusModalConfig.type === 'upcoming' ? <ClockIcon className="w-10 h-10" /> : <BarChart3Icon className="w-10 h-10" />}
-                            </div>
-                            <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">{statusModalConfig.title}</h3>
-                            <p className="text-gray-500 dark:text-gray-400 leading-relaxed mb-8">
-                                {statusModalConfig.message}
-                            </p>
 
-                            <div className="p-4 bg-gray-50 dark:bg-gray-900/40 rounded-2xl border border-gray-100 dark:border-gray-700 mb-8 inline-block mx-auto">
-                                <span className="text-sm font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                                    {statusModalConfig.type === 'upcoming' ? 'Scheduled Start' : 'Ended On'}
-                                </span>
-                                <span className="text-lg font-black text-sky-600 dark:text-sky-400">
-                                    {new Date(statusModalConfig.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                                </span>
+            {/* MODAL OVERLAY: APPLY / CONTEST POSITION */}
+            {showContestModal && selectedPosition && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl p-6 shadow-xl space-y-4 animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Submit Candidate Profile</h3>
+                                <p className="text-xs text-sky-600 dark:text-sky-400 font-medium mt-0.5">{selectedPosition.title}</p>
                             </div>
-
-                            <button
-                                onClick={() => setShowStatusModal(false)}
-                                className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-bold hover:opacity-90 transition-all shadow-xl"
-                            >
-                                Understood
+                            <button onClick={closeModalsAndResetLocalData} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400">
+                                <XIcon className="w-5 h-5" />
                             </button>
                         </div>
+
+                        {selectedPosition.criteria && (
+                            <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/60 rounded-xl space-y-1.5">
+                                <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-400 text-xs font-bold">
+                                    <AlertIcon className="w-4 h-4" /> Threshold Prerequisites
+                                </div>
+                                <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+                                    {selectedPosition.criteria}
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Written Manifesto / Statement</label>
+                            <textarea
+                                rows={4}
+                                required
+                                value={manifesto}
+                                onChange={(e) => setManifesto(e.target.value)}
+                                placeholder="Explain why members should cast their ballot for you..."
+                                className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            />
+                        </div>
+
+                        {selectedPosition.criteria && (
+                            <label className="flex items-start gap-2 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={criteriaAgreed}
+                                    onChange={(e) => setCriteriaAgreed(e.target.checked)}
+                                    className="mt-0.5 h-4 w-4 rounded-sm border-gray-300 text-sky-600 focus:ring-sky-500"
+                                />
+                                <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
+                                    I completely confirm that I meet all stated pre-requisites for this role.
+                                </span>
+                            </label>
+                        )}
+
+                        <div className="flex items-center justify-end gap-2 pt-2">
+                            <button
+                                onClick={closeModalsAndResetLocalData}
+                                className="px-4 py-2 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-xl"
+                            >
+                                Dismiss
+                            </button>
+                            <button
+                                onClick={handleContest}
+                                disabled={isSubmitting}
+                                className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl shadow-md disabled:opacity-50"
+                            >
+                                {isSubmitting ? 'Submitting...' : 'Register Candidate'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL OVERLAY: LIVE CAST BALLOT MODAL */}
+            {showVoteModal && selectedPosition && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-xl rounded-2xl p-6 shadow-xl space-y-4 max-h-[85vh] flex flex-col justify-between animate-in zoom-in-95 duration-200">
+                        <div>
+                            <div className="flex justify-between items-start border-b border-gray-100 dark:border-gray-700 pb-3 mb-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Cast Your Secure Vote</h3>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Select a candidate below for: <strong>{selectedPosition.title}</strong></p>
+                                </div>
+                                <button onClick={closeModalsAndResetLocalData} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400">
+                                    <XIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {hasUserVoted ? (
+                                <div className="p-4 text-center bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900 rounded-xl space-y-1">
+                                    <AlertIcon className="w-6 h-6 text-amber-500 mx-auto" />
+                                    <h4 className="font-bold text-sm text-amber-900 dark:text-amber-200">Ballot Already Processed</h4>
+                                    <p className="text-xs text-amber-600 dark:text-amber-400">You have already submitted a ballot entry for this election position.</p>
+                                </div>
+                            ) : approvedContestants.length === 0 ? (
+                                <div className="text-center py-8 text-gray-400 text-xs">
+                                    No vetted candidates are currently running in this category.
+                                </div>
+                            ) : (
+                                <div className="space-y-3 overflow-y-auto max-h-[45vh] pr-1">
+                                    {approvedContestants.map((c) => {
+                                        const profile = allUsers?.find(u => u.uid === c.userId);
+                                        return (
+                                            <div key={c.id} className="p-4 border border-gray-100 dark:border-gray-700 rounded-xl hover:border-sky-300 dark:hover:border-sky-500 flex items-start justify-between gap-4 transition-all bg-gray-50/50 dark:bg-gray-900/40">
+                                                <div className="space-y-1.5 flex-1">
+                                                    <h4 className="font-bold text-sm text-gray-900 dark:text-white">{profile?.name || 'Candidate Member'}</h4>
+                                                    <p className="text-xs text-gray-550 dark:text-gray-400 italic bg-white dark:bg-gray-800 p-2.5 rounded-lg border border-gray-100 dark:border-gray-700/60">
+                                                        "{c.manifesto || 'No written manifesto declared.'}"
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleCastVote(c.id)}
+                                                    disabled={isSubmitting}
+                                                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all shrink-0"
+                                                >
+                                                    Select
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end pt-3 border-t border-gray-100 dark:border-gray-700 mt-4">
+                            <button
+                                onClick={closeModalsAndResetLocalData}
+                                className="px-4 py-2 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-xl"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL OVERLAY: BALLOT TALLIES / RESULTS VIEW */}
+            {showResultsModal && selectedPosition && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl p-6 shadow-xl space-y-4 animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-start border-b border-gray-100 dark:border-gray-700 pb-3">
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Final Election Metrics</h3>
+                                <p className="text-xs text-sky-600 dark:text-sky-400 font-medium mt-0.5">{selectedPosition.title}</p>
+                            </div>
+                            <button onClick={closeModalsAndResetLocalData} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400">
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {sortedResults.length === 0 ? (
+                                <p className="text-center py-6 text-xs text-gray-400">No active tracking history logs found.</p>
+                            ) : (
+                                sortedResults.map((c, idx) => {
+                                    const profile = allUsers?.find(u => u.uid === c.userId);
+                                    const tally = getVoteCount(c.id);
+                                    const grossVotes = votes.length || 1;
+                                    const ratio = Math.round((tally / grossVotes) * 100);
+
+                                    return (
+                                        <div key={c.id} className="space-y-1">
+                                            <div className="flex justify-between text-xs font-bold text-gray-800 dark:text-gray-200">
+                                                <span>
+                                                    {idx === 0 && tally > 0 ? '👑 ' : ''}
+                                                    {profile?.name || 'Running Candidate'}
+                                                </span>
+                                                <span>{tally} votes ({ratio}%)</span>
+                                            </div>
+                                            <div className="w-full bg-gray-100 dark:bg-gray-700 h-2.5 rounded-full overflow-hidden">
+                                                <div 
+                                                    className={`h-full rounded-full transition-all duration-500 ${idx === 0 && tally > 0 ? 'bg-emerald-500' : 'bg-sky-500'}`}
+                                                    style={{ width: `${ratio}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        <div className="flex justify-end pt-2">
+                            <button
+                                onClick={closeModalsAndResetLocalData}
+                                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold rounded-xl transition-all"
+                            >
+                                Dismiss Window
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL OVERLAY: STATUS ALERTS (UPCOMING/CLOSED WARNINGS) */}
+            {showStatusModal && statusModalConfig && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-5 shadow-xl space-y-3.5 text-center animate-in zoom-in-95 duration-150">
+                        <div className={`p-3 rounded-full max-w-max mx-auto ${statusModalConfig.type === 'upcoming' ? 'bg-amber-50 text-amber-500 dark:bg-amber-950/40' : 'bg-red-50 text-red-500 dark:bg-red-950/40'}`}>
+                            {statusModalConfig.type === 'upcoming' ? <ClockIcon className="w-6 h-6" /> : <AlertIcon className="w-6 h-6" />}
+                        </div>
+                        
+                        <div>
+                            <h3 className="font-bold text-base text-gray-900 dark:text-white">{statusModalConfig.title}</h3>
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5 leading-relaxed px-2">
+                                {statusModalConfig.message}
+                            </p>
+                        </div>
+
+                        <div className="bg-gray-50 dark:bg-gray-900 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800 text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                            {statusModalConfig.type === 'upcoming' ? 'Opens: ' : 'Closed: '}
+                            {formatDateTime(statusModalConfig.date)}
+                        </div>
+
+                        <button
+                            onClick={closeModalsAndResetLocalData}
+                            className="w-full py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold rounded-xl transition-all"
+                        >
+                            Understood
+                        </button>
                     </div>
                 </div>
             )}
