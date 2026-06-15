@@ -35,11 +35,14 @@ const Gallery: React.FC<GalleryProps> = ({ currentUser }) => {
     }
   };
 
+  const isPatron = currentUser.role === 'PATRON';
+
   useEffect(() => {
     loadGalleryItems();
   }, []);
 
   const handleFileChange = (file: File | null) => {
+    if (!isPatron) return;
     setSelectedFile(file);
     if (file) {
       setErrorMessage(null);
@@ -54,6 +57,11 @@ const Gallery: React.FC<GalleryProps> = ({ currentUser }) => {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage(null);
+
+    if (!isPatron) {
+      setErrorMessage('Only patrons can upload images.');
+      return;
+    }
 
     if (!selectedFile) {
       setErrorMessage('Please upload an image to add to the gallery.');
@@ -119,14 +127,16 @@ const Gallery: React.FC<GalleryProps> = ({ currentUser }) => {
           <div className="space-y-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Upload an image</label>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <label className="inline-flex items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:border-sky-400 hover:text-sky-600">
+              <label className={`inline-flex items-center justify-center gap-2 rounded-2xl border border-dashed ${isPatron ? 'border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-sky-400 hover:text-sky-600 cursor-pointer' : 'border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 text-gray-400 cursor-not-allowed'}`}>
                 <CameraIcon className="w-5 h-5" />
                 <span>{selectedFile ? 'Change image' : 'Select image'}</span>
                 <input
                   type="file"
                   accept="image/*"
                   className="hidden"
+                  disabled={!isPatron}
                   onChange={(event) => {
+                    if (!isPatron) return;
                     const file = event.target.files?.[0] || null;
                     handleFileChange(file);
                   }}
@@ -158,8 +168,8 @@ const Gallery: React.FC<GalleryProps> = ({ currentUser }) => {
             <p className="text-xs text-gray-500 dark:text-gray-400">Only patrons can add gallery images. Images are stored immediately on upload.</p>
             <button
               type="submit"
-              disabled={isSaving}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-sky-600 text-white px-5 py-3 text-sm font-semibold shadow-sm hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              disabled={!isPatron || isSaving}
+              className={`inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold shadow-sm ${isPatron ? 'bg-sky-600 text-white hover:bg-sky-700' : 'bg-slate-300 text-slate-600 cursor-not-allowed'}`}
             >
               <PlusCircleIcon className="w-5 h-5" />
               {isSaving ? 'Uploading...' : 'Add to gallery'}
