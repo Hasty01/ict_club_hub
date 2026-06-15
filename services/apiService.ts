@@ -814,6 +814,54 @@ export const uploadFeedImage = async (file: File): Promise<string> => {
     return publicUrl;
 };
 
+export const getGalleryItems = async (): Promise<GalleryItem[]> => {
+    const { data, error } = await supabase
+        .from('gallery_items')
+        .select(`*, users(uid, name, avatar_url)`)
+        .order('created_at', { ascending: false });
+
+    if (error || !data) return [];
+
+    return data.map((item: any) => ({
+        id: String(item.id),
+        createdAt: item.created_at,
+        userUid: item.user_uid,
+        userName: item.users?.name || 'Unknown',
+        userAvatarUrl: item.users?.avatar_url,
+        imageUrl: item.image_url,
+        title: item.title,
+        description: item.description,
+    }));
+};
+
+export const uploadGalleryImage = async (file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+    const filePath = `gallery/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('feed_images')
+        .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+        .from('feed_images')
+        .getPublicUrl(filePath);
+
+    return publicUrl;
+};
+
+export const addGalleryItem = async (userId: string, title: string, description: string, imageUrl: string) => {
+    const { error } = await supabase.from('gallery_items').insert({
+        user_uid: userId,
+        title,
+        description,
+        image_url: imageUrl,
+    });
+    if (error) throw error;
+};
+
 export const deleteFeedItem = async (id: string) => {
     const { error } = await supabase.from('feed_items').delete().eq('id', id);
     if (error) throw error;

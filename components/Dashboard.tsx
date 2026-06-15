@@ -17,6 +17,7 @@ const CodePlayground = lazy(() => import('./CodePlayground'));
 const Resources = lazy(() => import('./Resources'));
 const Chat = lazy(() => import('./Chat'));
 const Showcase = lazy(() => import('./Showcase'));
+const Gallery = lazy(() => import('./Gallery'));
 const Suggestions = lazy(() => import('./Suggestions'));
 const Challenges = lazy(() => import('./Challenges'));
 const RoadmapView = lazy(() => import('./RoadmapView'));
@@ -221,6 +222,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
                 </TabPanel>
                 <TabPanel active={activeTab === 'projects' && (featureFlags.showProjects || currentUser.role === 'PATRON')}>
                     <ProjectsBoard currentUser={currentUser} />
+                </TabPanel>
+                <TabPanel active={activeTab === 'gallery' && (featureFlags.showGallery || currentUser.role === 'PATRON')}>
+                    <Gallery currentUser={currentUser} />
                 </TabPanel>
                 <TabPanel active={activeTab === 'playground' && (featureFlags.showPlayground || currentUser.role === 'PATRON')} className="h-full">
                     <CodePlayground 

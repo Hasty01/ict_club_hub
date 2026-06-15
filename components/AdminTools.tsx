@@ -128,6 +128,7 @@ const AdminTools: React.FC<AdminToolsProps> = ({ currentUser }) => {
         { key: 'showChallenges', label: 'Challenges', description: 'Member coding challenges and submissions.' },
         { key: 'showSuggestions', label: 'Suggestions', description: 'Feature & bug suggestions board.' },
         { key: 'showShowcase', label: 'Showcase', description: 'Member code showcases.' },
+        { key: 'showGallery', label: 'Gallery', description: 'Image gallery for patrons and club content.' },
         { key: 'showProjects', label: 'Projects', description: 'Project task board.' },
         { key: 'showActivities', label: 'Activities', description: 'Events and RSVPs.' },
         { key: 'showAttendance', label: 'Attendance', description: 'Attendance tracking.' },
