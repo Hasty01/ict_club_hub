@@ -192,6 +192,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onUpdateUserProfile,
         if (!featureFlags.showActivities) disabledTabs.add('activities');
         if (!featureFlags.showAttendance) disabledTabs.add('attendance');
         if (!featureFlags.showProjects) disabledTabs.add('projects');
+        if (!featureFlags.showGallery) disabledTabs.add('gallery');
         if (!featureFlags.showResources) disabledTabs.add('resources');
         if (!featureFlags.showChat) disabledTabs.add('chat');
         if (!featureFlags.showShowcase) disabledTabs.add('showcase');
