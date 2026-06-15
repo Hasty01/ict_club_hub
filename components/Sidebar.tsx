@@ -14,6 +14,7 @@ import { ChevronsLeftIcon } from './icons/ChevronsLeftIcon';
 import { ChevronsRightIcon } from './icons/ChevronsRightIcon';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
+import { CameraIcon } from './icons/CameraIcon';
 import { GlobeIcon } from './icons/GlobeIcon';
 import { LightBulbIcon } from './icons/LightBulbIcon';
 import { TrophyIcon } from './icons/TrophyIcon';
