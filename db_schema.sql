@@ -8,6 +8,7 @@ create table if not exists public.feature_flags (
   show_activities boolean not null default true,
   show_attendance boolean not null default true,
   show_projects boolean not null default true,
+  show_gallery boolean not null default true,
   show_resources boolean not null default true,
   show_chat boolean not null default true,
   show_showcase boolean not null default true,
