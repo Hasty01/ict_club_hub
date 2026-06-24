@@ -815,29 +815,51 @@ export const uploadFeedImage = async (file: File): Promise<string> => {
 };
 
 export const getGalleryItems = async (): Promise<GalleryItem[]> => {
-    const { data, error } = await supabase
+    // 1. Fetch raw items directly without a join statement
+    const { data: galleryData, error: galleryError } = await supabase
         .from('gallery_items')
-        // FIX: Explicitly join via the 'uploaded_by' foreign key column identifier
-        .select(`*, users!uploaded_by(uid, name, avatar_url)`)
+        .select('*')
         .order('created_at', { ascending: false });
 
-    if (error) {
-        console.error("Error fetching gallery items:", error);
+    if (galleryError) {
+        console.error("Error fetching gallery items:", galleryError);
         return [];
     }
-    if (!data) return [];
+    if (!galleryData || galleryData.length === 0) return [];
 
-    return data.map((item: any) => ({
-        id: String(item.id),
-        createdAt: item.created_at,
-        // FIX: Correctly align structural references from database values
-        userUid: item.uploaded_by || item.user_uid, 
-        userName: item.users?.name || 'Club Member',
-        userAvatarUrl: item.users?.avatar_url,
-        imageUrl: item.image_url,
-        title: item.title,
-        description: item.description,
-    }));
+    // 2. Extract unique user IDs to avoid repetitive queries
+    const userUids = Array.from(new Set(galleryData.map((item: any) => item.uploaded_by).filter(Boolean)));
+
+    // 3. Fetch all matching users in one round-trip
+    const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('uid, name, avatar_url')
+        .in('uid', userUids);
+
+    if (usersError) {
+        console.error("Error fetching gallery users:", usersError);
+    }
+
+    // 4. Create a quick lookup map for user profiles
+    const userMap = (usersData || []).reduce((acc: any, user: any) => {
+        acc[user.uid] = user;
+        return acc;
+    }, {});
+
+    // 5. Combine data perfectly back into frontend structures
+    return galleryData.map((item: any) => {
+        const associatedUser = userMap[item.uploaded_by];
+        return {
+            id: String(item.id),
+            createdAt: item.created_at,
+            userUid: item.uploaded_by || item.user_uid,
+            userName: associatedUser?.name || 'Club Member',
+            userAvatarUrl: associatedUser?.avatar_url || null,
+            imageUrl: item.image_url,
+            title: item.title,
+            description: item.description,
+        };
+    });
 };
 export const uploadGalleryImage = async (file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop();
