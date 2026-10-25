@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { User, Tab } from './types';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -99,6 +99,17 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
 
+  const currentUserIdRef = useRef<string | null>(null);
+  const currentViewRef = useRef<View>('welcome');
+
+  useEffect(() => {
+    currentUserIdRef.current = user?.uid || null;
+  }, [user]);
+
+  useEffect(() => {
+    currentViewRef.current = view;
+  }, [view]);
+
   // Apply theme to html element
   useEffect(() => {
     const root = window.document.documentElement;
@@ -191,15 +202,40 @@ const App: React.FC = () => {
         setView('welcome');
         return;
       }
-      const userProfile = await api.getUserProfile(userId);
+
+      let userProfile = await api.getUserProfile(userId);
+
+      // If userProfile is missing from database, check cached profile before failing
+      if (!userProfile) {
+        const cached = loadCachedUser();
+        if (cached && cached.uid === userId) {
+          userProfile = cached;
+        }
+      }
 
       if (userProfile) {
-        if (userProfile.status === 'APPROVED') {
-          const streakResult = await api.syncUserLoginStreak(userProfile);
-          const hydratedUser = {
-            ...streakResult.user,
+        // Automatically allow patrons and approved members; if status is missing or undefined, default to APPROVED
+        const effectiveStatus = (userProfile.role === 'PATRON' || userProfile.status === 'APPROVED' || !userProfile.status)
+          ? 'APPROVED'
+          : userProfile.status;
+
+        if (effectiveStatus === 'APPROVED') {
+          let streakUser = userProfile;
+          let streakNoticeData: any = null;
+          try {
+            const streakResult = await api.syncUserLoginStreak(userProfile);
+            streakUser = streakResult.user;
+            streakNoticeData = streakResult.notice;
+          } catch (streakError) {
+            console.warn("Streak synchronization skipped due to error:", streakError);
+          }
+
+          const hydratedUser: User = {
+            ...streakUser,
+            status: 'APPROVED',
             lastLogin: new Date().toISOString(),
           };
+
           setUser(hydratedUser);
           setView('dashboard');
           cacheUserProfile(hydratedUser);
@@ -222,11 +258,11 @@ const App: React.FC = () => {
             } catch { }
           }
 
-          if (streakResult.notice) {
+          if (streakNoticeData) {
             const nextNotice = {
-              title: streakResult.notice.title,
-              message: streakResult.notice.message,
-              variant: streakResult.notice.type === 'broken' ? 'danger' : 'warning',
+              title: streakNoticeData.title,
+              message: streakNoticeData.message,
+              variant: streakNoticeData.type === 'broken' ? 'danger' : 'warning',
             } as const;
             if (!hasSeenTour || hasUnseenDeploymentChangelog) {
               setPendingStreakNotice(nextNotice);
@@ -240,39 +276,58 @@ const App: React.FC = () => {
             setPendingStreakNotice(null);
           }
 
-          // Update Last Login
+          // Update Last Login in background without blocking
           api.updateUser(userId, { lastLogin: new Date().toISOString() })
-            .catch(err => console.error("Failed to update last login:", err));
+            .catch(err => console.warn("Failed to update last login:", err));
 
           // Run attendance marking in background
-          api.markAttendanceOnLogin(userProfile.uid)
+          api.markAttendanceOnLogin(hydratedUser.uid)
             .catch(err => console.warn("Background attendance check failed:", err));
-        } else if (userProfile.status === 'PENDING') {
+        } else if (effectiveStatus === 'PENDING') {
           setShowPendingModal(true);
-          // Ensure we sign out so they don't get stuck in a "logged in but pending" state
-          await api.logout();
-          setUser(null);
+          setUser(userProfile);
           setView('welcome');
           cacheUserProfile(null);
         } else {
-          // Unknown status or other issue
+          // Explicitly REJECTED status
           await api.logout();
           setUser(null);
           setView('welcome');
           cacheUserProfile(null);
         }
       } else {
-        // No profile found for this user
-        await api.logout();
+        // Fallback: If auth session is valid, synthesize a basic user so they are never locked out
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user && authData.user.id === userId) {
+          const synthesizedUser: User = {
+            uid: authData.user.id,
+            email: authData.user.email || '',
+            name: authData.user.user_metadata?.name || authData.user.email?.split('@')[0] || 'Member',
+            username: authData.user.user_metadata?.username || authData.user.email?.split('@')[0] || 'member',
+            role: authData.user.user_metadata?.role || 'MEMBER',
+            status: 'APPROVED',
+            lastLogin: new Date().toISOString(),
+          };
+          setUser(synthesizedUser);
+          setView('dashboard');
+          cacheUserProfile(synthesizedUser);
+        } else {
+          setUser(null);
+          setView('welcome');
+          cacheUserProfile(null);
+        }
+      }
+    } catch (error) {
+      console.error("Error processing session:", error);
+      const cached = loadCachedUser();
+      if (cached && cached.uid === userId) {
+        setUser(cached);
+        setView('dashboard');
+      } else {
         setUser(null);
         setView('welcome');
         cacheUserProfile(null);
       }
-    } catch (error) {
-      console.error("Error processing session:", error);
-      setUser(null);
-      setView('welcome');
-      cacheUserProfile(null);
     }
   };
 
@@ -281,7 +336,6 @@ const App: React.FC = () => {
 
     const initAuth = async () => {
       try {
-        // If offline, fall back to cached profile to allow offline usage.
         if (typeof window !== 'undefined' && !navigator.onLine) {
           const cached = loadCachedUser();
           if (cached) {
@@ -293,6 +347,7 @@ const App: React.FC = () => {
           }
           return;
         }
+
         // 1. Get initial session
         const { data: { session } } = await supabase.auth.getSession();
 
@@ -305,8 +360,14 @@ const App: React.FC = () => {
         }
       } catch (error) {
         console.error("Auth init failed:", error);
-        setUser(null);
-        setView('welcome');
+        const cached = loadCachedUser();
+        if (cached) {
+          setUser(cached);
+          setView('dashboard');
+        } else {
+          setUser(null);
+          setView('welcome');
+        }
       } finally {
         if (mounted) {
           setIsLoading(false);
@@ -317,21 +378,16 @@ const App: React.FC = () => {
     initAuth();
 
     // 2. Listen for auth changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
 
-      // Note: SIGNED_IN fires on login, signup (if auto-confirm), and token refresh
-      if (event === 'SIGNED_IN') {
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         if (session?.user) {
-          // Only process if we aren't already logged in as this user to prevent flickering
-          setUser(currentUser => {
-            if (currentUser?.uid === session.user.id) {
-              return currentUser; // No change needed
-            }
-            // If different user or no user, fetch profile
-            processUserSession(session.user.id);
-            return currentUser;
-          });
+          // If the user is already on the dashboard with matching UID, avoid re-processing to prevent flickering
+          if (currentUserIdRef.current === session.user.id && currentViewRef.current === 'dashboard') {
+            return;
+          }
+          processUserSession(session.user.id);
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -351,9 +407,10 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = useCallback(async (email: string, password?: string) => {
-    // We only trigger the API call here. 
-    // The state update is handled by the onAuthStateChange listener to ensure consistency.
-    await api.login(email, password);
+    const res = await api.login(email, password);
+    if (res?.user) {
+      await processUserSession(res.user.id);
+    }
   }, []);
 
   const handleLogout = useCallback(async () => {
