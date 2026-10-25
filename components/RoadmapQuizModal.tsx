@@ -9,11 +9,13 @@ import { FormattedMessage } from './FormattedMessage';
 interface RoadmapQuizModalProps {
     isOpen: boolean;
     onClose: () => void;
-    quizQuestions: QuizQuestion[] | null;
-    onPass: () => void;
+    quizQuestions?: QuizQuestion[] | null;
+    questions?: QuizQuestion[] | null;
+    onPass: () => void | Promise<void>;
 }
 
-const RoadmapQuizModal: React.FC<RoadmapQuizModalProps> = ({ isOpen, onClose, quizQuestions, onPass }) => {
+const RoadmapQuizModal: React.FC<RoadmapQuizModalProps> = ({ isOpen, onClose, quizQuestions, questions, onPass }) => {
+    const activeQuestions = quizQuestions || questions || null;
     const [currentIndex, setCurrentIndex] = useState(0);
     const [userAnswer, setUserAnswer] = useState('');
     const [isChecking, setIsChecking] = useState(false);
@@ -61,10 +63,10 @@ const RoadmapQuizModal: React.FC<RoadmapQuizModalProps> = ({ isOpen, onClose, qu
         return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     };
 
-    if (!isOpen || !quizQuestions || quizQuestions.length === 0) return null;
+    if (!isOpen || !activeQuestions || activeQuestions.length === 0) return null;
 
-    const currentQuestion = quizQuestions[currentIndex];
-    const totalQuestions = quizQuestions.length;
+    const currentQuestion = activeQuestions[currentIndex];
+    const totalQuestions = activeQuestions.length;
     const passingScore = Math.ceil(totalQuestions * 0.66); // 2 out of 3 usually
 
     const handleCheckAnswer = async () => {

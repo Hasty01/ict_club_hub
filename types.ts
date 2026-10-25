@@ -377,6 +377,7 @@ export interface Milestone {
 export interface Roadmap {
   id?: string;
   skillLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  skill_level?: string;
   topic: string; // e.g. "Python Basics" or "Data Structures"
   milestones: Milestone[];
   updatedAt?: string;
@@ -428,6 +429,7 @@ export interface VotingVote {
   positionId: string;
   contestantId: string;
   voterId: string;
+  voterUid?: string;
   createdAt: string;
 }
 

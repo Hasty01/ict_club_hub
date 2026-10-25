@@ -31,12 +31,14 @@ const Gallery: React.FC<GalleryProps> = ({ currentUser }) => {
       const data = await api.getGalleryItems();
       
       // FIX: Ensure raw Supabase properties match frontend type expectations
-      const normalizedData = (data || []).map((item: any) => ({
+      const normalizedData: GalleryItem[] = (data || []).map((item: any) => ({
         id: item.id,
         title: item.title,
         description: item.description,
         imageUrl: item.imageUrl || item.image_url, // Maps both camelCase and snake_case
         userName: item.userName || item.profiles?.full_name || 'Club Member', 
+        userUid: item.userUid || item.user_uid || item.userId || item.user_id || '',
+        userAvatarUrl: item.userAvatarUrl || item.user_avatar_url,
         createdAt: item.createdAt || item.created_at
       }));
 

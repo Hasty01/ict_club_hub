@@ -11,7 +11,8 @@
     ],
     "skipLibCheck": true,
     "types": [
-      "node"
+      "node",
+      "vite/client"
     ],
     "moduleResolution": "bundler",
     "isolatedModules": true,
@@ -25,5 +26,24 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": [
+    "App.tsx",
+    "DataContext.tsx",
+    "constants.ts",
+    "deploymentChangelog.ts",
+    "index.tsx",
+    "monacoSetup.ts",
+    "types.ts",
+    "components/**/*",
+    "services/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "supabase",
+    "test-send.ts",
+    "check-rooms.ts",
+    "test.js"
+  ]
 }

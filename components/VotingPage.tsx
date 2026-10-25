@@ -4,7 +4,7 @@ import { VotingPosition, VotingContestant, VotingVote, User } from '../types';
 import { VoteIcon } from './icons/VoteIcon';
 import { UserIcon } from './icons/UserIcon';
 import { PlusCircleIcon as PlusIcon } from './icons/PlusCircleIcon';
-import { HourglassIcon as ClockIcon } from './icons/HourglassIcon';
+import { HourglassIcon, HourglassIcon as ClockIcon } from './icons/HourglassIcon';
 import { ClipboardListIcon } from './icons/ClipboardListIcon';
 import { ChevronRightIcon } from './icons/ChevronRightIcon';
 import { ChartBarIcon as BarChart3Icon } from './icons/ChartBarIcon';

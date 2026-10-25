@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "vite build",
+    "lint": "tsc --noEmit",
     "preview": "vite preview",
     "cap:sync": "npx cap sync",
     "cap:open:android": "npx cap open android",
@@ -23,6 +24,7 @@
     "emmet-monaco-es": "^5.7.0",
     "emoji-picker-react": "^4.9.2",
     "lucide-react": "^1.7.0",
+    "monaco-editor": "^0.49.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^2.12.7",

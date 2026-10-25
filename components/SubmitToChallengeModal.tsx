@@ -216,7 +216,7 @@ const SubmitToChallengeModal: React.FC<SubmitToChallengeModalProps> = ({ isOpen,
                                     {aiFeedback.weaknesses && (
                                         <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-100 dark:border-red-900/20">
                                             <h4 className="text-sm font-bold text-red-900 dark:text-red-400 mb-2 flex items-center gap-2">
-                                                <AlertTriangleIcon className="w-4 h-4" />
+                                                <ExclamationCircleIcon className="w-4 h-4" />
                                                 Areas for Improvement / Missing Requirements
                                             </h4>
                                             <div className="text-sm text-red-800 dark:text-red-300">
@@ -228,7 +228,7 @@ const SubmitToChallengeModal: React.FC<SubmitToChallengeModalProps> = ({ isOpen,
                                     {aiFeedback.improvements && (
                                         <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/20">
                                             <h4 className="text-sm font-bold text-blue-900 dark:text-blue-400 mb-2 flex items-center gap-2">
-                                                <LightbulbIcon className="w-4 h-4" />
+                                                <LightBulbIcon className="w-4 h-4" />
                                                 Suggested Enhancements
                                             </h4>
                                             <div className="text-sm text-blue-800 dark:text-blue-300">

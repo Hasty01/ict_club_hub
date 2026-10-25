@@ -179,7 +179,7 @@ const splitTableRow = (line: string) => {
 const isTableSeparator = (line: string) => /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
 const isTableRow = (line: string) => line.includes('|');
 
-const renderTable = (header: string[], rows: string[][], isUser: boolean, key: number) => {
+const renderTable = (header: string[], rows: string[][], isUser: boolean, key: number | string) => {
     const headBg = isUser ? 'bg-teal-700/30 text-teal-50' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100';
     const cellBorder = isUser ? 'border-teal-400/30' : 'border-gray-200 dark:border-gray-600';
 

@@ -653,6 +653,7 @@ export const DataProvider: React.FC<{ children: ReactNode; currentUser: User | n
       showActivities: row.show_activities,
       showAttendance: row.show_attendance,
       showProjects: row.show_projects,
+      showGallery: row.show_gallery ?? defaultFeatureFlags.showGallery,
       showResources: row.show_resources,
       showChat: row.show_chat,
       showShowcase: row.show_showcase,

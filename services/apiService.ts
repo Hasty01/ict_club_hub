@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { User, Activity, AttendanceRecord, AttendanceStatus, FeedItem, ProjectData, ProjectTask, Resource, AppNotification, Room, ShowcaseItem, GalleryItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab, Roadmap, RoadmapProgress, ShowcaseComment, Message, Team, TeamChallenge, TeamChallengeSubmission, PlaygroundProject, PlaygroundProjectFile, PlaygroundProjectActivity, PlaygroundProjectMember, FeatureFlags, GameLeaderboardEntry } from '../types';
+import { User, Activity, AttendanceRecord, AttendanceStatus, FeedItem, ProjectData, ProjectTask, Resource, AppNotification, Room, ShowcaseItem, GalleryItem, Suggestion, Challenge, ChallengeSubmission, FeedComment, SuggestionType, SuggestionStatus, SubmissionStatus, ActivityCategory, FeedItemType, TaskPriority, ResourceCategory, ResourceType, Tab, Roadmap, RoadmapProgress, ShowcaseComment, Message, Team, TeamChallenge, TeamChallengeSubmission, PlaygroundProject, PlaygroundProjectFile, PlaygroundProjectActivity, PlaygroundProjectMember, FeatureFlags, GameLeaderboardEntry, VotingPosition, VotingContestant, VotingVote } from '../types';
 
 // --- Helper for Notifications ---
 const insertNotifications = async (notifications: Array<{ user_uid: string; message: string; is_read: boolean; link_to: Tab }>) => {
@@ -79,7 +79,7 @@ const truncateText = (text: string, maxLen: number) => {
     return text.length > maxLen ? `${text.slice(0, maxLen)}…` : text;
 };
 
-export const sendEmail = async (payload: { to: string | string[]; subject: string; html?: string; text?: string }) => {
+export const sendEmail = async (payload: { to: string | string[]; subject?: string; html?: string; text?: string; templateId?: string; templateData?: any }) => {
     const { data, error } = await supabase.functions.invoke('send-email', {
         body: payload
     });
@@ -2502,7 +2502,8 @@ export const getVotingVotes = async (positionId: string): Promise<VotingVote[]> 
     return (data || []).map((row: any) => ({
         id: row.id.toString(),
         positionId: row.position_id.toString(),
-        voterUid: row.voter_uid,
+        voterId: (row.voter_id || row.voter_uid || '').toString(),
+        voterUid: row.voter_uid || row.voter_id,
         contestantId: row.contestant_id.toString(),
         createdAt: row.created_at
     }));

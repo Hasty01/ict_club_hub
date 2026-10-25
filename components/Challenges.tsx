@@ -656,12 +656,12 @@ const ReviewSubmissionsModal: React.FC<{
     };
 
     const handleAnalyze = async (sub: ChallengeSubmission) => {
-        setAnalysis({ isOpen: true, content: '', isLoading: true });
+        setAnalysis({ isOpen: true, content: '', weaknesses: '', improvements: '', passed: null, isLoading: true });
         try {
             const result = await analyzeChallengeSubmission(challengeTitle, sub.content);
-            setAnalysis({ isOpen: true, content: result, isLoading: false });
+            setAnalysis({ isOpen: true, content: result, weaknesses: '', improvements: '', passed: null, isLoading: false });
         } catch (e) {
-            setAnalysis({ isOpen: true, content: "Error analyzing submission. Please ensure your API key is configured.", isLoading: false });
+            setAnalysis({ isOpen: true, content: "Error analyzing submission. Please ensure your API key is configured.", weaknesses: '', improvements: '', passed: null, isLoading: false });
         }
     }
 

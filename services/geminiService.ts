@@ -331,6 +331,7 @@ export const getAiTutorResponse = async (
     message: string,
     clubContext: string = ''
 ) => {
+    let chatMessages: Array<{ role: string; content: string }> = [];
     try {
         const systemPrompt = `You are a friendly, patient, and wise AI Tutor for St. Joseph's SSS Naggalama Secondary school ICT Club. 
         Your goal is to TEACH, not to do the work for the students. 
@@ -345,7 +346,7 @@ export const getAiTutorResponse = async (
         2. Explain concepts specific to the language being used.
         3. Be encouraging and use emojis.`;
 
-        const chatMessages = [
+        chatMessages = [
             { role: "system", content: systemPrompt },
             ...history.map(h => ({
                 role: h.role === 'model' ? 'assistant' : 'user',
